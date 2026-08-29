@@ -1,19 +1,24 @@
+import { useState } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { SecretGateProvider } from '@/features/secrets/SecretGate';
+import { SecretsView } from '@/features/secrets/SecretsView';
 
 export function SecretsPage() {
+  const [addOpen, setAddOpen] = useState(false);
+
   return (
-    <>
-      <TopBar title="Secrets" crumb="02 / MODULE" showWallet={false} />
-      <div className="wrap">
-        <div className="placeholder">
-          <div className="pk">Phase 3</div>
-          <h2>Secrets</h2>
-          <p>
-            The encrypted vault, biometric reveal gate and access log land here. Schema and the
-            encrypt / decrypt RPCs are already migrated.
-          </p>
-        </div>
-      </div>
-    </>
+    <SecretGateProvider>
+      <TopBar
+        title="Secrets"
+        crumb="02 / MODULE"
+        showWallet={false}
+        action={
+          <button className="btn primary" onClick={() => setAddOpen(true)}>
+            Add to vault
+          </button>
+        }
+      />
+      <SecretsView addOpen={addOpen} onAddOpenChange={setAddOpen} />
+    </SecretGateProvider>
   );
 }

@@ -163,5 +163,7 @@ Recurring invoices, payment-gateway integration, contracts / e-sign, per-project
 2. Expenses
    - ✅ **2a** — manual entry, month dashboard (bento), ledger with recategorise + standing rules, accounts wallet (`account_balances` view, migration 0006)
    - **2b** — `gmail` adapter: Edge Function parsing bank-alert emails → `ingest_transactions('gmail', …)`, `pg_cron` schedule, Google OAuth setup
-3. Secrets (vault + encryption + WebAuthn gate)
+3. Secrets
+   - ✅ **3a** — vault list + search, add/edit/delete against `secret_upsert`, gated reveal/copy (`secret_reveal`) with ~20s auto-hide + ~30s clipboard clear, password generator, access log. Reveal gate is client-side for now: platform-authenticator (Touch ID) via WebAuthn or a per-device master PIN.
+   - **3b** — decrypt Edge Function with server-verified WebAuthn challenges against `webauthn_credentials`, issuing the short-lived token the gate is meant to produce.
 4. Freelance (projects → deliverables/assets/time → invoices → PDF)

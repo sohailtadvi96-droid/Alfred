@@ -716,7 +716,39 @@ button {
 .expenses-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.expenses-head .btn {
+  margin-left: auto;
+}
+
+/* ---- flow toggle ---- */
+.flowtoggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.flowtoggle button {
+  padding: 7px 15px;
+  background: var(--surface);
+  border: none;
+  border-left: 1px solid var(--line);
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+.flowtoggle button:first-child {
+  border-left: none;
+}
+.flowtoggle button:hover {
+  color: var(--text);
+}
+.flowtoggle button.on {
+  background: var(--base);
+  color: var(--base-ink);
 }
 .monthnav {
   display: flex;
@@ -745,16 +777,198 @@ button {
   }
 }
 
-/* ---- bento ---- */
+/* ---- dashboard layout: main (total + category grid) | side (income + wallet) ---- */
+.dash-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  align-items: start;
+}
+.dash-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.dash-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (max-width: 1040px) {
+  .dash-layout {
+    grid-template-columns: 1fr;
+  }
+  .dash-side {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .dash-side > * {
+    flex: 1;
+    min-width: 260px;
+  }
+}
+.sumcard {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sumcard-l {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.sumcard-v {
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.sumcard-s {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.catgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 1240px) {
+  .catgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .catgrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.catcard {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--sh-sm);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  min-height: 208px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.catcard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sh);
+}
+.catcard:focus-visible {
+  outline: 2px solid var(--base);
+  outline-offset: 2px;
+}
+.catcard.active {
+  border-color: var(--base);
+  box-shadow: 0 0 0 2px var(--base-soft), var(--sh-sm);
+}
+.catcard.empty {
+  opacity: 0.6;
+}
+.catcard-band {
+  height: 92px;
+  position: relative;
+  padding: 12px 14px;
+}
+.catcard-rank {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.catcard-share {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.catcard-tools {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.catcard:hover .catcard-tools,
+.catcard:focus-within .catcard-tools {
+  opacity: 1;
+}
+.catcard-body {
+  flex: 1;
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-top-left-radius: 18px;
+  margin-top: -18px;
+  position: relative;
+  z-index: 1;
+}
+.catcard-title {
+  font-weight: 800;
+  font-size: 17px;
+}
+.catcard-sub {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+.catcard-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 16px;
+}
+.catcard-big {
+  font-weight: 900;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.catcard-big small {
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-left: 5px;
+}
+.catcard-entries {
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ---- legacy bento (design-system parity; kept for reuse) ---- */
 .bento {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
 }
 .bento-skeleton {
-  height: 168px;
+  height: 200px;
   border: 1px solid var(--line);
-  border-radius: 15px;
+  border-radius: 18px;
   background: var(--surface);
 }
 .dcard {
@@ -1319,4 +1533,264 @@ button {
   .monthnav .mn-label {
     min-width: 0;
   }
+}
+
+/* ============ Secrets module ============ */
+.secrets-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .secrets-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.secrets-banner {
+  margin-bottom: 16px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--base-line);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* ---- vault rows ---- */
+.secret-cell code {
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-all;
+}
+.secret-cell .dots {
+  color: var(--text-faint);
+  letter-spacing: 2px;
+}
+/* keep sensible column proportions; the actions cell must NOT inherit the
+   fixed 34px width the expenses ledger uses for its single-icon column */
+.vault-table {
+  table-layout: fixed;
+}
+.vault-table th:nth-child(1),
+.vault-table td:nth-child(1) {
+  width: 20%;
+}
+.vault-table th:nth-child(2),
+.vault-table td:nth-child(2) {
+  width: 20%;
+}
+.vault-table .secret-cell {
+  width: auto;
+}
+.vault-table .last-revealed {
+  width: 116px;
+  white-space: nowrap;
+}
+.ledger td.vault-actions {
+  width: 172px;
+  text-align: right;
+  padding-left: 6px;
+}
+.vault-actions-inner {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.vault-actions-inner .btn {
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.vault-table .mc a {
+  text-decoration: none;
+}
+.vault-table .mc a:hover {
+  color: var(--base);
+}
+.vault-table .dt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- access log ---- */
+.access-log {
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 16px;
+  background: var(--surface);
+}
+.access-log h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 12px;
+}
+.access-log .al-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.access-log ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.access-log li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  font-size: 12px;
+}
+.access-log .al-act {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.access-log .al-reveal,
+.access-log .al-copy {
+  color: var(--base);
+}
+.access-log .al-delete {
+  color: var(--neg);
+}
+.access-log .al-name {
+  color: var(--text);
+  font-weight: 600;
+}
+.access-log .al-when {
+  grid-column: 2;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+/* ---- reveal gate ---- */
+.gate-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.gate-body form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gate-link {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.gate-link:hover {
+  color: var(--base);
+}
+.gate-note {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+/* ---- secret input + password generator ---- */
+.secret-input {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.secret-input .input {
+  flex: 1;
+}
+textarea.input {
+  resize: vertical;
+  font-family: var(--sans);
+}
+
+.gen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  margin-bottom: 16px;
+}
+.gen-out {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.gen-out code {
+  flex: 1;
+  font-size: 12.5px;
+  word-break: break-all;
+  color: var(--text);
+}
+.gen-meter {
+  display: flex;
+  gap: 4px;
+}
+.gen-meter span {
+  height: 4px;
+  flex: 1;
+  border-radius: 2px;
+  background: var(--line);
+}
+.gen-meter.s1 span:nth-child(-n + 1),
+.gen-meter.s2 span:nth-child(-n + 2),
+.gen-meter.s3 span:nth-child(-n + 3),
+.gen-meter.s4 span:nth-child(-n + 4) {
+  background: var(--base);
+}
+.gen-meter-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-top: -4px;
+}
+.gen-len {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.gen-len input[type='range'] {
+  flex: 1;
+  accent-color: var(--base);
+}
+.gen-classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.gen-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.gen-check input {
+  accent-color: var(--base);
 }

@@ -56,11 +56,18 @@ export interface NewTransaction {
   note: string | null;
 }
 
+export interface CategoryTotal {
+  category: string;
+  direction: Direction;
+  cents: number;
+  count: number;
+}
+
 export interface MonthSummary {
   month: string;
   spendCents: number;
   incomeCents: number;
   prevSpendCents: number;
-  byCategory: { category: string; cents: number }[];
+  byCategory: CategoryTotal[];
   count: number;
 }

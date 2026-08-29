@@ -67,16 +67,17 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
   if (e1) throw e1;
   if (e2) throw e2;
 
-  const byCat = new Map<string, number>();
+  const byCat = new Map<string, { direction: Direction; cents: number; count: number }>();
   let spend = 0;
   let income = 0;
   for (const r of (curRows ?? []) as { amount_cents: number; direction: Direction; category: string }[]) {
-    if (r.direction === 'debit') {
-      spend += r.amount_cents;
-      byCat.set(r.category, (byCat.get(r.category) ?? 0) + r.amount_cents);
-    } else {
-      income += r.amount_cents;
-    }
+    if (r.direction === 'debit') spend += r.amount_cents;
+    else income += r.amount_cents;
+    const key = `${r.direction}:${r.category}`;
+    const e = byCat.get(key) ?? { direction: r.direction, cents: 0, count: 0 };
+    e.cents += r.amount_cents;
+    e.count += 1;
+    byCat.set(key, e);
   }
   let prevSpend = 0;
   for (const r of (prevRows ?? []) as { amount_cents: number; direction: Direction }[]) {
@@ -90,7 +91,12 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
     prevSpendCents: prevSpend,
     count: curRows?.length ?? 0,
     byCategory: [...byCat.entries()]
-      .map(([category, cents]) => ({ category, cents }))
+      .map(([key, v]) => ({
+        category: key.slice(key.indexOf(':') + 1),
+        direction: v.direction,
+        cents: v.cents,
+        count: v.count,
+      }))
       .sort((a, b) => b.cents - a.cents),
   };
 }

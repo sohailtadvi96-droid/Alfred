@@ -1,24 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 
-/** Staggered rise-in for a grid of cards. Children set style={{ ['--i' as any]: n }}. */
+/** Staggered rise-in for a grid of cards. Children set style={{ ['--i' as any]: n }}.
+ *  Once the entrance finishes it drops the animation classes so per-child
+ *  transitions (hover, etc.) are no longer overridden. */
 export function SeatedEnter({
   children,
   className,
+  count = 12,
 }: {
   children: React.ReactNode;
   className?: string;
+  count?: number;
 }) {
-  const [play, setPlay] = useState(false);
+  const [phase, setPhase] = useState<'idle' | 'play' | 'done'>('idle');
   const raf = useRef(0);
+  const timer = useRef(0);
 
   useEffect(() => {
-    raf.current = requestAnimationFrame(() => setPlay(true));
-    return () => cancelAnimationFrame(raf.current);
-  }, []);
+    raf.current = requestAnimationFrame(() => setPhase('play'));
+    timer.current = window.setTimeout(() => setPhase('done'), 800 + count * 70 + 200);
+    return () => {
+      cancelAnimationFrame(raf.current);
+      clearTimeout(timer.current);
+    };
+  }, [count]);
 
-  return (
-    <div className={`seated-enter${play ? ' play' : ''}${className ? ` ${className}` : ''}`}>
-      {children}
-    </div>
-  );
+  const cls =
+    phase === 'done'
+      ? className
+      : `seated-enter${phase === 'play' ? ' play' : ''}${className ? ` ${className}` : ''}`;
+
+  return <div className={cls}>{children}</div>;
 }
