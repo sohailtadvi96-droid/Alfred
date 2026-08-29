@@ -1,19 +1,54 @@
+import { useState } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { money, monthKey } from '@/lib/format';
+import { useAccountBalances } from '@/features/expenses/hooks';
+import { MonthNav } from '@/features/expenses/MonthNav';
+import { MonthDashboard } from '@/features/expenses/MonthDashboard';
+import { AccountsWallet } from '@/features/expenses/AccountsWallet';
+import { TransactionList } from '@/features/expenses/TransactionList';
+import { AddTransactionDialog } from '@/features/expenses/AddTransactionDialog';
+import type { TxnFilter } from '@/features/expenses/api';
 
 export function ExpensesPage() {
+  const [month, setMonth] = useState(monthKey());
+  const [addOpen, setAddOpen] = useState(false);
+  const [filter, setFilter] = useState<Omit<TxnFilter, 'month'>>({});
+  const { data: balances } = useAccountBalances();
+
+  const total = (balances ?? []).reduce((s, a) => s + a.balance_cents, 0);
+
   return (
     <>
-      <TopBar title="Expenses" crumb="01 / MODULE" />
-      <div className="wrap">
-        <div className="placeholder">
-          <div className="pk">Phase 2</div>
-          <h2>Expenses</h2>
-          <p>
-            Manual entry, the Gmail ingestion adapter, rule-based categorisation and the month
-            dashboard land here. Schema is already migrated.
-          </p>
+      <TopBar
+        title="Expenses"
+        crumb="01 / MODULE"
+        walletValue={balances && balances.length > 0 ? money(total, true) : '—'}
+        onWalletAdd={() => setAddOpen(true)}
+        action={
+          <button className="btn primary" onClick={() => setAddOpen(true)}>
+            Add transaction
+          </button>
+        }
+      />
+      <div className="wrap expenses">
+        <div className="expenses-head">
+          <MonthNav month={month} onChange={setMonth} />
+        </div>
+
+        <MonthDashboard month={month} />
+
+        <div className="expenses-grid">
+          <TransactionList
+            filter={{ ...filter, month }}
+            onFilterChange={(f) =>
+              setFilter({ category: f.category, direction: f.direction, accountId: f.accountId })
+            }
+          />
+          <AccountsWallet />
         </div>
       </div>
+
+      <AddTransactionDialog open={addOpen} onOpenChange={setAddOpen} />
     </>
   );
 }

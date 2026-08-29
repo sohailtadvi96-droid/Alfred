@@ -159,7 +159,9 @@ Recurring invoices, payment-gateway integration, contracts / e-sign, per-project
 - No suggestions engine, no chatbot.
 
 ## Build phases
-1. Scaffold + Supabase schema + **login/auth** + app shell + design system
-2. Expenses — manual entry + ingestion pipeline (`ingest_transactions` RPC, dedupe, categorization), then the `gmail` adapter (Edge Function + `pg_cron` + Google OAuth setup)
+1. ✅ Scaffold + Supabase schema + login/auth + app shell + design system
+2. Expenses
+   - ✅ **2a** — manual entry, month dashboard (bento), ledger with recategorise + standing rules, accounts wallet (`account_balances` view, migration 0006)
+   - **2b** — `gmail` adapter: Edge Function parsing bank-alert emails → `ingest_transactions('gmail', …)`, `pg_cron` schedule, Google OAuth setup
 3. Secrets (vault + encryption + WebAuthn gate)
 4. Freelance (projects → deliverables/assets/time → invoices → PDF)

@@ -5,11 +5,17 @@ export function TopBar({
   crumb = 'ALFRED',
   action,
   showWallet = true,
+  walletLabel = 'Bal',
+  walletValue = '—',
+  onWalletAdd,
 }: {
   title: string;
   crumb?: string;
   action?: ReactNode;
   showWallet?: boolean;
+  walletLabel?: string;
+  walletValue?: string;
+  onWalletAdd?: () => void;
 }) {
   return (
     <div className="topbar">
@@ -19,10 +25,22 @@ export function TopBar({
       </div>
       <div className="tr">
         {showWallet && (
-          <div className="wchip" data-tip="Balances arrive with the Expenses build" role="group" aria-label="Wallet">
-            <span className="wc-l">Bal</span>
-            <span className="wc-v">—</span>
-            <button className="wc-b" type="button" aria-label="Add a transaction" data-tip="Add a transaction" disabled>
+          <div
+            className="wchip"
+            data-tip={onWalletAdd ? 'Across accounts' : 'Balances arrive with the Expenses build'}
+            role="group"
+            aria-label="Wallet"
+          >
+            <span className="wc-l">{walletLabel}</span>
+            <span className="wc-v">{walletValue}</span>
+            <button
+              className="wc-b"
+              type="button"
+              aria-label="Add a transaction"
+              data-tip="Add a transaction"
+              onClick={onWalletAdd}
+              disabled={!onWalletAdd}
+            >
               +
             </button>
           </div>
