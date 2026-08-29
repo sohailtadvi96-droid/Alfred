@@ -167,3 +167,5 @@ Recurring invoices, payment-gateway integration, contracts / e-sign, per-project
    - ✅ **3a** — vault list + search, add/edit/delete against `secret_upsert`, gated reveal/copy (`secret_reveal`) with ~20s auto-hide + ~30s clipboard clear, password generator, access log. Reveal gate is client-side for now: platform-authenticator (Touch ID) via WebAuthn or a per-device master PIN.
    - **3b** — decrypt Edge Function with server-verified WebAuthn challenges against `webauthn_credentials`, issuing the short-lived token the gate is meant to produce.
 4. Freelance (projects → deliverables/assets/time → invoices → PDF)
+   - ✅ **4a** — Work page with Freelance / Office-work category toggle; project list + detail; project form with inline client create; assets checklist, deliverables (with due/overdue), time log + running total, earnings summary (effective hourly). Routes `/work`, `/work/:projectId`.
+   - **4b** — invoice builder from a project (line items, flat tax, notes, client billing block), `ALF-YYYY-####` via `next_invoice_number()`, statuses, global invoice list, print-styled PDF export.

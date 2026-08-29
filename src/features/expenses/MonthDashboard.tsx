@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { money } from '@/lib/format';
-import { readableInk } from '@/lib/color';
 import { SeatedEnter } from '@/components/SeatedEnter';
 import { CategoryCard } from './CategoryCard';
+import { EditCategoryDialog } from './EditCategoryDialog';
 import { AccountsWallet } from './AccountsWallet';
 import { useCategories, useMonthSummary } from './hooks';
-import type { Direction } from './categories';
+import type { Category, Direction } from './categories';
 import type { TxnFilter } from './api';
 
 export function MonthDashboard({
@@ -19,6 +20,7 @@ export function MonthDashboard({
   const { data, isLoading } = useMonthSummary(month);
   const cats = useCategories();
   const flow = filter.direction;
+  const [editCat, setEditCat] = useState<Category | null>(null);
 
   if (isLoading || !data) {
     return <div className="bento-skeleton" aria-busy="true" />;
@@ -27,6 +29,9 @@ export function MonthDashboard({
   const { spendCents, incomeCents, prevSpendCents, count } = data;
   const delta =
     prevSpendCents > 0 ? Math.round(((spendCents - prevSpendCents) / prevSpendCents) * 100) : null;
+  const creditCount = data.byCategory
+    .filter((c) => c.direction === 'credit')
+    .reduce((s, c) => s + c.count, 0);
 
   const totals = new Map(data.byCategory.map((c) => [`${c.direction}:${c.category}`, c]));
   const denom = (d: Direction) => (d === 'credit' ? incomeCents : spendCents);
@@ -73,6 +78,7 @@ export function MonthDashboard({
                 sharePct={d > 0 ? Math.round((cents / d) * 100) : 0}
                 active={filter.category === cat.slug}
                 onToggle={() => toggleCategory(cat.slug, cat.direction)}
+                onEdit={() => setEditCat(cat)}
               />
             );
           })}
@@ -80,25 +86,20 @@ export function MonthDashboard({
       </div>
 
       <div className="dash-side">
-        <div
-          className="sumcard"
-          style={{
-            background: cats.color('refund', 'credit'),
-            color: readableInk(cats.color('refund', 'credit')),
-            borderColor: 'transparent',
-          }}
-        >
-          <span className="sumcard-l" style={{ opacity: 0.8 }}>
-            Income · this month
+        <div className="sumcard sumcard-income">
+          <span className="sumcard-l">Income · this month</span>
+          <span className="sumcard-v" style={{ color: 'var(--pos)' }}>
+            {money(incomeCents, true)}
           </span>
-          <span className="sumcard-v">{money(incomeCents, true)}</span>
-          <span className="sumcard-s" style={{ opacity: 0.8 }}>
-            credits
+          <span className="sumcard-s">
+            {creditCount} credit{creditCount === 1 ? '' : 's'}
           </span>
         </div>
 
         <AccountsWallet />
       </div>
+
+      {editCat && <EditCategoryDialog cat={editCat} onClose={() => setEditCat(null)} />}
     </div>
   );
 }

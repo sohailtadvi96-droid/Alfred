@@ -14,6 +14,24 @@ export function money(cents: number, whole = false): string {
   return (whole ? inrWhole : inr).format(cents / 100);
 }
 
+const moneyFmtCache = new Map<string, Intl.NumberFormat>();
+
+/** cents -> currency string for an arbitrary ISO code (projects/invoices
+ *  carry their own currency; Expenses stays INR-only via `money`). */
+export function moneyIn(cents: number, currency: string, whole = false): string {
+  const key = `${currency}:${whole}`;
+  let fmt = moneyFmtCache.get(key);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: currency || 'INR',
+      maximumFractionDigits: whole ? 0 : 2,
+    });
+    moneyFmtCache.set(key, fmt);
+  }
+  return fmt.format(cents / 100);
+}
+
 /** cents -> "−₹1,234.00" / "+₹1,234.00" for a debit/credit */
 export function signedMoney(cents: number, direction: 'debit' | 'credit', whole = false): string {
   const sign = direction === 'credit' ? '+' : '−';

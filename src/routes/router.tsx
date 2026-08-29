@@ -3,8 +3,10 @@ import { AppShell } from '@/components/AppShell';
 import { RequireAuth } from '@/auth/RequireAuth';
 import { LoginPage } from '@/auth/LoginPage';
 import { ExpensesPage } from './ExpensesPage';
+import { TransactionsPage } from './TransactionsPage';
 import { SecretsPage } from './SecretsPage';
 import { WorkPage } from './WorkPage';
+import { ProjectDetailPage } from './ProjectDetailPage';
 import { SettingsPage } from './SettingsPage';
 
 export const router = createBrowserRouter([
@@ -19,8 +21,10 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/expenses" replace /> },
       { path: 'expenses', element: <ExpensesPage /> },
+      { path: 'expenses/transactions', element: <TransactionsPage /> },
       { path: 'secrets', element: <SecretsPage /> },
       { path: 'work', element: <WorkPage /> },
+      { path: 'work/:projectId', element: <ProjectDetailPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
   },

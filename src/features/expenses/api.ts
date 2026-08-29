@@ -34,6 +34,22 @@ export async function addTransaction(input: NewTransaction): Promise<void> {
   if (error) throw error;
 }
 
+/** Bank-statement CSV import — the `statement` ingestion adapter.
+ *  rows are NormalizedRow objects from features/expenses/csv.ts.
+ *  Returns the number newly inserted (duplicates are skipped server-side). */
+export async function importStatementRows(
+  rows: Record<string, unknown>[],
+  accountId: string | null,
+): Promise<number> {
+  const payload = accountId ? rows.map((r) => ({ ...r, account_id: accountId })) : rows;
+  const { data, error } = await supabase.rpc('ingest_transactions', {
+    p_source_type: 'statement',
+    p_rows: payload,
+  });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
 export async function updateTransaction(
   id: string,
   patch: Partial<Pick<Transaction, 'category' | 'note' | 'account_id' | 'merchant_raw'>>,

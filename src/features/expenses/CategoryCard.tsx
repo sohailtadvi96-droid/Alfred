@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react';
 import { money } from '@/lib/format';
 import { readableInk } from '@/lib/color';
+import { Icon } from '@/components/Icon';
 import { CategoryColorButton } from './CategoryColorButton';
 import type { Category } from './categories';
 
@@ -11,6 +13,7 @@ export function CategoryCard({
   sharePct,
   active,
   onToggle,
+  onEdit,
   style,
 }: {
   cat: Category;
@@ -20,10 +23,16 @@ export function CategoryCard({
   sharePct: number;
   active: boolean;
   onToggle: () => void;
-  style?: React.CSSProperties;
+  onEdit: () => void;
+  style?: CSSProperties;
 }) {
   const ink = readableInk(cat.color);
   const empty = count === 0;
+
+  const bandStyle = {
+    '--band': `linear-gradient(135deg, ${cat.color}, color-mix(in srgb, ${cat.color} 60%, #000))`,
+    color: ink,
+  } as CSSProperties;
 
   return (
     <div
@@ -41,20 +50,21 @@ export function CategoryCard({
       }}
       data-tip={active ? 'Showing this category — click to clear' : 'Filter the ledger to this category'}
     >
-      <div
-        className="catcard-band"
-        style={{
-          background: `linear-gradient(135deg, ${cat.color}, color-mix(in srgb, ${cat.color} 62%, #000))`,
-          color: ink,
-        }}
-      >
+      <div className="catcard-band" style={bandStyle}>
         <span className="catcard-rank">{String(rank).padStart(2, '0')}</span>
         <div className="catcard-tools" onClick={(e) => e.stopPropagation()}>
           <CategoryColorButton cat={cat} />
+          <button
+            type="button"
+            className="cat-edit"
+            onClick={onEdit}
+            data-tip="Edit category"
+            aria-label={`Edit ${cat.label}`}
+          >
+            <Icon name="pencil" size={12} />
+          </button>
         </div>
-        <span className="catcard-share" style={{ color: ink }}>
-          {empty ? '—' : `${sharePct}% of month`}
-        </span>
+        <span className="catcard-share">{empty ? '—' : `${sharePct}% of month`}</span>
       </div>
 
       <div className="catcard-body">
@@ -64,7 +74,7 @@ export function CategoryCard({
         <div className="catcard-foot">
           <span className="catcard-big">
             {money(spentCents, true)}
-            <small>spent</small>
+            <small>{cat.direction === 'credit' ? 'in' : 'spent'}</small>
           </span>
           <span className="catcard-entries">
             {count} {count === 1 ? 'entry' : 'entries'}

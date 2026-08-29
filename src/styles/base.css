@@ -836,6 +836,12 @@ button {
   font-size: 11px;
   color: var(--text-dim);
 }
+.sumcard-income {
+  border-left: 3px solid var(--pos);
+}
+.sumcard-income .sumcard-l {
+  color: var(--pos);
+}
 
 .catgrid {
   display: grid;
@@ -853,6 +859,24 @@ button {
   }
 }
 
+@keyframes catcard-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.96);
+  }
+}
+@keyframes active-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--base-soft), var(--sh-sm);
+  }
+  60% {
+    box-shadow: 0 0 0 8px transparent, var(--sh-sm);
+  }
+  100% {
+    box-shadow: 0 0 0 2px var(--base-soft), var(--sh-sm);
+  }
+}
+
 .catcard {
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -863,11 +887,20 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 208px;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  will-change: transform;
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    border-color 0.16s ease;
 }
 .catcard:hover {
-  transform: translateY(-2px);
+  transform: translateY(-8px) scale(1.025);
   box-shadow: var(--sh);
+  border-color: var(--base-line);
+}
+.catcard:active {
+  transform: translateY(-3px) scale(1.005);
+  transition-duration: 0.09s;
 }
 .catcard:focus-visible {
   outline: 2px solid var(--base);
@@ -875,15 +908,30 @@ button {
 }
 .catcard.active {
   border-color: var(--base);
+  animation: active-pulse 0.5s ease;
   box-shadow: 0 0 0 2px var(--base-soft), var(--sh-sm);
 }
+.catcard.active:hover {
+  box-shadow: 0 0 0 2px var(--base-soft), var(--sh);
+}
 .catcard.empty {
-  opacity: 0.6;
+  opacity: 0.55;
+}
+.catcard.empty:hover {
+  opacity: 0.85;
 }
 .catcard-band {
   height: 92px;
   position: relative;
   padding: 12px 14px;
+  background-image: var(--band);
+  background-size: 180% 180%;
+  background-position: 0% 0%;
+  transition: background-position 0.5s ease, filter 0.25s ease;
+}
+.catcard:hover .catcard-band {
+  background-position: 100% 100%;
+  filter: brightness(1.08) saturate(1.06);
 }
 .catcard-rank {
   font-family: var(--mono);
@@ -905,12 +953,33 @@ button {
   position: absolute;
   top: 10px;
   right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transform: translateY(-3px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
 }
 .catcard:hover .catcard-tools,
 .catcard:focus-within .catcard-tools {
   opacity: 1;
+  transform: translateY(0);
+}
+.cat-edit {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.cat-edit:hover {
+  background: rgba(0, 0, 0, 0.45);
 }
 .catcard-body {
   flex: 1;
@@ -957,6 +1026,141 @@ button {
   font-size: 13px;
   color: var(--text-dim);
   white-space: nowrap;
+}
+/* ---- jump to the full ledger (arrow only) ---- */
+.txn-arrow {
+  align-self: flex-end;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--base);
+  color: var(--base-ink);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 24px;
+  text-decoration: none;
+  box-shadow: var(--sh-sm);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), filter 0.14s ease, box-shadow 0.16s ease;
+}
+.txn-arrow:hover {
+  transform: translateX(5px) scale(1.06);
+  filter: brightness(1.06);
+  box-shadow: var(--sh);
+}
+.txn-arrow:focus-visible {
+  outline: 2px solid var(--base);
+  outline-offset: 3px;
+}
+
+/* ---- CSV import dialog ---- */
+.csv-drop {
+  width: 100%;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  cursor: pointer;
+}
+.csv-drop:hover {
+  border-color: var(--base-line);
+}
+.csv-drop-t {
+  font-weight: 800;
+  font-size: 15px;
+}
+.csv-drop-s {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.csv-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+.csv-map {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+  margin-top: 4px;
+}
+.csv-map .field {
+  margin-bottom: 0;
+}
+.csv-map .field label .hint {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-faint);
+}
+.csv-preview {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.csv-preview-h {
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+.csv-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.csv-preview td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text-dim);
+}
+.csv-preview tr:last-child td {
+  border-bottom: none;
+}
+.csv-desc {
+  color: var(--text);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.csv-amt {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.csv-amt.in {
+  color: var(--pos);
+}
+.csv-warn {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--neg);
+  margin: 0;
+}
+.csv-result {
+  text-align: center;
+  padding: 12px 0;
+}
+.csv-result-big {
+  font-weight: 900;
+  font-size: 44px;
+  color: var(--base);
+}
+.csv-result p {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 8px 0 0;
 }
 
 /* ---- legacy bento (design-system parity; kept for reuse) ---- */
@@ -1099,6 +1303,14 @@ button {
   font-weight: 700;
   font-size: 12.5px;
   box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.18);
+  position: relative;
+  z-index: 1;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
+}
+.wallet .acct:hover {
+  transform: translateY(-14px);
+  z-index: 8;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.34), 0 -3px 10px rgba(0, 0, 0, 0.18);
 }
 .wallet .acct .bal {
   font-family: var(--mono);
@@ -1536,11 +1748,19 @@ button {
 }
 
 /* ============ Secrets module ============ */
+.secrets-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
 .secrets-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
   gap: 20px;
   align-items: start;
+}
+.secrets-grid.no-log {
+  grid-template-columns: 1fr;
 }
 @media (max-width: 900px) {
   .secrets-grid {
@@ -1793,4 +2013,340 @@ textarea.input {
 }
 .gen-check input {
   accent-color: var(--base);
+}
+
+/* ============ Work module ============ */
+.wrap.work {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ---- category toggle (Freelance | Office work) ---- */
+.work-cat {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.work-cat button {
+  padding: 8px 18px;
+  background: var(--surface);
+  border: none;
+  border-left: 1px solid var(--line);
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+.work-cat button:first-child {
+  border-left: none;
+}
+.work-cat button:hover {
+  color: var(--text);
+}
+.work-cat button.on {
+  background: var(--base);
+  color: var(--base-ink);
+}
+
+/* ---- project grid ---- */
+.work-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.work-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.14s ease, transform 0.14s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.14s ease;
+}
+.work-card:hover {
+  border-color: var(--base-line);
+  transform: translateY(-2px);
+  box-shadow: var(--sh-sm);
+}
+.work-card:focus-visible {
+  outline: 2px solid var(--base);
+  outline-offset: 2px;
+}
+.work-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.work-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--st, var(--text-dim));
+}
+.work-status::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--st, var(--text-dim));
+}
+.work-card-cur {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.work-card-name {
+  font-size: 16px;
+  font-weight: 800;
+}
+.work-card-client {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.work-card-foot {
+  margin-top: auto;
+  padding-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.work-card-rate {
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.work-card-due {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* ---- project detail ---- */
+.work-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.work-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.work-detail-title {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.work-detail-title h2 {
+  font-size: 26px;
+}
+.work-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.work-detail-desc {
+  margin: 4px 0 0;
+  max-width: 60ch;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.work-detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ---- earnings summary ---- */
+.work-earn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  border: 1px solid var(--base-line);
+  border-radius: 15px;
+  background: var(--base-soft);
+  min-height: 84px;
+}
+.work-earn-l {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.work-earn-v {
+  font-weight: 900;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.work-earn-s {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ---- sections (deliverables / assets / time) ---- */
+.work-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.work-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+}
+.work-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.work-section-head h3 {
+  font-size: 14px;
+  font-weight: 800;
+}
+.work-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.work-list {
+  display: flex;
+  flex-direction: column;
+}
+.work-empty {
+  padding: 14px 4px;
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+.work-empty code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.work-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.work-row:first-child {
+  border-top: none;
+}
+.work-check {
+  display: flex;
+  align-items: center;
+  padding-top: 1px;
+}
+.work-check input {
+  accent-color: var(--base);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+.work-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.work-row-label {
+  font-size: 13px;
+  color: var(--text);
+}
+.work-row.done .work-row-label {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.work-row-note {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.work-row-note.overdue {
+  color: var(--neg);
+  font-weight: 600;
+}
+.work-time-date {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding-top: 2px;
+  white-space: nowrap;
+  width: 88px;
+  flex-shrink: 0;
+}
+
+/* ---- inline add rows ---- */
+.work-add {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 4px;
+}
+.work-add .input {
+  flex: 1;
+  min-width: 120px;
+}
+.work-add .btn {
+  flex-shrink: 0;
+}
+.work-add.time .input[type='date'] {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* ---- inline "new client" block in the project dialog ---- */
+.work-newclient {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.work-newclient .field-row {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .work-detail-head {
+    flex-direction: column;
+  }
+  .work-sections {
+    grid-template-columns: 1fr;
+  }
 }

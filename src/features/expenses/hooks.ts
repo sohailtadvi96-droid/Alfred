@@ -93,6 +93,15 @@ export function useAddTransaction() {
   });
 }
 
+export function useImportStatement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ rows, accountId }: { rows: Record<string, unknown>[]; accountId: string | null }) =>
+      api.importStatementRows(rows, accountId),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
 export function useUpdateTransaction() {
   const qc = useQueryClient();
   return useMutation({

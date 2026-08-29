@@ -10,6 +10,7 @@ import type { Secret } from './types';
 
 const REVEAL_HIDE_MS = 20_000;
 const CLIPBOARD_CLEAR_MS = 30_000;
+const LOG_PREF_KEY = 'alfred.secrets.showLog';
 
 export function SecretsView({
   addOpen,
@@ -27,6 +28,21 @@ export function SecretsView({
   const [rows, setRows] = useState<Record<string, VaultRowState>>({});
   const [edit, setEdit] = useState<EditTarget | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  const [showLog, setShowLog] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(LOG_PREF_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOG_PREF_KEY, showLog ? '1' : '0');
+    } catch {
+      /* storage disabled — preference just won't persist */
+    }
+  }, [showLog]);
 
   const hideTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const clipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,7 +133,18 @@ export function SecretsView({
     <div className="wrap secrets">
       {banner && <div className="secrets-banner">{banner}</div>}
 
-      <div className="secrets-grid">
+      <div className="secrets-toolbar">
+        <button
+          className="btn ghost sm"
+          type="button"
+          aria-pressed={showLog}
+          onClick={() => setShowLog((v) => !v)}
+        >
+          {showLog ? 'Hide access log' : 'Show access log'}
+        </button>
+      </div>
+
+      <div className={`secrets-grid${showLog ? '' : ' no-log'}`}>
         <VaultList
           secrets={secrets}
           isLoading={isLoading}
@@ -129,7 +156,7 @@ export function SecretsView({
           onEdit={doEdit}
           onDelete={doDelete}
         />
-        <AccessLogPanel secrets={secrets} />
+        {showLog && <AccessLogPanel secrets={secrets} />}
       </div>
 
       <SecretFormDialog open={addOpen} onOpenChange={onAddOpenChange} />

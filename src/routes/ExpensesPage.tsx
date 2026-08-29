@@ -1,23 +1,25 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
-import { money, monthKey } from '@/lib/format';
+import { money } from '@/lib/format';
 import { useAccountBalances } from '@/features/expenses/hooks';
+import { useExpenseFilters } from '@/features/expenses/useExpenseFilters';
 import { MonthNav } from '@/features/expenses/MonthNav';
 import { FlowToggle } from '@/features/expenses/FlowToggle';
 import { MonthDashboard } from '@/features/expenses/MonthDashboard';
-import { TransactionList } from '@/features/expenses/TransactionList';
 import { AddTransactionDialog } from '@/features/expenses/AddTransactionDialog';
 import { AddCategoryDialog } from '@/features/expenses/AddCategoryDialog';
-import type { TxnFilter } from '@/features/expenses/api';
+import { ImportCsvDialog } from '@/features/expenses/ImportCsvDialog';
 
 export function ExpensesPage() {
-  const [month, setMonth] = useState(monthKey());
+  const { month, flow, filter, search, setMonth, setFlow, patch } = useExpenseFilters();
   const [addOpen, setAddOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
-  const [filter, setFilter] = useState<Omit<TxnFilter, 'month'>>({});
+  const [importOpen, setImportOpen] = useState(false);
   const { data: balances } = useAccountBalances();
 
   const total = (balances ?? []).reduce((s, a) => s + a.balance_cents, 0);
+  const txnHref = { pathname: '/expenses/transactions', search: search ? `?${search}` : '' };
 
   return (
     <>
@@ -27,35 +29,40 @@ export function ExpensesPage() {
         walletValue={balances && balances.length > 0 ? money(total, true) : '—'}
         onWalletAdd={() => setAddOpen(true)}
         action={
-          <button className="btn primary" onClick={() => setAddOpen(true)}>
-            Add transaction
-          </button>
+          <>
+            <button className="btn sec" onClick={() => setImportOpen(true)}>
+              Import CSV
+            </button>
+            <button className="btn primary" onClick={() => setAddOpen(true)}>
+              Add transaction
+            </button>
+          </>
         }
       />
       <div className="wrap expenses">
         <div className="expenses-head">
           <MonthNav month={month} onChange={setMonth} />
-          <FlowToggle
-            value={filter.direction}
-            onChange={(dir) => setFilter((f) => ({ ...f, direction: dir, category: undefined }))}
-          />
+          <FlowToggle value={flow} onChange={setFlow} />
           <button className="btn sec sm" onClick={() => setCatOpen(true)}>
             Add category
           </button>
         </div>
 
-        <MonthDashboard month={month} filter={filter} onFilterChange={setFilter} />
+        <MonthDashboard month={month} filter={filter} onFilterChange={patch} />
 
-        <TransactionList
-          filter={{ ...filter, month }}
-          onFilterChange={(f) =>
-            setFilter({ category: f.category, direction: f.direction, accountId: f.accountId })
-          }
-        />
+        <Link
+          className="txn-arrow"
+          to={txnHref}
+          data-tip="Open the full ledger — flow, category & account filters"
+          aria-label="Open transactions"
+        >
+          →
+        </Link>
       </div>
 
       <AddTransactionDialog open={addOpen} onOpenChange={setAddOpen} />
       <AddCategoryDialog open={catOpen} onOpenChange={setCatOpen} />
+      <ImportCsvDialog open={importOpen} onOpenChange={setImportOpen} />
     </>
   );
 }

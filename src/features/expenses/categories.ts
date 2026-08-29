@@ -13,8 +13,12 @@ export interface Category {
   direction: Direction;
   color: string;
   sort: number;
+  /** the resolved row's is_system flag (false once a user row shadows it) */
   isSystem: boolean;
+  /** a user-owned row exists for this slug + direction */
   isOverride: boolean;
+  /** a system default row exists for this slug + direction */
+  hasSystemDefault: boolean;
 }
 
 export interface RawCategoryRow {
@@ -27,17 +31,25 @@ export interface RawCategoryRow {
   user_id: string | null;
 }
 
+const sys = (
+  slug: string,
+  label: string,
+  direction: Direction,
+  color: string,
+  sort: number,
+): Category => ({ slug, label, direction, color, sort, isSystem: true, isOverride: false, hasSystemDefault: true });
+
 /** Used while the categories query is loading or if it fails / before migration 0007. */
 export const FALLBACK_CATEGORIES: Category[] = [
-  { slug: 'online_shopping', label: 'Online shopping', direction: 'debit', color: '#7E97AB', sort: 10, isSystem: true, isOverride: false },
-  { slug: 'dineout', label: 'Dineout', direction: 'debit', color: '#BC6250', sort: 20, isSystem: true, isOverride: false },
-  { slug: 'grocery', label: 'Grocery', direction: 'debit', color: '#8D9E79', sort: 30, isSystem: true, isOverride: false },
-  { slug: 'alcohol', label: 'Alcohol', direction: 'debit', color: '#93839F', sort: 40, isSystem: true, isOverride: false },
-  { slug: 'person', label: 'Person', direction: 'debit', color: '#BF8B84', sort: 50, isSystem: true, isOverride: false },
-  { slug: 'ticket_booking', label: 'Ticket booking', direction: 'debit', color: '#D6994F', sort: 60, isSystem: true, isOverride: false },
-  { slug: 'misc', label: 'Misc', direction: 'debit', color: '#6E8CA8', sort: 70, isSystem: true, isOverride: false },
-  { slug: 'person', label: 'Person', direction: 'credit', color: '#BF8B84', sort: 10, isSystem: true, isOverride: false },
-  { slug: 'refund', label: 'Refund', direction: 'credit', color: '#6E9B5F', sort: 20, isSystem: true, isOverride: false },
+  sys('online_shopping', 'Online shopping', 'debit', '#7E97AB', 10),
+  sys('dineout', 'Dineout', 'debit', '#BC6250', 20),
+  sys('grocery', 'Grocery', 'debit', '#8D9E79', 30),
+  sys('alcohol', 'Alcohol', 'debit', '#93839F', 40),
+  sys('person', 'Person', 'debit', '#BF8B84', 50),
+  sys('ticket_booking', 'Ticket booking', 'debit', '#D6994F', 60),
+  sys('misc', 'Misc', 'debit', '#6E8CA8', 70),
+  sys('person', 'Person', 'credit', '#BF8B84', 10),
+  sys('refund', 'Refund', 'credit', '#6E9B5F', 20),
 ];
 
 export function slugify(input: string): string {
@@ -54,6 +66,10 @@ export function slugify(input: string): string {
 /** Fold system + user rows into one list; a user row shadows a system row. */
 export function resolveCategories(rows: RawCategoryRow[]): Category[] {
   if (!rows.length) return FALLBACK_CATEGORIES;
+
+  const systemKeys = new Set<string>();
+  for (const r of rows) if (r.user_id == null) systemKeys.add(`${r.direction}:${r.slug}`);
+
   const map = new Map<string, Category>();
   for (const r of rows) {
     const key = `${r.direction}:${r.slug}`;
@@ -65,6 +81,7 @@ export function resolveCategories(rows: RawCategoryRow[]): Category[] {
       sort: r.sort,
       isSystem: r.is_system,
       isOverride: r.user_id != null,
+      hasSystemDefault: systemKeys.has(key),
     };
     if (!map.has(key) || r.user_id != null) map.set(key, cat);
   }
