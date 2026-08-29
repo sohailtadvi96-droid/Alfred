@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from './api';
 import type { TxnFilter } from './api';
+import { FALLBACK_CATEGORIES, resolveCategories, type Category, type Direction } from './categories';
 import type { NewTransaction, Transaction } from './types';
 
 const keys = {
@@ -9,6 +11,7 @@ const keys = {
   accounts: ['expenses', 'accounts'] as const,
   balances: ['expenses', 'balances'] as const,
   rules: ['expenses', 'rules'] as const,
+  categories: ['expenses', 'categories'] as const,
 };
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
@@ -33,6 +36,53 @@ export function useAccountBalances() {
 
 export function useUserRules() {
   return useQuery({ queryKey: keys.rules, queryFn: api.listUserRules });
+}
+
+export interface CategoryHelpers {
+  all: Category[];
+  loading: boolean;
+  forDirection: (d: Direction) => Category[];
+  get: (slug: string, d: Direction) => Category | undefined;
+  label: (slug: string, d: Direction) => string;
+  color: (slug: string, d: Direction) => string;
+}
+
+export function useCategories(): CategoryHelpers {
+  const q = useQuery({
+    queryKey: keys.categories,
+    queryFn: api.listCategories,
+    staleTime: 5 * 60_000,
+  });
+
+  return useMemo(() => {
+    const all = q.isError ? FALLBACK_CATEGORIES : resolveCategories(q.data ?? []);
+    const get = (slug: string, d: Direction) => all.find((c) => c.slug === slug && c.direction === d);
+    return {
+      all,
+      loading: q.isLoading,
+      forDirection: (d: Direction) => all.filter((c) => c.direction === d),
+      get,
+      label: (slug: string, d: Direction) => get(slug, d)?.label ?? slug,
+      color: (slug: string, d: Direction) => get(slug, d)?.color ?? '#8D9E79',
+    };
+  }, [q.data, q.isError, q.isLoading]);
+}
+
+export function useUpsertCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.upsertCategory,
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, direction }: { slug: string; direction: Direction }) =>
+      api.deleteCategory(slug, direction),
+    onSuccess: () => invalidateAll(qc),
+  });
 }
 
 export function useAddTransaction() {

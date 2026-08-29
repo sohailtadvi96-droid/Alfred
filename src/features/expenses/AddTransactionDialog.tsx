@@ -1,8 +1,9 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Dialog } from '@/components/Dialog';
+import { errMessage } from '@/lib/errors';
 import { parseAmountToCents } from '@/lib/format';
-import { categoriesFor, type Direction } from './categories';
-import { useAccounts, useAddTransaction } from './hooks';
+import type { Direction } from './categories';
+import { useAccounts, useAddTransaction, useCategories } from './hooks';
 
 function todayLocalISODate() {
   const d = new Date();
@@ -18,6 +19,7 @@ export function AddTransactionDialog({
 }) {
   const add = useAddTransaction();
   const { data: accounts } = useAccounts();
+  const cats = useCategories();
 
   const [direction, setDirection] = useState<Direction>('debit');
   const [amount, setAmount] = useState('');
@@ -28,7 +30,7 @@ export function AddTransactionDialog({
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const cats = useMemo(() => categoriesFor(direction), [direction]);
+  const options = cats.forDirection(direction);
 
   function reset() {
     setDirection('debit');
@@ -62,7 +64,7 @@ export function AddTransactionDialog({
       reset();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add the transaction.');
+      setError(errMessage(err, 'Could not add the transaction.'));
     }
   }
 
@@ -157,8 +159,8 @@ export function AddTransactionDialog({
             <label htmlFor="txn-cat">Category</label>
             <select id="txn-cat" className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="">Guess from merchant</option>
-              {cats.map((c) => (
-                <option key={c.id} value={c.id}>
+              {options.map((c) => (
+                <option key={c.slug} value={c.slug}>
                   {c.label}
                 </option>
               ))}

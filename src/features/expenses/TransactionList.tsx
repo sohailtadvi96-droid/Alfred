@@ -1,7 +1,7 @@
 import { shortDate, signedMoney } from '@/lib/format';
-import { ALL_CATEGORIES, categoryLabel, type Direction } from './categories';
+import type { Direction } from './categories';
 import { RecategoriseMenu } from './RecategoriseMenu';
-import { useAccounts, useDeleteTransaction, useTransactions } from './hooks';
+import { useAccounts, useCategories, useDeleteTransaction, useTransactions } from './hooks';
 import type { TxnFilter } from './api';
 
 export function TransactionList({
@@ -13,7 +13,10 @@ export function TransactionList({
 }) {
   const { data: txns, isLoading, error } = useTransactions(filter);
   const { data: accounts } = useAccounts();
+  const cats = useCategories();
   const del = useDeleteTransaction();
+
+  const uniqueCats = Array.from(new Map(cats.all.map((c) => [c.slug, c])).values());
 
   const accountName = (id: string | null) => {
     if (!id) return '—';
@@ -41,10 +44,8 @@ export function TransactionList({
           onChange={(e) => onFilterChange({ ...filter, category: e.target.value || undefined })}
         >
           <option value="">All categories</option>
-          {ALL_CATEGORIES.filter(
-            (c, i, arr) => arr.findIndex((x) => x.id === c.id) === i,
-          ).map((c) => (
-            <option key={c.id} value={c.id}>
+          {uniqueCats.map((c) => (
+            <option key={c.slug} value={c.slug}>
               {c.label}
             </option>
           ))}
@@ -104,7 +105,8 @@ export function TransactionList({
                     <button
                       className="row-x"
                       onClick={() => {
-                        if (confirm(`Delete this ${categoryLabel(t.category)} transaction?`)) del.mutate(t.id);
+                        if (confirm(`Delete this ${cats.label(t.category, t.direction)} transaction?`))
+                          del.mutate(t.id);
                       }}
                       data-tip="Delete"
                       aria-label="Delete transaction"

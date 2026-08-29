@@ -1191,6 +1191,88 @@ button {
   flex: 1;
 }
 
+/* ---- category colour tools ---- */
+.cat-card-tools {
+  position: absolute;
+  top: 12px;
+  right: 40px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.dcard:hover .cat-card-tools,
+.dcard:focus-within .cat-card-tools {
+  opacity: 1;
+}
+.cat-color-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.cat-color {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  padding: 0;
+}
+.cat-color-input {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.menu-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex: none;
+  margin-right: 2px;
+}
+.menu-item {
+  gap: 8px;
+}
+
+/* ---- colour swatch row (add-category dialog) ---- */
+.swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swatch-pick {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+}
+.swatch-pick.on {
+  border-color: var(--text);
+}
+.swatch-pick.custom {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.swatch-pick.custom::after {
+  content: '+';
+  font-weight: 800;
+  color: #fff;
+  mix-blend-mode: difference;
+}
+.swatch-pick.custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 /* ---- segmented control ---- */
 .seg {
   display: flex;

@@ -7,11 +7,13 @@ import { MonthDashboard } from '@/features/expenses/MonthDashboard';
 import { AccountsWallet } from '@/features/expenses/AccountsWallet';
 import { TransactionList } from '@/features/expenses/TransactionList';
 import { AddTransactionDialog } from '@/features/expenses/AddTransactionDialog';
+import { AddCategoryDialog } from '@/features/expenses/AddCategoryDialog';
 import type { TxnFilter } from '@/features/expenses/api';
 
 export function ExpensesPage() {
   const [month, setMonth] = useState(monthKey());
   const [addOpen, setAddOpen] = useState(false);
+  const [catOpen, setCatOpen] = useState(false);
   const [filter, setFilter] = useState<Omit<TxnFilter, 'month'>>({});
   const { data: balances } = useAccountBalances();
 
@@ -33,6 +35,9 @@ export function ExpensesPage() {
       <div className="wrap expenses">
         <div className="expenses-head">
           <MonthNav month={month} onChange={setMonth} />
+          <button className="btn sec sm" onClick={() => setCatOpen(true)}>
+            Add category
+          </button>
         </div>
 
         <MonthDashboard month={month} />
@@ -49,6 +54,7 @@ export function ExpensesPage() {
       </div>
 
       <AddTransactionDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddCategoryDialog open={catOpen} onOpenChange={setCatOpen} />
     </>
   );
 }

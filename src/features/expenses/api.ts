@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { addMonths, monthRange } from '@/lib/format';
-import type { Direction } from './categories';
+import type { Direction, RawCategoryRow } from './categories';
 import type { Account, AccountBalance, CategoryRule, MonthSummary, NewTransaction, Transaction } from './types';
 
 export interface TxnFilter {
@@ -29,14 +29,9 @@ export async function listTransactions(filter: TxnFilter): Promise<Transaction[]
   return data as Transaction[];
 }
 
-export async function addTransaction(input: NewTransaction): Promise<Transaction> {
-  const { data, error } = await supabase
-    .from('transactions')
-    .insert({ ...input, source_type: 'manual' })
-    .select('*')
-    .single();
+export async function addTransaction(input: NewTransaction): Promise<void> {
+  const { error } = await supabase.from('transactions').insert({ ...input, source_type: 'manual' });
   if (error) throw error;
-  return data as Transaction;
 }
 
 export async function updateTransaction(
@@ -149,6 +144,38 @@ export async function applyCategoryToMatching(input: {
     .update({ category: input.category })
     .eq('direction', input.direction)
     .ilike('merchant_raw', `%${input.pattern}%`);
+  if (error) throw error;
+}
+
+// ---------- categories ----------
+export async function listCategories(): Promise<RawCategoryRow[]> {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('slug,label,direction,color,sort,is_system,user_id')
+    .order('sort');
+  if (error) throw error;
+  return data as RawCategoryRow[];
+}
+
+export async function upsertCategory(input: {
+  slug: string;
+  label: string;
+  direction: Direction;
+  color: string;
+  sort?: number;
+}): Promise<void> {
+  const { error } = await supabase.rpc('upsert_category', {
+    p_slug: input.slug,
+    p_label: input.label,
+    p_direction: input.direction,
+    p_color: input.color,
+    p_sort: input.sort ?? 100,
+  });
+  if (error) throw error;
+}
+
+export async function deleteCategory(slug: string, direction: Direction): Promise<void> {
+  const { error } = await supabase.rpc('delete_category', { p_slug: slug, p_direction: direction });
   if (error) throw error;
 }
 

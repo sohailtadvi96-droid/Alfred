@@ -1,19 +1,28 @@
 import * as DM from '@radix-ui/react-dropdown-menu';
-import { categoriesFor, categoryLabel } from './categories';
-import { useRecategorise } from './hooks';
+import { useCategories, useRecategorise } from './hooks';
 import type { Transaction } from './types';
 
 export function RecategoriseMenu({ txn }: { txn: Transaction }) {
   const recat = useRecategorise();
-  const options = categoriesFor(txn.direction);
+  const cats = useCategories();
+  const options = cats.forDirection(txn.direction);
   const merchant = txn.merchant_raw?.trim();
+  const current = cats.get(txn.category, txn.direction);
 
   return (
     <DM.Root>
       <DM.Trigger asChild>
-        <button className={`tag as-button cat-${txn.category}`} data-tip="Recategorise">
-          <i />
-          {categoryLabel(txn.category)}
+        <button
+          className="tag as-button"
+          data-tip="Recategorise"
+          style={
+            current
+              ? { borderColor: current.color, color: current.color }
+              : undefined
+          }
+        >
+          <i style={current ? { background: current.color } : undefined} />
+          {cats.label(txn.category, txn.direction)}
         </button>
       </DM.Trigger>
       <DM.Portal>
@@ -21,12 +30,13 @@ export function RecategoriseMenu({ txn }: { txn: Transaction }) {
           <DM.Label className="menu-label">Set category</DM.Label>
           {options.map((c) => (
             <DM.Item
-              key={c.id}
+              key={c.slug}
               className="menu-item"
-              onSelect={() => recat.mutate({ txn, category: c.id, makeRule: false })}
+              onSelect={() => recat.mutate({ txn, category: c.slug, makeRule: false })}
             >
+              <span className="menu-dot" style={{ background: c.color }} />
               {c.label}
-              {c.id === txn.category && <span className="menu-check">✓</span>}
+              {c.slug === txn.category && <span className="menu-check">✓</span>}
             </DM.Item>
           ))}
 
@@ -41,10 +51,11 @@ export function RecategoriseMenu({ txn }: { txn: Transaction }) {
                   <DM.SubContent className="menu" sideOffset={4}>
                     {options.map((c) => (
                       <DM.Item
-                        key={c.id}
+                        key={c.slug}
                         className="menu-item"
-                        onSelect={() => recat.mutate({ txn, category: c.id, makeRule: true })}
+                        onSelect={() => recat.mutate({ txn, category: c.slug, makeRule: true })}
                       >
+                        <span className="menu-dot" style={{ background: c.color }} />
                         {c.label}
                       </DM.Item>
                     ))}
