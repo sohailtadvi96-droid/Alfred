@@ -1,0 +1,96 @@
+/* ===================== ALFRED — design tokens =====================
+   The owner picks the BACKGROUND; text, surfaces, lines, accent and
+   shadows re-derive from it. 12 presets to start, appendable.
+   Selected via [data-ground] on <html>.                              */
+
+:root {
+  /* ---- default ground: INK ---- */
+  --ground: #17150f;
+  --surface: #201d16;
+  --surface-2: #2a261d;
+  --line: #39342a;
+  --line-soft: #2c281f;
+  --text: #f1ecdd;
+  --text-dim: #a79e89;
+  --text-faint: #6e6656;
+  --base: #e4c56b;
+  --base-ink: #241c09;
+  --cut: drop-shadow(2.5px 2.5px 0 rgba(0, 0, 0, 0.55));
+  --sh: 0 2px 6px rgba(0, 0, 0, 0.34), 0 18px 44px -20px rgba(0, 0, 0, 0.6);
+  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px -10px rgba(0, 0, 0, 0.5);
+
+  /* ---- fixed on every ground ---- */
+  --base-soft: color-mix(in srgb, var(--base) 15%, transparent);
+  --base-line: color-mix(in srgb, var(--base) 42%, transparent);
+
+  --c-rust: #bc6250;
+  --c-ochre: #d6994f;
+  --c-sage: #8d9e79;
+  --c-slate: #7e97ab;
+  --c-clay: #bf8b84;
+  --c-plum: #93839f;
+
+  --pos: #6e9b5f;
+  --neg: #c56350;
+  --wip: #6e8ca8;
+}
+
+/* ===================== 12 GROUND PRESETS ===================== */
+/* --- dark --- */
+:root[data-ground='slate'] {
+  --ground: #16171a; --surface: #1f2024; --surface-2: #292b30; --line: #383a40; --line-soft: #2b2d32;
+  --text: #eceef2; --text-dim: #9aa0aa; --text-faint: #626771; --base: #e0c36a; --base-ink: #241c09;
+}
+:root[data-ground='char'] {
+  --ground: #1a1a1a; --surface: #232323; --surface-2: #2e2e2e; --line: #3c3c3c; --line-soft: #2c2c2c;
+  --text: #ededec; --text-dim: #9e9e9c; --text-faint: #666664; --base: #e2c368; --base-ink: #241c09;
+}
+:root[data-ground='pine'] {
+  --ground: #10201a; --surface: #182c24; --surface-2: #21382e; --line: #2f473c; --line-soft: #24382f;
+  --text: #e8f0ea; --text-dim: #9db3a6; --text-faint: #5f7a6d; --base: #e7c873; --base-ink: #152410;
+}
+:root[data-ground='navy'] {
+  --ground: #111a2b; --surface: #1a2438; --surface-2: #243048; --line: #354360; --line-soft: #28344b;
+  --text: #e9eef6; --text-dim: #97a4bc; --text-faint: #5c6a85; --base: #e6c87a; --base-ink: #16202f;
+}
+:root[data-ground='dusk'] {
+  --ground: #171525; --surface: #201e33; --surface-2: #2b2843; --line: #3a3656; --line-soft: #2c2943;
+  --text: #ece9f4; --text-dim: #a29cb8; --text-faint: #665f80; --base: #e4c56b; --base-ink: #241c09;
+}
+:root[data-ground='oxblood'] {
+  --ground: #1e1214; --surface: #2a1b1d; --surface-2: #362527; --line: #4a3739; --line-soft: #382a2b;
+  --text: #f2e7e6; --text-dim: #b79e9d; --text-faint: #7c6362; --base: #e0b36a; --base-ink: #241407;
+}
+:root[data-ground='espresso'] {
+  --ground: #1b1510; --surface: #261e16; --surface-2: #322820; --line: #443a2e; --line-soft: #332b22;
+  --text: #f0e9dd; --text-dim: #ae9f89; --text-faint: #6f6350; --base: #e3c36b; --base-ink: #241c09;
+}
+/* --- light --- */
+:root[data-ground='parchment'] {
+  --ground: #f3eddf; --surface: #fbf7ec; --surface-2: #ece3cf; --line: #d7cbb1; --line-soft: #e4dac3;
+  --text: #2a2417; --text-dim: #6a5f48; --text-faint: #9a8d72; --base: #b07c24; --base-ink: #fff6e4;
+  --cut: drop-shadow(2px 2px 0 rgba(40, 30, 10, 0.22));
+  --sh: 0 1px 2px rgba(60, 48, 22, 0.12), 0 14px 34px -18px rgba(60, 48, 22, 0.28);
+  --sh-sm: 0 1px 2px rgba(60, 48, 22, 0.12), 0 6px 16px -10px rgba(60, 48, 22, 0.22);
+}
+:root[data-ground='linen'] {
+  --ground: #efeee9; --surface: #f8f7f3; --surface-2: #e4e2da; --line: #cfccc1; --line-soft: #dedbd1;
+  --text: #24231e; --text-dim: #626057; --text-faint: #928f82; --base: #9a6e2c; --base-ink: #fff6ea;
+  --cut: drop-shadow(2px 2px 0 rgba(30, 28, 20, 0.2));
+  --sh: 0 1px 2px rgba(30, 28, 20, 0.1), 0 14px 34px -18px rgba(30, 28, 20, 0.22);
+  --sh-sm: 0 1px 2px rgba(30, 28, 20, 0.1), 0 6px 16px -10px rgba(30, 28, 20, 0.18);
+}
+:root[data-ground='fog'] {
+  --ground: #e9e9e6; --surface: #f7f7f5; --surface-2: #dfdfdb; --line: #c9c9c2; --line-soft: #d9d9d3;
+  --text: #1e1f1f; --text-dim: #5b5d5b; --text-faint: #8b8d8a; --base: #9e6a28; --base-ink: #fff6ec;
+  --cut: drop-shadow(2px 2px 0 rgba(20, 20, 20, 0.2));
+  --sh: 0 1px 2px rgba(20, 20, 20, 0.1), 0 14px 34px -18px rgba(20, 20, 20, 0.22);
+  --sh-sm: 0 1px 2px rgba(20, 20, 20, 0.1), 0 6px 16px -10px rgba(20, 20, 20, 0.18);
+}
+:root[data-ground='oat'] {
+  --ground: #e4dbc8; --surface: #f0e9d9; --surface-2: #d5cab1; --line: #bcad8e; --line-soft: #ccc0a3;
+  --text: #262013; --text-dim: #665c44; --text-faint: #948871; --base: #8a5a22; --base-ink: #f7eedd;
+  --cut: drop-shadow(2px 2px 0 rgba(40, 32, 12, 0.22));
+  --sh: 0 1px 2px rgba(50, 40, 18, 0.12), 0 14px 34px -18px rgba(50, 40, 18, 0.26);
+  --sh-sm: 0 1px 2px rgba(50, 40, 18, 0.12), 0 6px 16px -10px rgba(50, 40, 18, 0.2);
+}
