@@ -944,7 +944,7 @@ button {
 /* gradient "shine" band */
 .catcard-band {
   height: 92px;
-  position: relative;
+  position: relative; /* no z-index: keeps .catcard-front's stacking context flat */
   padding: 12px 14px;
   background-image: var(--band);
   background-size: 180% 180%;
@@ -957,8 +957,8 @@ button {
 }
 .catcard-share {
   position: absolute;
-  right: 14px;
-  bottom: 12px;
+  left: 14px;
+  top: 12px;
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.06em;
@@ -969,37 +969,42 @@ button {
 .catcard:hover .catcard-share {
   opacity: 0;
 }
+/* title row — category name + tools (tools appear on hover, beside the name) */
+.catcard-titlerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .catcard-tools {
-  position: absolute;
-  top: 10px;
-  right: 12px;
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: none;
   opacity: 0;
-  transform: translateY(-3px);
+  transform: translateX(4px);
   transition: opacity 0.14s ease, transform 0.14s ease;
 }
 .catcard:hover .catcard-tools,
 .catcard:focus-within .catcard-tools {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(0);
 }
 .cat-edit {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  border: 1.5px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
-  background: rgba(0, 0, 0, 0.3);
-  color: #fff;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-dim);
   display: grid;
   place-items: center;
   cursor: pointer;
   padding: 0;
 }
 .cat-edit:hover {
-  background: rgba(0, 0, 0, 0.5);
+  color: var(--base);
+  border-color: var(--base-line);
 }
 
 .catcard-body {
@@ -1011,7 +1016,7 @@ button {
   border-top-left-radius: 18px;
   margin-top: -18px;
   position: relative;
-  z-index: 1;
+  z-index: 2; /* the green FRONT — covers the receipt */
 }
 .catcard-title {
   font-weight: 800;
@@ -1053,45 +1058,35 @@ button {
   white-space: nowrap;
 }
 
-/* paper receipt — sits inside the green card. Persistent one-line peek;
-   expands on hover to reveal the two most-recent entries. */
-/* middle layer — the receipt slip, tucked behind the front panel.
-   Its top pokes into the pocket at the card's TOP; grows upward on hover. */
+/* middle layer — the receipt slip at the band/body seam: behind the green
+   body, in front of the brown band. Slides up over the band on hover.
+   The torn top edge is a clip-path on the slip itself (no extra fill),
+   so the brown band shows straight through the teeth. */
 .catcard-receipt {
   position: absolute;
   left: 16px;
   right: 16px;
-  top: 0;
+  top: 56px;
   z-index: 1;
-  height: 32px; /* rest: only the ~26px top strip shows above the front */
+  height: 30px; /* rest: ~18px sliver over the band, at the seam */
   overflow: hidden;
-  transition: height 0.32s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
+  transition: height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
   background: #f6f1e6;
   background-image: repeating-linear-gradient(#f6f1e6 0 20px, #ece3cd 20px 21px);
   color: #2b2620;
-  border-radius: 3px 3px 2px 2px;
-  padding: 11px 12px 14px;
+  border-radius: 0 0 2px 2px;
+  padding: 12px 12px 14px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
-}
-/* torn top edge — the free end of the slip poking into the pocket. Static. */
-.catcard-receipt::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 7px;
-  background: rgba(28, 18, 10, 0.6);
   clip-path: polygon(
-    0 0, 100% 0, 100% 20%,
-    96% 100%, 92% 20%, 88% 100%, 84% 20%, 80% 100%, 76% 20%, 72% 100%, 68% 20%,
-    64% 100%, 60% 20%, 56% 100%, 52% 20%, 48% 100%, 44% 20%, 40% 100%, 36% 20%,
-    32% 100%, 28% 20%, 24% 100%, 20% 20%, 16% 100%, 12% 20%, 8% 100%, 4% 20%, 0 100%
+    0 5px, 5% 0, 12% 5px, 19% 0, 26% 5px, 33% 0, 40% 5px, 47% 0, 54% 5px, 61% 0,
+    68% 5px, 75% 0, 82% 5px, 89% 0, 96% 5px, 100% 0, 100% 100%, 0 100%
   );
 }
 .catcard:hover .catcard-receipt,
 .catcard:focus-within .catcard-receipt {
-  height: 132px; /* rises into the opened top pocket, both rows visible */
+  height: 122px;
+  transform: translateY(-32px); /* rises over the brown band, clear of the tools */
   box-shadow: 0 12px 22px rgba(0, 0, 0, 0.3);
 }
 .catcard-receipt .rc-row {
@@ -1155,28 +1150,29 @@ button {
   flex: 1;
   justify-content: center;
 }
-/* ---- jump to the full ledger (arrow only) ---- */
-.txn-arrow {
-  align-self: flex-end;
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+/* ---- jump to the full ledger — a grid cell right after the last card ---- */
+.catgrid-arrow {
+  align-self: center;
+  justify-self: start;
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
   background: var(--base);
   color: var(--base-ink);
   display: grid;
   place-items: center;
   font-weight: 900;
-  font-size: 24px;
+  font-size: 26px;
   text-decoration: none;
   box-shadow: var(--sh-sm);
   transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), filter 0.14s ease, box-shadow 0.16s ease;
 }
-.txn-arrow:hover {
+.catgrid-arrow:hover {
   transform: translateX(5px) scale(1.06);
   filter: brightness(1.06);
   box-shadow: var(--sh);
 }
-.txn-arrow:focus-visible {
+.catgrid-arrow:focus-visible {
   outline: 2px solid var(--base);
   outline-offset: 3px;
 }
@@ -1762,11 +1758,11 @@ button {
   display: inline-flex;
 }
 .cat-color {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  border: 1.5px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
   cursor: pointer;
   padding: 0;
 }
@@ -2823,4 +2819,392 @@ textarea.input {
 }
 .inv-row-actions .btn + .btn {
   margin-left: 3px;
+}
+
+/* ============ Work — Office ============ */
+.office {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.office-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .office-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.office-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+}
+.office-section-wide {
+  width: 100%;
+}
+.office-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.office-section-head h3 {
+  font-size: 14px;
+  font-weight: 800;
+}
+.office-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.office-list {
+  display: flex;
+  flex-direction: column;
+}
+.office-empty {
+  padding: 12px 2px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* ---- task / due rows ---- */
+.office-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.office-row:first-child {
+  border-top: none;
+}
+.office-check {
+  display: flex;
+  align-items: center;
+  padding-top: 1px;
+}
+.office-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--base);
+  cursor: pointer;
+}
+.office-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.office-row-click {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.office-row-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+}
+.office-row.done .office-row-label {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.office-pri-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pri, var(--text-faint));
+  flex-shrink: 0;
+}
+.office-row-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+}
+.office-row-note {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.office-due.tone-overdue {
+  color: var(--neg);
+  font-weight: 600;
+}
+.office-due.tone-today {
+  color: var(--c-ochre);
+  font-weight: 600;
+}
+.office-due.tone-soon {
+  color: var(--text-dim);
+}
+.office-due.tone-later {
+  color: var(--text-faint);
+}
+.office-done-toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.office-done-toggle:hover {
+  color: var(--base);
+}
+
+/* ---- inline add rows ---- */
+.office-add {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 4px;
+}
+.office-add .input {
+  flex: 1;
+  min-width: 120px;
+}
+.office-add .input[type='date'] {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.office-add .btn {
+  flex-shrink: 0;
+}
+
+/* ---- meetings agenda ---- */
+.office-day + .office-day {
+  margin-top: 8px;
+}
+.office-day-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 6px 0 4px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.office-evt {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.office-evt:first-of-type {
+  border-top: none;
+}
+.office-evt-time {
+  width: 62px;
+  flex-shrink: 0;
+  padding-top: 1px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.office-evt-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.office-evt-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text);
+}
+.office-evt-badge {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border: 1px solid var(--base-line);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.office-evt-actions {
+  display: inline-flex;
+  gap: 2px;
+  min-width: 20px;
+  justify-content: flex-end;
+}
+a.row-x {
+  text-decoration: none;
+  display: inline-block;
+}
+
+/* ---- notes ---- */
+.office-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+.office-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+}
+.office-note.pinned {
+  border-color: var(--base-line);
+}
+.office-note p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: var(--text);
+}
+.office-note-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+.office-note-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.office-note-btn:hover {
+  color: var(--base);
+  background: var(--surface);
+}
+
+/* ---- today panel ---- */
+.office-today {
+  border: 1px solid var(--base-line);
+  border-radius: 16px;
+  padding: 20px 22px;
+  background: var(--base-soft);
+}
+.office-today-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.office-today-kicker {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.office-today-date {
+  font-weight: 800;
+  font-size: 16px;
+}
+.office-today-clear {
+  font-size: 13px;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+.office-today-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+@media (max-width: 640px) {
+  .office-today-cols {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+.office-today-col-h {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---- google calendar sync strip ---- */
+.gsync {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.gsync-setup {
+  align-items: flex-start;
+}
+.gsync-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-faint);
+}
+.gsync-dot.on {
+  background: var(--pos);
+}
+.gsync-dot.err {
+  background: var(--neg);
+}
+.gsync-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.gsync-text strong {
+  font-size: 12.5px;
+  color: var(--text);
+}
+.gsync-text span {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.45;
+}
+.gsync-text code {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+.gsync .btn {
+  flex-shrink: 0;
 }

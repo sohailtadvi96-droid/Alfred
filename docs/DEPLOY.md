@@ -13,10 +13,26 @@ them present for every build.
 |---|---|---|
 | `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` | Production, Preview, Development |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon **public** key | Production, Preview, Development |
+| `VITE_GOOGLE_CLIENT_ID` | OAuth web client ID (optional) | Production, Preview, Development |
 
 > Never add the Supabase `service_role` key (or any other real secret) as a
 > `VITE_*` variable — anything with that prefix is compiled into client code
 > that ships to the browser.
+
+### `VITE_GOOGLE_CLIENT_ID` (optional — Work / Office-work calendar sync)
+
+Only needed for the Google Calendar sync on the Office-work tab. Without it the
+tab still works; it just shows a "not set up" note instead of a Connect button.
+
+1. Google Cloud Console → **APIs & Services → Enable APIs** → enable **Google Calendar API**.
+2. **APIs & Services → Credentials → Create credentials → OAuth client ID → Web application**.
+3. Under **Authorised JavaScript origins** add every origin the app runs on —
+   `http://localhost:5173`, the Vercel preview domain(s), and the production domain.
+4. Copy the **Client ID** into `VITE_GOOGLE_CLIENT_ID`. No client secret is used
+   (the browser flow is token-only) and the only scope requested is the
+   read-only `https://www.googleapis.com/auth/calendar.events.readonly`.
+5. While the OAuth consent screen is in "Testing", add your Google account under
+   **Test users**.
 
 ## Setting them
 

@@ -1,16 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
 import { ProjectList } from '@/features/work/ProjectList';
 import { ProjectFormDialog } from '@/features/work/ProjectFormDialog';
 import { useProjects } from '@/features/work/hooks';
+import { OfficeView } from '@/features/office/OfficeView';
 
 type Category = 'freelance' | 'office';
+const CAT_KEY = 'alfred.work.category';
+
+function readCategory(): Category {
+  try {
+    return localStorage.getItem(CAT_KEY) === 'office' ? 'office' : 'freelance';
+  } catch {
+    return 'freelance';
+  }
+}
 
 export function WorkPage() {
-  const [category, setCategory] = useState<Category>('freelance');
+  const [category, setCategory] = useState<Category>(readCategory);
   const [addOpen, setAddOpen] = useState(false);
   const { data: projects, isLoading, error } = useProjects();
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CAT_KEY, category);
+    } catch {
+      /* storage disabled — selection just won't persist */
+    }
+  }, [category]);
 
   return (
     <>
@@ -56,14 +74,7 @@ export function WorkPage() {
         {category === 'freelance' ? (
           <ProjectList projects={projects} isLoading={isLoading} error={error} />
         ) : (
-          <div className="placeholder">
-            <div className="pk">Phase 2</div>
-            <h2>Office work</h2>
-            <p>
-              Meetings, tasks and the day plan land here once Google Calendar is wired in. Freelance
-              is the MVP tab.
-            </p>
-          </div>
+          <OfficeView />
         )}
       </div>
 

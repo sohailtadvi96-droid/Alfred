@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from './api';
 import type { TxnFilter } from './api';
 import { FALLBACK_CATEGORIES, resolveCategories, type Category, type Direction } from './categories';
@@ -19,11 +19,19 @@ function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
 }
 
 export function useTransactions(filter: TxnFilter) {
-  return useQuery({ queryKey: keys.txns(filter), queryFn: () => api.listTransactions(filter) });
+  return useQuery({
+    queryKey: keys.txns(filter),
+    queryFn: () => api.listTransactions(filter),
+    placeholderData: keepPreviousData, // no flash when the month/filters change
+  });
 }
 
 export function useMonthSummary(month: string) {
-  return useQuery({ queryKey: keys.summary(month), queryFn: () => api.getMonthSummary(month) });
+  return useQuery({
+    queryKey: keys.summary(month),
+    queryFn: () => api.getMonthSummary(month),
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useAccounts() {

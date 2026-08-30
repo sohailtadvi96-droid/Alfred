@@ -14,7 +14,7 @@ interface NavItem {
 const MODULES: NavItem[] = [
   { to: '/expenses', label: 'Expenses', index: '01', icon: 'expenses', tip: 'Money in and out, by category' },
   { to: '/secrets', label: 'Secrets', index: '02', icon: 'secrets', tip: 'Passwords and keys, encrypted at rest' },
-  { to: '/work', label: 'Work', index: '03', icon: 'work', tip: 'Freelance projects, time and invoices' },
+  { to: '/work', label: 'Work', index: '03', icon: 'work', tip: 'Freelance projects and invoices · office tasks, meetings and notes' },
 ];
 
 const LATER: NavItem[] = [

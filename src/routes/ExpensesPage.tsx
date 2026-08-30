@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
 import { money } from '@/lib/format';
 import { useAccountBalances } from '@/features/expenses/hooks';
@@ -11,13 +10,12 @@ import { AddTransactionDialog } from '@/features/expenses/AddTransactionDialog';
 import { AddCategoryDialog } from '@/features/expenses/AddCategoryDialog';
 
 export function ExpensesPage() {
-  const { month, flow, search, setMonth, setFlow } = useExpenseFilters();
+  const { month, flow, setMonth, setFlow } = useExpenseFilters();
   const [addOpen, setAddOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const { data: balances } = useAccountBalances();
 
   const total = (balances ?? []).reduce((s, a) => s + a.balance_cents, 0);
-  const txnHref = { pathname: '/expenses/transactions', search: search ? `?${search}` : '' };
 
   return (
     <>
@@ -42,15 +40,6 @@ export function ExpensesPage() {
         </div>
 
         <MonthDashboard month={month} flow={flow} />
-
-        <Link
-          className="txn-arrow"
-          to={txnHref}
-          data-tip="Open the full ledger — flow, category & account filters"
-          aria-label="Open transactions"
-        >
-          →
-        </Link>
       </div>
 
       <AddTransactionDialog open={addOpen} onOpenChange={setAddOpen} />

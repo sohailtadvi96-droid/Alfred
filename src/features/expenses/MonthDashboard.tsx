@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { money, monthKey } from '@/lib/format';
+import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SeatedEnter } from '@/components/SeatedEnter';
 import { CategoryCard, type RecentEntry } from './CategoryCard';
 import { EditCategoryDialog } from './EditCategoryDialog';
@@ -62,18 +63,33 @@ export function MonthDashboard({
     navigate({ pathname: '/expenses/transactions', search: `?${p.toString()}` });
   }
 
+  const ledgerSearch = (() => {
+    const p = new URLSearchParams();
+    if (month !== monthKey()) p.set('month', month);
+    if (flow) p.set('flow', flow);
+    const s = p.toString();
+    return s ? `?${s}` : '';
+  })();
+
   return (
     <div className="dash-layout">
       <div className="dash-main">
         <div className="sumcard">
           <span className="sumcard-l">Total spend · this month</span>
-          <span className="sumcard-v">{money(spendCents, true)}</span>
+          <span className="sumcard-v">
+            <AnimatedNumber value={spendCents} format={(c) => money(c, true)} />
+          </span>
           <span className="sumcard-s">
-            {delta !== null
-              ? `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta)}% vs last month`
-              : 'no last-month data'}
+            {delta !== null ? (
+              <>
+                {delta >= 0 ? '▲' : '▼'} <AnimatedNumber value={Math.abs(delta)} format={String} />%
+                vs last month
+              </>
+            ) : (
+              'no last-month data'
+            )}
             {' · '}
-            {count} {count === 1 ? 'entry' : 'entries'}
+            <AnimatedNumber value={count} format={String} /> {count === 1 ? 'entry' : 'entries'}
           </span>
         </div>
 
@@ -85,6 +101,7 @@ export function MonthDashboard({
                 key={`${cat.direction}:${cat.slug}`}
                 style={{ ['--i' as string]: i } as React.CSSProperties}
                 cat={cat}
+                month={month}
                 spentCents={cents}
                 count={n}
                 sharePct={d > 0 ? Math.round((cents / d) * 100) : 0}
@@ -94,6 +111,15 @@ export function MonthDashboard({
               />
             );
           })}
+          <Link
+            className="catgrid-arrow"
+            to={{ pathname: '/expenses/transactions', search: ledgerSearch }}
+            style={{ ['--i' as string]: cards.length } as React.CSSProperties}
+            data-tip="Open the full ledger — flow, category & account filters"
+            aria-label="Open transactions"
+          >
+            →
+          </Link>
         </SeatedEnter>
       </div>
 
@@ -101,10 +127,11 @@ export function MonthDashboard({
         <div className="sumcard sumcard-income">
           <span className="sumcard-l">Income · this month</span>
           <span className="sumcard-v" style={{ color: 'var(--pos)' }}>
-            {money(incomeCents, true)}
+            <AnimatedNumber value={incomeCents} format={(c) => money(c, true)} />
           </span>
           <span className="sumcard-s">
-            {creditCount} credit{creditCount === 1 ? '' : 's'}
+            <AnimatedNumber value={creditCount} format={String} /> credit
+            {creditCount === 1 ? '' : 's'}
           </span>
         </div>
 
