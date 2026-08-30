@@ -9,13 +9,11 @@ import { FlowToggle } from '@/features/expenses/FlowToggle';
 import { MonthDashboard } from '@/features/expenses/MonthDashboard';
 import { AddTransactionDialog } from '@/features/expenses/AddTransactionDialog';
 import { AddCategoryDialog } from '@/features/expenses/AddCategoryDialog';
-import { ImportCsvDialog } from '@/features/expenses/ImportCsvDialog';
 
 export function ExpensesPage() {
-  const { month, flow, filter, search, setMonth, setFlow, patch } = useExpenseFilters();
+  const { month, flow, search, setMonth, setFlow } = useExpenseFilters();
   const [addOpen, setAddOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const { data: balances } = useAccountBalances();
 
   const total = (balances ?? []).reduce((s, a) => s + a.balance_cents, 0);
@@ -29,14 +27,9 @@ export function ExpensesPage() {
         walletValue={balances && balances.length > 0 ? money(total, true) : '—'}
         onWalletAdd={() => setAddOpen(true)}
         action={
-          <>
-            <button className="btn sec" onClick={() => setImportOpen(true)}>
-              Import CSV
-            </button>
-            <button className="btn primary" onClick={() => setAddOpen(true)}>
-              Add transaction
-            </button>
-          </>
+          <button className="btn primary" onClick={() => setAddOpen(true)}>
+            Add transaction
+          </button>
         }
       />
       <div className="wrap expenses">
@@ -48,7 +41,7 @@ export function ExpensesPage() {
           </button>
         </div>
 
-        <MonthDashboard month={month} filter={filter} onFilterChange={patch} />
+        <MonthDashboard month={month} flow={flow} />
 
         <Link
           className="txn-arrow"
@@ -62,7 +55,6 @@ export function ExpensesPage() {
 
       <AddTransactionDialog open={addOpen} onOpenChange={setAddOpen} />
       <AddCategoryDialog open={catOpen} onOpenChange={setCatOpen} />
-      <ImportCsvDialog open={importOpen} onOpenChange={setImportOpen} />
     </>
   );
 }

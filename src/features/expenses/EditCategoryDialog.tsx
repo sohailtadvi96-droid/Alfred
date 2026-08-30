@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { errMessage } from '@/lib/errors';
 import { CATEGORY_PALETTE } from '@/lib/color';
-import type { Category } from './categories';
+import type { Category, Direction } from './categories';
 import { useDeleteCategory, useUpsertCategory } from './hooks';
 
 export function EditCategoryDialog({
@@ -16,8 +16,10 @@ export function EditCategoryDialog({
   const del = useDeleteCategory();
   const [label, setLabel] = useState(cat.label);
   const [color, setColor] = useState(cat.color);
+  const [direction, setDirection] = useState<Direction>(cat.direction);
   const [error, setError] = useState<string | null>(null);
 
+  const dirChanged = direction !== cat.direction;
   const canRemove = cat.isOverride || !cat.hasSystemDefault;
   const removeLabel = cat.hasSystemDefault ? 'Reset to default' : 'Delete category';
 
@@ -28,10 +30,18 @@ export function EditCategoryDialog({
       await up.mutateAsync({
         slug: cat.slug,
         label: label.trim() || cat.slug,
-        direction: cat.direction,
+        direction,
         color,
         sort: cat.sort,
       });
+      // moving flow: drop the old-direction override so it doesn't linger
+      if (dirChanged && cat.isOverride) {
+        try {
+          await del.mutateAsync({ slug: cat.slug, direction: cat.direction });
+        } catch {
+          /* best effort */
+        }
+      }
       onClose();
     } catch (err) {
       setError(errMessage(err, 'Could not save the category.'));
@@ -53,7 +63,6 @@ export function EditCategoryDialog({
       open
       onOpenChange={(v) => !v && onClose()}
       title={`Edit “${cat.label}”`}
-      description={cat.direction === 'credit' ? 'Money in' : 'Money out'}
       footer={
         <>
           {canRemove && (
@@ -77,6 +86,15 @@ export function EditCategoryDialog({
       }
     >
       <form id="edit-cat-form" onSubmit={onSave}>
+        <div className="seg">
+          <button type="button" className={direction === 'debit' ? 'on' : ''} onClick={() => setDirection('debit')}>
+            Money out
+          </button>
+          <button type="button" className={direction === 'credit' ? 'on' : ''} onClick={() => setDirection('credit')}>
+            Money in
+          </button>
+        </div>
+
         <div className={`field${error ? ' bad' : ''}`}>
           <label htmlFor="edit-cat-label">Name</label>
           <input
@@ -108,7 +126,12 @@ export function EditCategoryDialog({
           </div>
         </div>
 
-        {cat.hasSystemDefault && !cat.isOverride && (
+        {dirChanged && (
+          <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '4px 0 0' }}>
+            Past transactions keep their current flow — only new ones use this.
+          </p>
+        )}
+        {!dirChanged && cat.hasSystemDefault && !cat.isOverride && (
           <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '4px 0 0' }}>
             Editing a built-in category creates your own version of it.
           </p>

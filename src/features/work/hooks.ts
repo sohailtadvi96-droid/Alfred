@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from './api';
-import type { DeliverableStatus, NewClient, NewProject } from './types';
+import type {
+  DeliverableStatus,
+  InvoiceStatus,
+  NewClient,
+  NewProject,
+  SaveInvoiceInput,
+} from './types';
 
 const keys = {
   clients: ['work', 'clients'] as const,
@@ -9,6 +15,9 @@ const keys = {
   assets: (id: string) => ['work', 'assets', id] as const,
   deliverables: (id: string) => ['work', 'deliverables', id] as const,
   time: (id: string) => ['work', 'time', id] as const,
+  invoices: ['work', 'invoices'] as const,
+  projectInvoices: (id: string) => ['work', 'invoices', 'project', id] as const,
+  invoice: (id: string) => ['work', 'invoice', id] as const,
 };
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
@@ -158,5 +167,47 @@ export function useDeleteTimeEntry(projectId: string) {
   return useMutation({
     mutationFn: (id: string) => api.deleteTimeEntry(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.time(projectId) }),
+  });
+}
+
+// ---------- invoices ----------
+export function useInvoices() {
+  return useQuery({ queryKey: keys.invoices, queryFn: api.listInvoices });
+}
+
+export function useProjectInvoices(projectId: string) {
+  return useQuery({
+    queryKey: keys.projectInvoices(projectId),
+    queryFn: () => api.listProjectInvoices(projectId),
+    enabled: !!projectId,
+  });
+}
+
+export function useInvoice(id: string) {
+  return useQuery({ queryKey: keys.invoice(id), queryFn: () => api.getInvoice(id), enabled: !!id });
+}
+
+export function useSaveInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveInvoiceInput) => api.saveInvoice(input),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useSetInvoiceStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: InvoiceStatus }) =>
+      api.setInvoiceStatus(id, status),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useDeleteInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteInvoice(id),
+    onSuccess: () => invalidateAll(qc),
   });
 }

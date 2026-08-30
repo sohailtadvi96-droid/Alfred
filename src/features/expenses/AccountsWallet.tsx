@@ -3,11 +3,13 @@ import { money } from '@/lib/format';
 import { Icon } from '@/components/Icon';
 import { useAccountBalances } from './hooks';
 import { AddAccountDialog } from './AddAccountDialog';
+import { ImportCsvDialog } from './ImportCsvDialog';
 
 export function AccountsWallet() {
   const { data: accounts, isLoading } = useAccountBalances();
   const [hidden, setHidden] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const total = (accounts ?? []).reduce((s, a) => s + a.balance_cents, 0);
   const show = (c: number) => (hidden ? '••••••' : money(c, true));
@@ -44,10 +46,16 @@ export function AccountsWallet() {
           </button>
         </div>
       </div>
-      <button className="btn sec sm" onClick={() => setAddOpen(true)}>
-        Add account
-      </button>
+      <div className="wallet-actions">
+        <button className="btn sec sm" onClick={() => setAddOpen(true)}>
+          Add account
+        </button>
+        <button className="btn sec sm" onClick={() => setImportOpen(true)}>
+          Import CSV
+        </button>
+      </div>
       <AddAccountDialog open={addOpen} onOpenChange={setAddOpen} />
+      <ImportCsvDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
 import { ProjectList } from '@/features/work/ProjectList';
 import { ProjectFormDialog } from '@/features/work/ProjectFormDialog';
@@ -19,9 +20,14 @@ export function WorkPage() {
         showWallet={false}
         action={
           category === 'freelance' ? (
-            <button className="btn primary" onClick={() => setAddOpen(true)}>
-              New project
-            </button>
+            <>
+              <Link className="btn sec" to="/work/invoices">
+                Invoices
+              </Link>
+              <button className="btn primary" onClick={() => setAddOpen(true)}>
+                New project
+              </button>
+            </>
           ) : undefined
         }
       />

@@ -3,10 +3,14 @@ import type {
   Client,
   Deliverable,
   DeliverableStatus,
+  InvoiceFull,
+  InvoiceRow,
+  InvoiceStatus,
   NewClient,
   NewProject,
   ProjectAsset,
   ProjectWithClient,
+  SaveInvoiceInput,
   TimeEntry,
 } from './types';
 
@@ -179,5 +183,115 @@ export async function addTimeEntry(
 
 export async function deleteTimeEntry(id: string): Promise<void> {
   const { error } = await supabase.from('time_entries').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ---------- invoices ----------
+const INVOICE_SELECT_ROW = '*, project:projects(id,name), client:clients(id,name)';
+const INVOICE_SELECT_FULL =
+  '*, project:projects(id,name), client:clients(*), line_items:invoice_line_items(*)';
+
+/** quantity carries 2 decimals; amount is rounded to whole cents. */
+function lineAmountCents(quantity: number, unitPriceCents: number): number {
+  return Math.round(quantity * unitPriceCents);
+}
+
+export async function listInvoices(): Promise<InvoiceRow[]> {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select(INVOICE_SELECT_ROW)
+    .order('issue_date', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as InvoiceRow[];
+}
+
+export async function listProjectInvoices(projectId: string): Promise<InvoiceRow[]> {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select(INVOICE_SELECT_ROW)
+    .eq('project_id', projectId)
+    .order('issue_date', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as InvoiceRow[];
+}
+
+export async function getInvoice(id: string): Promise<InvoiceFull> {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select(INVOICE_SELECT_FULL)
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  const inv = data as InvoiceFull;
+  inv.line_items = [...(inv.line_items ?? [])]
+    .map((li) => ({ ...li, quantity: Number(li.quantity) }))
+    .sort((a, b) => a.position - b.position);
+  return inv;
+}
+
+/** Insert the invoice header + its line items, or replace them on update.
+ *  A new invoice draws its number from `next_invoice_number()`; an existing
+ *  one keeps the number it already has. */
+export async function saveInvoice(input: SaveInvoiceInput): Promise<string> {
+  const items = input.lineItems.map((li, i) => ({
+    description: li.description.trim(),
+    quantity: li.quantity,
+    unit_price_cents: li.unit_price_cents,
+    amount_cents: lineAmountCents(li.quantity, li.unit_price_cents),
+    position: i,
+  }));
+  const subtotal = items.reduce((s, li) => s + li.amount_cents, 0);
+  const tax = Math.max(0, Math.round(input.tax_cents));
+  const header = {
+    project_id: input.project_id,
+    client_id: input.client_id,
+    issue_date: input.issue_date,
+    due_date: input.due_date,
+    currency: input.currency,
+    notes: input.notes.trim() || null,
+    subtotal_cents: subtotal,
+    tax_cents: tax,
+    total_cents: subtotal + tax,
+  };
+
+  let invoiceId = input.id;
+  if (invoiceId) {
+    const { error } = await supabase.from('invoices').update(header).eq('id', invoiceId);
+    if (error) throw error;
+    const { error: delErr } = await supabase
+      .from('invoice_line_items')
+      .delete()
+      .eq('invoice_id', invoiceId);
+    if (delErr) throw delErr;
+  } else {
+    const { data: num, error: numErr } = await supabase.rpc('next_invoice_number');
+    if (numErr) throw numErr;
+    const { data, error } = await supabase
+      .from('invoices')
+      .insert({ ...header, invoice_number: num as string, status: 'draft' })
+      .select('id')
+      .single();
+    if (error) throw error;
+    invoiceId = (data as { id: string }).id;
+  }
+
+  if (items.length > 0) {
+    const { error } = await supabase
+      .from('invoice_line_items')
+      .insert(items.map((li) => ({ ...li, invoice_id: invoiceId })));
+    if (error) throw error;
+  }
+  return invoiceId;
+}
+
+export async function setInvoiceStatus(id: string, status: InvoiceStatus): Promise<void> {
+  const { error } = await supabase.from('invoices').update({ status }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteInvoice(id: string): Promise<void> {
+  const { error } = await supabase.from('invoices').delete().eq('id', id);
   if (error) throw error;
 }

@@ -5,16 +5,20 @@ import { fullDate } from '@/lib/format';
 import { AssetsChecklist } from './AssetsChecklist';
 import { DeliverablesList } from './DeliverablesList';
 import { EarningsSummary } from './EarningsSummary';
+import { InvoiceFormDialog } from './InvoiceFormDialog';
+import { InvoiceList } from './InvoiceList';
 import { ProjectFormDialog } from './ProjectFormDialog';
 import { TimeLog } from './TimeLog';
 import { projectStatusMeta } from './status';
-import { useDeleteProject, useProject } from './hooks';
+import { useDeleteProject, useProject, useProjectInvoices } from './hooks';
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const { data: project, isLoading, error } = useProject(projectId);
+  const invoices = useProjectInvoices(projectId);
   const del = useDeleteProject();
   const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
 
   if (error) {
@@ -72,18 +76,29 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         <TimeLog projectId={project.id} />
       </div>
 
-      <section className="work-section">
+      <section className="work-section work-section-wide">
         <div className="work-section-head">
           <h3>Invoices</h3>
-          <span className="work-count">next build</span>
+          <button className="btn sec sm" onClick={() => setInvoiceOpen(true)}>
+            New invoice
+          </button>
         </div>
-        <div className="work-empty">
-          Invoice generation, tracked <code>ALF-YYYY-####</code> numbering and PDF export arrive in
-          the next Phase 4 pass.
-        </div>
+        <InvoiceList
+          invoices={invoices.data}
+          isLoading={invoices.isLoading}
+          error={invoices.error}
+          showProject={false}
+          emptyHint="Generate the first invoice for this project."
+        />
       </section>
 
       <ProjectFormDialog open={editOpen} onOpenChange={setEditOpen} edit={project} />
+      <InvoiceFormDialog
+        open={invoiceOpen}
+        onOpenChange={setInvoiceOpen}
+        project={project}
+        onSaved={(id) => navigate(`/work/invoices/${id}`)}
+      />
     </div>
   );
 }

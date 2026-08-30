@@ -1,25 +1,24 @@
 import { useState } from 'react';
-import { money } from '@/lib/format';
+import { useNavigate } from 'react-router-dom';
+import { money, monthKey } from '@/lib/format';
 import { SeatedEnter } from '@/components/SeatedEnter';
-import { CategoryCard } from './CategoryCard';
+import { CategoryCard, type RecentEntry } from './CategoryCard';
 import { EditCategoryDialog } from './EditCategoryDialog';
 import { AccountsWallet } from './AccountsWallet';
-import { useCategories, useMonthSummary } from './hooks';
+import { useCategories, useMonthSummary, useTransactions } from './hooks';
 import type { Category, Direction } from './categories';
-import type { TxnFilter } from './api';
 
 export function MonthDashboard({
   month,
-  filter,
-  onFilterChange,
+  flow,
 }: {
   month: string;
-  filter: Omit<TxnFilter, 'month'>;
-  onFilterChange: (f: Omit<TxnFilter, 'month'>) => void;
+  flow: Direction | undefined;
 }) {
   const { data, isLoading } = useMonthSummary(month);
+  const { data: monthTxns } = useTransactions({ month });
   const cats = useCategories();
-  const flow = filter.direction;
+  const navigate = useNavigate();
   const [editCat, setEditCat] = useState<Category | null>(null);
 
   if (isLoading || !data) {
@@ -36,6 +35,17 @@ export function MonthDashboard({
   const totals = new Map(data.byCategory.map((c) => [`${c.direction}:${c.category}`, c]));
   const denom = (d: Direction) => (d === 'credit' ? incomeCents : spendCents);
 
+  // up to 2 most-recent entries per category (list is already newest-first)
+  const recentByKey = new Map<string, RecentEntry[]>();
+  for (const t of monthTxns ?? []) {
+    const k = `${t.direction}:${t.category}`;
+    const arr = recentByKey.get(k) ?? [];
+    if (arr.length < 2) {
+      arr.push({ merchant: t.merchant_raw, amountCents: t.amount_cents, direction: t.direction, date: t.occurred_at });
+      recentByKey.set(k, arr);
+    }
+  }
+
   const cards = cats.all
     .filter((c) => !flow || c.direction === flow)
     .map((cat) => {
@@ -44,9 +54,12 @@ export function MonthDashboard({
     })
     .sort((a, b) => b.cents - a.cents || a.cat.sort - b.cat.sort);
 
-  function toggleCategory(slug: string, direction: Direction) {
-    if (filter.category === slug) onFilterChange({ ...filter, category: undefined });
-    else onFilterChange({ ...filter, category: slug, direction });
+  function openCategory(cat: Category) {
+    const p = new URLSearchParams();
+    if (month !== monthKey()) p.set('month', month);
+    p.set('flow', cat.direction);
+    p.set('category', cat.slug);
+    navigate({ pathname: '/expenses/transactions', search: `?${p.toString()}` });
   }
 
   return (
@@ -72,12 +85,11 @@ export function MonthDashboard({
                 key={`${cat.direction}:${cat.slug}`}
                 style={{ ['--i' as string]: i } as React.CSSProperties}
                 cat={cat}
-                rank={i + 1}
                 spentCents={cents}
                 count={n}
                 sharePct={d > 0 ? Math.round((cents / d) * 100) : 0}
-                active={filter.category === cat.slug}
-                onToggle={() => toggleCategory(cat.slug, cat.direction)}
+                recent={recentByKey.get(`${cat.direction}:${cat.slug}`) ?? []}
+                onOpen={() => openCategory(cat)}
                 onEdit={() => setEditCat(cat)}
               />
             );

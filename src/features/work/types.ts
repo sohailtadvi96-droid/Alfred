@@ -87,3 +87,68 @@ export interface Earnings {
   effectiveHourlyCents: number | null;
   basis: RateType;
 }
+
+// ---------- invoices ----------
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue';
+
+export interface InvoiceLineItem {
+  id: string;
+  invoice_id: string;
+  description: string;
+  quantity: number;
+  unit_price_cents: number;
+  amount_cents: number;
+  position: number;
+}
+
+export interface Invoice {
+  id: string;
+  invoice_number: string;
+  project_id: string | null;
+  client_id: string | null;
+  issue_date: string;
+  due_date: string | null;
+  status: InvoiceStatus;
+  currency: string;
+  subtotal_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** List row: invoice joined with project + client names. */
+export interface InvoiceRow extends Invoice {
+  project: Pick<Project, 'id' | 'name'> | null;
+  client: Pick<Client, 'id' | 'name'> | null;
+}
+
+/** Full invoice for the document view: line items + the client billing block. */
+export interface InvoiceFull extends Invoice {
+  project: Pick<Project, 'id' | 'name'> | null;
+  client: Client | null;
+  line_items: InvoiceLineItem[];
+}
+
+/** A row in the invoice form before it's saved. */
+export interface DraftLineItem {
+  /** existing row id, or null for a new one */
+  id: string | null;
+  description: string;
+  quantity: string;
+  unitPrice: string;
+}
+
+export interface SaveInvoiceInput {
+  /** null → create (allocates a number), otherwise update that invoice */
+  id: string | null;
+  project_id: string | null;
+  client_id: string | null;
+  issue_date: string;
+  due_date: string | null;
+  currency: string;
+  notes: string;
+  tax_cents: number;
+  lineItems: { description: string; quantity: number; unit_price_cents: number }[];
+}
