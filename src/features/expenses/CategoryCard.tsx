@@ -4,6 +4,7 @@ import { readableInk } from '@/lib/color';
 import { Icon } from '@/components/Icon';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { CategoryColorButton } from './CategoryColorButton';
+import { usePrivacy, MASK } from './privacy';
 import type { Category, Direction } from './categories';
 
 export interface RecentEntry {
@@ -36,6 +37,9 @@ export function CategoryCard({
 }) {
   const ink = readableInk(cat.color);
   const empty = count === 0;
+  const { hidden } = usePrivacy();
+  // only money-in categories are masked by the global toggle
+  const maskAmount = hidden && cat.direction === 'credit';
 
   // a sheet prints out only when a NEW entry lands in the month on screen —
   // not when the month itself changes
@@ -95,7 +99,7 @@ export function CategoryCard({
                 <span className="rc-d">{shortDate(r.date)}</span>
                 <span className="rc-m">{r.merchant || '—'}</span>
                 <span className={`rc-a${r.direction === 'credit' ? ' in' : ''}`}>
-                  {signedMoney(r.amountCents, r.direction)}
+                  {maskAmount ? '••••' : signedMoney(r.amountCents, r.direction)}
                 </span>
               </div>
             ))}
@@ -122,7 +126,7 @@ export function CategoryCard({
 
           <div className="catcard-foot">
             <span className={`catcard-big${printKey > 0 ? ' bumped' : ''}`}>
-              <AnimatedNumber value={spentCents} format={(c) => money(c, true)} />
+              {maskAmount ? MASK : <AnimatedNumber value={spentCents} format={(c) => money(c, true)} />}
               <small>{cat.direction === 'credit' ? 'in' : 'spent'}</small>
             </span>
             <span className="catcard-entries">

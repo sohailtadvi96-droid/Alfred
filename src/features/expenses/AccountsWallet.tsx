@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { money } from '@/lib/format';
 import { Icon } from '@/components/Icon';
 import { useAccountBalances } from './hooks';
+import { usePrivacy } from './privacy';
 import { AddAccountDialog } from './AddAccountDialog';
 import { ImportCsvDialog } from './ImportCsvDialog';
 
 export function AccountsWallet() {
   const { data: accounts, isLoading } = useAccountBalances();
-  const [hidden, setHidden] = useState(false);
+  const { hidden, toggle } = usePrivacy();
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
@@ -38,9 +39,9 @@ export function AccountsWallet() {
           <div className="amt">{show(total)}</div>
           <button
             className={`eye${hidden ? ' off' : ''}`}
-            onClick={() => setHidden((h) => !h)}
-            data-tip={hidden ? 'Show figures' : 'Hide every figure'}
-            aria-label={hidden ? 'Show figures' : 'Hide figures'}
+            onClick={toggle}
+            data-tip={hidden ? 'Show all amounts' : 'Hide all amounts'}
+            aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
           >
             <Icon name="eye" size={15} />
           </button>

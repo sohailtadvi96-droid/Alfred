@@ -7,6 +7,7 @@ import { CategoryCard, type RecentEntry } from './CategoryCard';
 import { EditCategoryDialog } from './EditCategoryDialog';
 import { AccountsWallet } from './AccountsWallet';
 import { useCategories, useMonthSummary, useTransactions } from './hooks';
+import { usePrivacy, MASK } from './privacy';
 import type { Category, Direction } from './categories';
 
 export function MonthDashboard({
@@ -20,6 +21,7 @@ export function MonthDashboard({
   const { data: monthTxns } = useTransactions({ month });
   const cats = useCategories();
   const navigate = useNavigate();
+  const { hidden } = usePrivacy();
   const [editCat, setEditCat] = useState<Category | null>(null);
 
   if (isLoading || !data) {
@@ -127,7 +129,7 @@ export function MonthDashboard({
         <div className="sumcard sumcard-income">
           <span className="sumcard-l">Income · this month</span>
           <span className="sumcard-v" style={{ color: 'var(--pos)' }}>
-            <AnimatedNumber value={incomeCents} format={(c) => money(c, true)} />
+            {hidden ? MASK : <AnimatedNumber value={incomeCents} format={(c) => money(c, true)} />}
           </span>
           <span className="sumcard-s">
             <AnimatedNumber value={creditCount} format={String} /> credit
