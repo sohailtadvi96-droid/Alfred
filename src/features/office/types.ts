@@ -30,8 +30,28 @@ export interface OfficeNote {
   body: string;
   pinned: boolean;
   archived: boolean;
+  /** null → running quick note (calendar landing); a date → that day's page */
+  entry_date: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  entry_date: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** what a calendar day holds — drives the cell's dots and its hover preview */
+export interface DaySummary {
+  /** local meeting titles (Google titles are merged in on the client) */
+  events: string[];
+  tasks: { title: string; done: boolean }[];
+  noteCount: number;
+  /** first line of the journal entry, trimmed — null when empty */
+  journal: string | null;
 }
 
 export interface NewTask {

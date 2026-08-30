@@ -13,7 +13,7 @@ export function NotesPanel() {
     e.preventDefault();
     if (!body.trim()) return;
     try {
-      await add.mutateAsync(body);
+      await add.mutateAsync({ body });
       setBody('');
     } catch (err) {
       setBanner(errMessage(err, 'Could not save the note.'));
@@ -23,7 +23,7 @@ export function NotesPanel() {
   return (
     <section className="office-section office-section-wide">
       <div className="office-section-head">
-        <h3>Notes &amp; follow-ups</h3>
+        <h3>Quick notes</h3>
         <span className="office-count">{notes?.length ?? 0}</span>
       </div>
 

@@ -1149,40 +1149,15 @@ button {
   animation: card-print 0.95s cubic-bezier(0.3, 1, 0.4, 1) both;
 }
 
-/* wallet action buttons row */
+/* wallet action buttons — stacked below the pocket */
 .wallet-actions {
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 .wallet-actions .btn {
-  flex: 1;
+  width: 100%;
   justify-content: center;
-}
-/* ---- jump to the full ledger — a grid cell right after the last card ---- */
-.catgrid-arrow {
-  align-self: center;
-  justify-self: start;
-  width: 62px;
-  height: 62px;
-  border-radius: 18px;
-  background: var(--base);
-  color: var(--base-ink);
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  font-size: 26px;
-  text-decoration: none;
-  box-shadow: var(--sh-sm);
-  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), filter 0.14s ease, box-shadow 0.16s ease;
-}
-.catgrid-arrow:hover {
-  transform: translateX(5px) scale(1.06);
-  filter: brightness(1.06);
-  box-shadow: var(--sh);
-}
-.catgrid-arrow:focus-visible {
-  outline: 2px solid var(--base);
-  outline-offset: 3px;
 }
 
 /* ---- CSV import dialog ---- */
@@ -1444,6 +1419,31 @@ button {
   z-index: 8;
   box-shadow: 0 14px 26px rgba(0, 0, 0, 0.34), 0 -3px 10px rgba(0, 0, 0, 0.18);
 }
+.wallet.managing .acct:hover {
+  transform: none;
+  z-index: 1;
+  box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.18);
+}
+.acct-del {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: none;
+  background: #c56350;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.acct-del:hover {
+  background: #a83f30;
+}
 .wallet .acct .bal {
   font-family: var(--mono);
   font-weight: 500;
@@ -1482,21 +1482,94 @@ button {
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
-.wallet .pocket .eye {
-  margin: 12px auto 0;
-  width: 30px;
-  height: 30px;
+.wallet .pocket-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+.wallet .pocket-controls .pk-right {
+  display: flex;
+  gap: 6px;
+}
+.wallet .pk-btn {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: 1px solid rgba(245, 240, 225, 0.25);
+  background: none;
+  color: #9a927e;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
   display: grid;
   place-items: center;
-  color: #9a927e;
-  background: none;
   cursor: pointer;
+  padding: 0;
+  transition: color 0.14s ease, border-color 0.14s ease;
 }
-.wallet .pocket .eye.off {
-  color: #c7bfa8;
-  border-color: rgba(245, 240, 225, 0.5);
+.wallet .pk-btn:hover {
+  color: #ede7d6;
+  border-color: rgba(245, 240, 225, 0.55);
+}
+.wallet .pk-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.wallet .pk-btn.on {
+  color: #ede7d6;
+  border-color: rgba(245, 240, 225, 0.6);
+}
+.wallet .pk-btn.on.danger {
+  color: #e08a7c;
+  border-color: #c56350;
+}
+
+/* ---- ledger totals bar ---- */
+.ledger-summary {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.ledger-summary .ls-item {
+  flex: 1;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-left: 1px solid var(--line);
+}
+.ledger-summary .ls-item:first-child {
+  border-left: none;
+}
+.ledger-summary .ls-l {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.ledger-summary .ls-v {
+  font-weight: 800;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.ledger-summary .ls-item.in .ls-v {
+  color: var(--pos);
+}
+@media (max-width: 560px) {
+  .ledger-summary {
+    flex-direction: column;
+  }
+  .ledger-summary .ls-item {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+  .ledger-summary .ls-item:first-child {
+    border-top: none;
+  }
 }
 
 /* ---- ledger ---- */
@@ -3215,4 +3288,194 @@ a.row-x {
 }
 .gsync .btn {
   flex-shrink: 0;
+}
+
+/* ---- office: month calendar (journal landing) ---- */
+.office-cal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.office-cal-nav {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.office-cal-nav:hover {
+  border-color: var(--base-line);
+  color: var(--base);
+}
+.office-cal-title {
+  font-weight: 800;
+  font-size: 16px;
+}
+.office-cal-today {
+  margin-left: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.office-cal-today:hover {
+  color: var(--base);
+  border-color: var(--base-line);
+}
+.office-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.office-cal-wd {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 2px 0 6px;
+}
+.office-cal-cell {
+  min-height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.office-cal-cell:hover {
+  border-color: var(--base-line);
+  background: var(--surface);
+}
+.office-cal-cell:focus-visible {
+  outline: 2px solid var(--base);
+  outline-offset: 1px;
+}
+.office-cal-cell.out {
+  opacity: 0.42;
+}
+.office-cal-cell.today {
+  border-color: var(--base);
+  box-shadow: inset 0 0 0 1px var(--base);
+}
+.office-cal-num {
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.office-cal-dots {
+  display: flex;
+  gap: 3px;
+  margin-top: auto;
+}
+.office-cal-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.office-cal-dot.evt {
+  background: var(--wip);
+}
+.office-cal-dot.task {
+  background: var(--c-ochre);
+}
+.office-cal-dot.note {
+  background: var(--c-sage);
+}
+.office-cal-dot.jrnl {
+  background: var(--base);
+}
+.office-cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.office-cal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+@media (max-width: 560px) {
+  .office-cal-cell {
+    min-height: 48px;
+    padding: 4px 5px;
+  }
+  .office-cal-num {
+    font-size: 11px;
+  }
+}
+
+/* ---- office: single-day page ---- */
+.office-day-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.office-day-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.office-day-title {
+  flex: 1;
+  font-weight: 800;
+  font-size: 17px;
+  min-width: 0;
+}
+.office-day-today {
+  color: var(--base);
+  font-weight: 700;
+}
+.office-day-step {
+  display: flex;
+  gap: 4px;
+}
+textarea.office-journal {
+  font-family: var(--sans);
+  line-height: 1.62;
+  resize: vertical;
+}
+
+/* ---- office: calendar cell hover preview ---- */
+.office-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  max-width: 220px;
+}
+.office-tip > div {
+  line-height: 1.4;
+}
+.office-tip b {
+  display: block;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin-bottom: 1px;
 }

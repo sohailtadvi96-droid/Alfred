@@ -10,10 +10,13 @@ export function TaskDialog({
   open,
   onOpenChange,
   edit,
+  defaultDue,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   edit?: OfficeTask;
+  /** pre-fill the due date when adding (day page) */
+  defaultDue?: string;
 }) {
   const save = useSaveTask();
   const [title, setTitle] = useState('');
@@ -26,10 +29,10 @@ export function TaskDialog({
     if (!open) return;
     setTitle(edit?.title ?? '');
     setNotes(edit?.notes ?? '');
-    setDue(edit?.due_date ?? '');
+    setDue(edit?.due_date ?? defaultDue ?? '');
     setPriority(edit?.priority ?? 'normal');
     setError(null);
-  }, [open, edit]);
+  }, [open, edit, defaultDue]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

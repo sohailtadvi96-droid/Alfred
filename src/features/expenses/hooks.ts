@@ -135,6 +135,14 @@ export function useAddAccount() {
   });
 }
 
+export function useDeleteAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteAccount(id),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
 /** Recategorise one txn, and optionally make it a standing rule for the merchant. */
 export function useRecategorise() {
   const qc = useQueryClient();

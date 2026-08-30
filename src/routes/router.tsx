@@ -7,6 +7,7 @@ import { TransactionsPage } from './TransactionsPage';
 import { SecretsPage } from './SecretsPage';
 import { WorkPage } from './WorkPage';
 import { ProjectDetailPage } from './ProjectDetailPage';
+import { OfficeDayPage } from './OfficeDayPage';
 import { InvoicesPage } from './InvoicesPage';
 import { InvoiceViewPage } from './InvoiceViewPage';
 import { SettingsPage } from './SettingsPage';
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
       { path: 'expenses/transactions', element: <TransactionsPage /> },
       { path: 'secrets', element: <SecretsPage /> },
       { path: 'work', element: <WorkPage /> },
+      { path: 'work/day/:date', element: <OfficeDayPage /> },
       { path: 'work/invoices', element: <InvoicesPage /> },
       { path: 'work/invoices/:invoiceId', element: <InvoiceViewPage /> },
       { path: 'work/:projectId', element: <ProjectDetailPage /> },

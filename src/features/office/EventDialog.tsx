@@ -5,7 +5,11 @@ import { fromLocalInput, toLocalInput } from './datetime';
 import { useSaveEvent } from './hooks';
 import type { OfficeEvent } from './types';
 
-function defaultStart(): string {
+function defaultStart(dayKey?: string): string {
+  if (dayKey) {
+    const [y, m, d] = dayKey.split('-').map(Number);
+    return toLocalInput(new Date(y, m - 1, d, 9, 0).toISOString());
+  }
   const d = new Date();
   d.setMinutes(0, 0, 0);
   d.setHours(d.getHours() + 1);
@@ -16,10 +20,13 @@ export function EventDialog({
   open,
   onOpenChange,
   edit,
+  defaultDate,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   edit?: OfficeEvent;
+  /** when adding from a day page, seed the start at 09:00 on that date */
+  defaultDate?: string;
 }) {
   const save = useSaveEvent();
   const [title, setTitle] = useState('');
@@ -33,13 +40,13 @@ export function EventDialog({
   useEffect(() => {
     if (!open) return;
     setTitle(edit?.title ?? '');
-    setStart(edit ? toLocalInput(edit.starts_at) : defaultStart());
+    setStart(edit ? toLocalInput(edit.starts_at) : defaultStart(defaultDate));
     setEnd(edit?.ends_at ? toLocalInput(edit.ends_at) : '');
     setLocation(edit?.location ?? '');
     setAttendees(edit?.attendees ?? '');
     setNotes(edit?.notes ?? '');
     setError(null);
-  }, [open, edit]);
+  }, [open, edit, defaultDate]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

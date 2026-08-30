@@ -1,8 +1,6 @@
-import { EventList } from './EventList';
 import { GoogleSync } from './GoogleSync';
 import { NotesPanel } from './NotesPanel';
-import { TaskList } from './TaskList';
-import { TodayView } from './TodayView';
+import { OfficeCalendar } from './OfficeCalendar';
 import { useGoogleCalendar } from './useGoogleCalendar';
 
 export function OfficeView() {
@@ -10,13 +8,8 @@ export function OfficeView() {
 
   return (
     <div className="office">
-      <TodayView googleEvents={gcal.events} />
-
-      <div className="office-grid">
-        <EventList googleEvents={gcal.events} syncStrip={<GoogleSync gcal={gcal} />} />
-        <TaskList />
-      </div>
-
+      <GoogleSync gcal={gcal} />
+      <OfficeCalendar googleEvents={gcal.events} />
       <NotesPanel />
     </div>
   );

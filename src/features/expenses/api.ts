@@ -139,6 +139,12 @@ export async function addAccount(input: {
   if (error) throw error;
 }
 
+/** Delete an account. Its transactions keep their rows (account_id -> null). */
+export async function deleteAccount(id: string): Promise<void> {
+  const { error } = await supabase.from('accounts').delete().eq('id', id);
+  if (error) throw error;
+}
+
 /** User override rule for a merchant substring. */
 export async function addCategoryRule(input: {
   pattern: string;

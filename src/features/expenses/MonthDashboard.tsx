@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { money, monthKey } from '@/lib/format';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SeatedEnter } from '@/components/SeatedEnter';
@@ -65,14 +65,6 @@ export function MonthDashboard({
     navigate({ pathname: '/expenses/transactions', search: `?${p.toString()}` });
   }
 
-  const ledgerSearch = (() => {
-    const p = new URLSearchParams();
-    if (month !== monthKey()) p.set('month', month);
-    if (flow) p.set('flow', flow);
-    const s = p.toString();
-    return s ? `?${s}` : '';
-  })();
-
   return (
     <div className="dash-layout">
       <div className="dash-main">
@@ -113,15 +105,6 @@ export function MonthDashboard({
               />
             );
           })}
-          <Link
-            className="catgrid-arrow"
-            to={{ pathname: '/expenses/transactions', search: ledgerSearch }}
-            style={{ ['--i' as string]: cards.length } as React.CSSProperties}
-            data-tip="Open the full ledger — flow, category & account filters"
-            aria-label="Open transactions"
-          >
-            →
-          </Link>
         </SeatedEnter>
       </div>
 

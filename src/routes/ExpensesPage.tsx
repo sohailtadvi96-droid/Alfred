@@ -12,12 +12,21 @@ import { AddTransactionDialog } from '@/features/expenses/AddTransactionDialog';
 import { AddCategoryDialog } from '@/features/expenses/AddCategoryDialog';
 
 const HIDE_KEY = 'alfred-expenses-hide-amounts';
+const WALLET_HIDE_KEY = 'alfred-expenses-hide-wallet';
 
-function readHidden() {
+function readFlag(key: string) {
   try {
-    return localStorage.getItem(HIDE_KEY) === '1';
+    return localStorage.getItem(key) === '1';
   } catch {
     return false;
+  }
+}
+
+function persist(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, value ? '1' : '0');
+  } catch {
+    /* ignore */
   }
 }
 
@@ -25,30 +34,32 @@ export function ExpensesPage() {
   const { month, flow, setMonth, setFlow } = useExpenseFilters();
   const [addOpen, setAddOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
-  const [hidden, setHidden] = useState(readHidden);
+  const [hidden, setHidden] = useState(() => readFlag(HIDE_KEY));
+  const [walletHidden, setWalletHidden] = useState(() => readFlag(WALLET_HIDE_KEY));
   const { data: balances } = useAccountBalances();
 
-  const toggleHidden = useCallback(() => {
+  const toggle = useCallback(() => {
     setHidden((h) => {
-      const next = !h;
-      try {
-        localStorage.setItem(HIDE_KEY, next ? '1' : '0');
-      } catch {
-        /* ignore */
-      }
-      return next;
+      persist(HIDE_KEY, !h);
+      return !h;
+    });
+  }, []);
+  const toggleWallet = useCallback(() => {
+    setWalletHidden((h) => {
+      persist(WALLET_HIDE_KEY, !h);
+      return !h;
     });
   }, []);
 
   const total = (balances ?? []).reduce((s, a) => s + a.balance_cents, 0);
-  const walletValue = hidden
+  const walletValue = walletHidden
     ? MASK
     : balances && balances.length > 0
       ? money(total, true)
       : '—';
 
   return (
-    <PrivacyContext.Provider value={{ hidden, toggle: toggleHidden }}>
+    <PrivacyContext.Provider value={{ hidden, toggle, walletHidden, toggleWallet }}>
       <TopBar
         title="Expenses"
         crumb="01 / MODULE"
@@ -58,8 +69,8 @@ export function ExpensesPage() {
           <>
             <button
               className={`btn sec btn-icon${hidden ? ' on' : ''}`}
-              onClick={toggleHidden}
-              data-tip={hidden ? 'Show amounts' : 'Hide all amounts'}
+              onClick={toggle}
+              data-tip={hidden ? 'Show money-in amounts' : 'Hide money-in amounts'}
               aria-pressed={hidden}
               aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
             >

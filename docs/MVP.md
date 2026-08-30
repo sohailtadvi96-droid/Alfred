@@ -120,8 +120,9 @@ TOTP/2FA code storage, breach check, import from other managers, sharing, browse
 
 ## Module 3 — Work / Freelance
 
-*(The "Office work" tab — tasks, meetings, notes and a Today view, with optional
-read-only Google Calendar sync — shipped in Phase 5.)*
+*(The "Office work" tab — a journal calendar landing → per-day pages with
+schedule, tasks, a journal entry and notes, plus optional read-only Google
+Calendar sync — shipped in Phase 5.)*
 
 ### Features
 - **Project list** with status: `prospective`, `active`, `delivered`, `closed`, `on_hold`.
@@ -171,6 +172,7 @@ Recurring invoices, payment-gateway integration, contracts / e-sign, per-project
    - ✅ **4a** — Work page with Freelance / Office-work category toggle; project list + detail; project form with inline client create; assets checklist, deliverables (with due/overdue), time log + running total, earnings summary (effective hourly). Routes `/work`, `/work/:projectId`.
    - ✅ **4b** — invoice builder (dialog, dynamic line items, flat tax, notes) from a project or blank; `ALF-YYYY-####` via `next_invoice_number()` on create; status draft/sent/paid/overdue (sent + past-due reads as overdue); per-project + global invoice lists; print-styled invoice document (`@media print`) with client billing block. Routes `/work/invoices`, `/work/invoices/:invoiceId`.
    - ✅ **4c** — per-project **Client brief** box (edit-in-place, `projects.brief`, migration 0008); Edit + PDF actions on invoice list rows (`?print=1` deep-link auto-opens the print dialog); print names the file after the invoice number.
-5. Office work (Work module, second tab) — migration 0009 (`office_tasks`, `office_events`, `office_notes`)
-   - ✅ Today panel (today's schedule + tasks due/overdue), Tasks (priority, due, done), Meetings (local + merged agenda), Notes & follow-ups (pin/archive).
-   - ✅ Optional Google Calendar read-only sync via GIS token client (`VITE_GOOGLE_CLIENT_ID`); events merged into the agenda, never stored. Degrades to a setup note when unconfigured.
+5. Office work (Work module, second tab) — migrations 0009 (`office_tasks`, `office_events`, `office_notes`), 0010 (`office_notes.entry_date`, `office_journal`)
+   - ✅ Journal calendar as the landing: a Monday-first month grid with per-day dots (meeting / task due / note / journal), month + Today nav, plus a running **Quick notes** panel (undated, pin/archive) and the Google-sync strip.
+   - ✅ Per-day page `/work/day/:date` — Schedule (local meetings + that day's Google events, add/edit local), Due (tasks with that due date, add pre-dated), Journal (one free-text entry per day, autosaves on blur), Notes (short notes filed to that date). Prev/next-day nav.
+   - ✅ Optional Google Calendar read-only sync via GIS token client (`VITE_GOOGLE_CLIENT_ID`); events merged into calendar dots + the day schedule, never stored. Degrades to a setup note when unconfigured.

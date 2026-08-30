@@ -1,5 +1,15 @@
 import { supabase } from '@/lib/supabase';
-import type { NewEvent, NewTask, OfficeEvent, OfficeNote, OfficeTask, TaskStatus } from './types';
+import { localDateKey } from './datetime';
+import type {
+  DaySummary,
+  JournalEntry,
+  NewEvent,
+  NewTask,
+  OfficeEvent,
+  OfficeNote,
+  OfficeTask,
+  TaskStatus,
+} from './types';
 
 // ---------- tasks ----------
 export async function listTasks(): Promise<OfficeTask[]> {
@@ -77,19 +87,35 @@ export async function deleteEvent(id: string): Promise<void> {
 }
 
 // ---------- notes ----------
+/** Running "quick notes" on the calendar landing — the undated ones. */
 export async function listNotes(): Promise<OfficeNote[]> {
   const { data, error } = await supabase
     .from('office_notes')
     .select('*')
     .eq('archived', false)
+    .is('entry_date', null)
     .order('pinned', { ascending: false })
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data as OfficeNote[];
 }
 
-export async function addNote(body: string): Promise<void> {
-  const { error } = await supabase.from('office_notes').insert({ body: body.trim() });
+/** Notes attached to one calendar day. */
+export async function listDayNotes(date: string): Promise<OfficeNote[]> {
+  const { data, error } = await supabase
+    .from('office_notes')
+    .select('*')
+    .eq('archived', false)
+    .eq('entry_date', date)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as OfficeNote[];
+}
+
+export async function addNote(body: string, entryDate: string | null = null): Promise<void> {
+  const { error } = await supabase
+    .from('office_notes')
+    .insert({ body: body.trim(), entry_date: entryDate });
   if (error) throw error;
 }
 
@@ -101,4 +127,96 @@ export async function updateNote(
   if (typeof next.body === 'string') next.body = next.body.trim();
   const { error } = await supabase.from('office_notes').update(next).eq('id', id);
   if (error) throw error;
+}
+
+// ---------- day-scoped reads ----------
+export async function listEventsOn(dayStartISO: string, dayEndISO: string): Promise<OfficeEvent[]> {
+  const { data, error } = await supabase
+    .from('office_events')
+    .select('*')
+    .gte('starts_at', dayStartISO)
+    .lt('starts_at', dayEndISO)
+    .order('starts_at', { ascending: true });
+  if (error) throw error;
+  return data as OfficeEvent[];
+}
+
+export async function listTasksDue(date: string): Promise<OfficeTask[]> {
+  const { data, error } = await supabase
+    .from('office_tasks')
+    .select('*')
+    .eq('due_date', date)
+    .order('status', { ascending: true })
+    .order('priority', { ascending: false });
+  if (error) throw error;
+  return data as OfficeTask[];
+}
+
+// ---------- journal ----------
+export async function getJournal(date: string): Promise<JournalEntry | null> {
+  const { data, error } = await supabase
+    .from('office_journal')
+    .select('*')
+    .eq('entry_date', date)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as JournalEntry) ?? null;
+}
+
+export async function saveJournal(date: string, body: string): Promise<void> {
+  const { error } = await supabase
+    .from('office_journal')
+    .upsert({ entry_date: date, body }, { onConflict: 'user_id,entry_date' });
+  if (error) throw error;
+}
+
+// ---------- calendar month markers ----------
+/** For a date window (grid start .. grid end, inclusive date strings), a short
+ *  summary of each day: meeting + task titles, note count, journal first line.
+ *  Drives both the cell dots and the hover preview. */
+export async function monthActivity(
+  startDate: string,
+  endDate: string,
+): Promise<Record<string, DaySummary>> {
+  const startISO = new Date(`${startDate}T00:00:00`).toISOString();
+  const endISO = new Date(`${endDate}T23:59:59`).toISOString();
+
+  const [ev, tk, nt, jr] = await Promise.all([
+    supabase
+      .from('office_events')
+      .select('starts_at, title')
+      .gte('starts_at', startISO)
+      .lte('starts_at', endISO)
+      .order('starts_at', { ascending: true }),
+    supabase
+      .from('office_tasks')
+      .select('due_date, title, status')
+      .gte('due_date', startDate)
+      .lte('due_date', endDate),
+    supabase
+      .from('office_notes')
+      .select('entry_date')
+      .eq('archived', false)
+      .gte('entry_date', startDate)
+      .lte('entry_date', endDate),
+    supabase.from('office_journal').select('entry_date, body').gte('entry_date', startDate).lte('entry_date', endDate),
+  ]);
+  for (const r of [ev, tk, nt, jr]) if (r.error) throw r.error;
+
+  const map: Record<string, DaySummary> = {};
+  const touch = (key: string): DaySummary =>
+    (map[key] ??= { events: [], tasks: [], noteCount: 0, journal: null });
+
+  for (const r of (ev.data ?? []) as { starts_at: string; title: string }[])
+    touch(localDateKey(r.starts_at)).events.push(r.title);
+  for (const r of (tk.data ?? []) as { due_date: string | null; title: string; status: string }[])
+    if (r.due_date) touch(r.due_date).tasks.push({ title: r.title, done: r.status === 'done' });
+  for (const r of (nt.data ?? []) as { entry_date: string | null }[])
+    if (r.entry_date) touch(r.entry_date).noteCount += 1;
+  for (const r of (jr.data ?? []) as { entry_date: string; body: string }[]) {
+    const line = r.body.replace(/\s+/g, ' ').trim();
+    if (line) touch(r.entry_date).journal = line.slice(0, 90);
+  }
+
+  return map;
 }
