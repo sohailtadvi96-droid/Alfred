@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { errMessage } from '@/lib/errors';
 import { fullDate } from '@/lib/format';
 import { AssetsChecklist } from './AssetsChecklist';
+import { BriefBox } from './BriefBox';
 import { DeliverablesList } from './DeliverablesList';
 import { EarningsSummary } from './EarningsSummary';
+import { useInvoiceEditor } from './InvoiceEditor';
 import { InvoiceFormDialog } from './InvoiceFormDialog';
 import { InvoiceList } from './InvoiceList';
 import { ProjectFormDialog } from './ProjectFormDialog';
@@ -15,6 +17,7 @@ import { useDeleteProject, useProject, useProjectInvoices } from './hooks';
 export function ProjectDetail({ projectId }: { projectId: string }) {
   const { data: project, isLoading, error } = useProject(projectId);
   const invoices = useProjectInvoices(projectId);
+  const { editInvoice, editorNode } = useInvoiceEditor();
   const del = useDeleteProject();
   const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
@@ -70,6 +73,8 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
 
       <EarningsSummary project={project} />
 
+      <BriefBox projectId={project.id} brief={project.brief} />
+
       <div className="work-sections">
         <DeliverablesList projectId={project.id} />
         <AssetsChecklist projectId={project.id} />
@@ -89,6 +94,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
           error={invoices.error}
           showProject={false}
           emptyHint="Generate the first invoice for this project."
+          onEdit={editInvoice}
         />
       </section>
 
@@ -99,6 +105,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         project={project}
         onSaved={(id) => navigate(`/work/invoices/${id}`)}
       />
+      {editorNode}
     </div>
   );
 }

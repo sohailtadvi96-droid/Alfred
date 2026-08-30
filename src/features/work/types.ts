@@ -15,6 +15,8 @@ export interface Project {
   name: string;
   client_id: string | null;
   description: string | null;
+  /** the full brief the client sent, edited in place on the project page */
+  brief: string | null;
   status: ProjectStatus;
   rate_type: RateType;
   rate_cents: number | null;

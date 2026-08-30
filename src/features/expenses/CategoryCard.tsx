@@ -34,43 +34,28 @@ export function CategoryCard({
   const ink = readableInk(cat.color);
   const empty = count === 0;
 
-  // a fresh "sheet" drops into the folder whenever an entry lands here
+  // a sheet prints out whenever an entry lands in this category
   const prev = useRef(count);
   const [printKey, setPrintKey] = useState(0);
   useEffect(() => {
     if (count > prev.current) {
       setPrintKey((k) => k + 1);
-      const t = setTimeout(() => setPrintKey(0), 900);
+      const t = setTimeout(() => setPrintKey(0), 950);
       prev.current = count;
       return () => clearTimeout(t);
     }
     prev.current = count;
   }, [count]);
 
-  const cardStyle = { ...style, ['--c']: cat.color, ['--fink']: ink } as CSSProperties;
-
-  const paper = (i: number) => {
-    const r = recent[i];
-    return (
-      <div className={`paper paper-${i}${printKey > 0 && i === 0 ? ' printing' : ''}`} key={i}>
-        {r ? (
-          <>
-            <span className="paper-d">{shortDate(r.date)}</span>
-            <span className="paper-m">{r.merchant || '—'}</span>
-            <span className={`paper-a${r.direction === 'credit' ? ' in' : ''}`}>
-              {signedMoney(r.amountCents, r.direction)}
-            </span>
-          </>
-        ) : (
-          <span className="paper-empty">No entry</span>
-        )}
-      </div>
-    );
-  };
+  const cardStyle = {
+    ...style,
+    '--band': `linear-gradient(135deg, ${cat.color}, color-mix(in srgb, ${cat.color} 60%, #000))`,
+  } as CSSProperties;
+  const bandStyle = { color: ink } as CSSProperties;
 
   return (
     <div
-      className={`folder${empty ? ' empty' : ''}`}
+      className={`catcard${empty ? ' empty' : ''}`}
       style={cardStyle}
       role="button"
       tabIndex={0}
@@ -83,34 +68,55 @@ export function CategoryCard({
       }}
       data-tip={`Open ${cat.label} transactions`}
     >
-      <div className="folder-papers">
-        {paper(1)}
-        {paper(0)}
-      </div>
-
-      <div className="folder-front">
-        <span className="folder-share">{empty ? '—' : `${sharePct}% of month`}</span>
-        <div className="folder-tools" onClick={(e) => e.stopPropagation()}>
-          <CategoryColorButton cat={cat} />
-          <button
-            type="button"
-            className="cat-edit"
-            onClick={onEdit}
-            data-tip="Edit category"
-            aria-label={`Edit ${cat.label}`}
-          >
-            <Icon name="pencil" size={12} />
-          </button>
+      {/* front panel: brown band (back) | receipt (middle) | green body (front) */}
+      <div className="catcard-front">
+        <div className="catcard-band" style={bandStyle}>
+          <div className="catcard-tools" onClick={(e) => e.stopPropagation()}>
+            <CategoryColorButton cat={cat} />
+            <button
+              type="button"
+              className="cat-edit"
+              onClick={onEdit}
+              data-tip="Edit category"
+              aria-label={`Edit ${cat.label}`}
+            >
+              <Icon name="pencil" size={12} />
+            </button>
+          </div>
+          <span className="catcard-share">{empty ? '—' : `${sharePct}% of month`}</span>
         </div>
-        <div className="folder-title">{cat.label}</div>
-        <div className="folder-row">
-          <span className={`folder-amt${printKey > 0 ? ' bumped' : ''}`}>
-            {money(spentCents, true)}
-            <small>{cat.direction === 'credit' ? 'in' : 'spent'}</small>
-          </span>
-          <span className="folder-count">
-            {count} {count === 1 ? 'entry' : 'entries'}
-          </span>
+
+        {printKey > 0 && recent.length > 0 && (
+          <span key={printKey} className="catcard-print" aria-hidden="true" />
+        )}
+
+        {recent.length > 0 && (
+          <div className="catcard-receipt">
+            {recent.map((r, i) => (
+              <div className="rc-row" key={i}>
+                <span className="rc-d">{shortDate(r.date)}</span>
+                <span className="rc-m">{r.merchant || '—'}</span>
+                <span className={`rc-a${r.direction === 'credit' ? ' in' : ''}`}>
+                  {signedMoney(r.amountCents, r.direction)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="catcard-body">
+          <div className="catcard-title">{cat.label}</div>
+          <div className="catcard-sub">{cat.direction === 'credit' ? 'Money in' : 'Money out'}</div>
+
+          <div className="catcard-foot">
+            <span className={`catcard-big${printKey > 0 ? ' bumped' : ''}`}>
+              {money(spentCents, true)}
+              <small>{cat.direction === 'credit' ? 'in' : 'spent'}</small>
+            </span>
+            <span className="catcard-entries">
+              {count} {count === 1 ? 'entry' : 'entries'}
+            </span>
+          </div>
         </div>
       </div>
     </div>

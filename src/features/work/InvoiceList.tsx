@@ -9,12 +9,15 @@ export function InvoiceList({
   error,
   showProject = true,
   emptyHint,
+  onEdit,
 }: {
   invoices: InvoiceRow[] | undefined;
   isLoading: boolean;
   error: unknown;
   showProject?: boolean;
   emptyHint?: string;
+  /** when set, each row gets an Edit action that opens the invoice form */
+  onEdit?: (id: string) => void;
 }) {
   if (error) return <div className="ledger-empty">Couldn’t load invoices. Try again.</div>;
   if (isLoading) return <div className="ledger-empty">Loading…</div>;
@@ -39,6 +42,7 @@ export function InvoiceList({
             <th>Due</th>
             <th className="ta-r">Total</th>
             <th>Status</th>
+            <th aria-label="Actions" />
           </tr>
         </thead>
         <tbody>
@@ -59,6 +63,25 @@ export function InvoiceList({
                   <span className="work-status" style={{ ['--st' as string]: meta.color }}>
                     {meta.label}
                   </span>
+                </td>
+                <td className="inv-row-actions">
+                  {onEdit && (
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => onEdit(inv.id)}
+                      data-tip="Edit invoice"
+                    >
+                      Edit
+                    </button>
+                  )}
+                  <Link
+                    className="btn ghost"
+                    to={`/work/invoices/${inv.id}?print=1`}
+                    data-tip="Open and print / save as PDF"
+                  >
+                    PDF
+                  </Link>
                 </td>
               </tr>
             );

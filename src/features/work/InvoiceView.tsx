@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
 import { errMessage } from '@/lib/errors';
 import { fullDate, moneyIn } from '@/lib/format';
@@ -10,14 +10,51 @@ import type { InvoiceStatus } from './types';
 
 const fmtQty = (q: number) => (Number.isInteger(q) ? String(q) : q.toFixed(2));
 
+/** Print with the invoice number as the document title so a "Save as PDF"
+ *  lands as e.g. "ALF-2026-0007.pdf", then restore the app title. */
+function printAs(name: string) {
+  const prev = document.title;
+  document.title = name;
+  const restore = () => {
+    document.title = prev;
+    window.removeEventListener('afterprint', restore);
+  };
+  window.addEventListener('afterprint', restore);
+  window.print();
+  // Safari/Firefox may not fire afterprint reliably.
+  setTimeout(restore, 1000);
+}
+
 export function InvoiceView({ invoiceId }: { invoiceId: string }) {
   const { data: inv, isLoading, error } = useInvoice(invoiceId);
   const { user } = useAuth();
   const setStatus = useSetInvoiceStatus();
   const del = useDeleteInvoice();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [editOpen, setEditOpen] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+
+  const doPrint = useCallback(() => {
+    if (inv) printAs(inv.invoice_number);
+  }, [inv]);
+
+  // arriving with ?print=1 (from a list "PDF" action) → auto-open the dialog once
+  const autoPrinted = useRef(false);
+  useEffect(() => {
+    if (!inv || autoPrinted.current || searchParams.get('print') !== '1') return;
+    autoPrinted.current = true;
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('print');
+        return p;
+      },
+      { replace: true },
+    );
+    const t = setTimeout(doPrint, 250);
+    return () => clearTimeout(t);
+  }, [inv, searchParams, setSearchParams, doPrint]);
 
   if (error) return <div className="ledger-empty">Couldn’t load this invoice.</div>;
   if (isLoading || !inv) return <div className="ledger-empty">Loading…</div>;
@@ -67,7 +104,7 @@ export function InvoiceView({ invoiceId }: { invoiceId: string }) {
           <button className="btn sec sm" onClick={() => setEditOpen(true)}>
             Edit
           </button>
-          <button className="btn sec sm" onClick={() => window.print()}>
+          <button className="btn sec sm" onClick={doPrint}>
             Print / PDF
           </button>
           <button className="btn neg sm" onClick={onDelete} disabled={del.isPending}>

@@ -87,6 +87,15 @@ export async function deleteProject(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Edit-in-place client brief on the project page. */
+export async function updateProjectBrief(id: string, brief: string): Promise<void> {
+  const { error } = await supabase
+    .from('projects')
+    .update({ brief: brief.trim() || null })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 // ---------- project assets ----------
 export async function listAssets(projectId: string): Promise<ProjectAsset[]> {
   const { data, error } = await supabase

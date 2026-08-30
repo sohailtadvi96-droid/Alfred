@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
 import { InvoiceList } from '@/features/work/InvoiceList';
 import { InvoiceFormDialog } from '@/features/work/InvoiceFormDialog';
+import { useInvoiceEditor } from '@/features/work/InvoiceEditor';
 import { useInvoices } from '@/features/work/hooks';
 
 export function InvoicesPage() {
   const { data: invoices, isLoading, error } = useInvoices();
+  const { editInvoice, editorNode } = useInvoiceEditor();
   const [addOpen, setAddOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -33,6 +35,7 @@ export function InvoicesPage() {
           isLoading={isLoading}
           error={error}
           emptyHint="Generate one from a project, or start a blank invoice here."
+          onEdit={editInvoice}
         />
       </div>
 
@@ -41,6 +44,7 @@ export function InvoicesPage() {
         onOpenChange={setAddOpen}
         onSaved={(id) => navigate(`/work/invoices/${id}`)}
       />
+      {editorNode}
     </>
   );
 }
