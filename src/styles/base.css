@@ -1159,6 +1159,14 @@ button {
   width: 100%;
   justify-content: center;
 }
+.wallet-lastimport {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  text-align: center;
+  margin-top: -2px;
+}
 
 /* ---- CSV import dialog ---- */
 .csv-drop {
@@ -3478,6 +3486,22 @@ textarea.office-journal {
   text-transform: uppercase;
   opacity: 0.55;
   margin-bottom: 1px;
+}
+
+/* ---- office: task group dividers (backlog + today) ---- */
+.office-group-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 12px 0 4px;
+}
+.office-list > .office-group-label:first-child {
+  padding-top: 2px;
+}
+.office-group-label.overdue {
+  color: var(--neg);
 }
 
 /* ============ Design — inspiration library ============ */

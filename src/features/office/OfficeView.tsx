@@ -1,15 +1,14 @@
 import { GoogleSync } from './GoogleSync';
 import { NotesPanel } from './NotesPanel';
 import { OfficeCalendar } from './OfficeCalendar';
-import { useGoogleCalendar } from './useGoogleCalendar';
+import { TaskBacklog } from './TaskBacklog';
 
 export function OfficeView() {
-  const gcal = useGoogleCalendar(14);
-
   return (
     <div className="office">
-      <GoogleSync gcal={gcal} />
-      <OfficeCalendar googleEvents={gcal.events} />
+      <GoogleSync />
+      <OfficeCalendar />
+      <TaskBacklog />
       <NotesPanel />
     </div>
   );

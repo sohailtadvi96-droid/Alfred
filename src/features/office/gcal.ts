@@ -1,3 +1,4 @@
+import { errMessage } from '@/lib/errors';
 import type { AgendaEvent } from './types';
 
 /** Read-only Google Calendar access via Google Identity Services (GIS).
@@ -126,6 +127,52 @@ export function disconnect() {
   rememberConnected(false);
 }
 
+// ---------- shared auth state (module store) ----------
+// Connection status is global — the calendar month view and any day page all
+// read the same token — so it lives here rather than in one component's state.
+export interface GAuthState {
+  connected: boolean;
+  connecting: boolean;
+  error: string | null;
+}
+let authState: GAuthState = {
+  connected: isGoogleConfigured() && wasConnected(),
+  connecting: false,
+  error: null,
+};
+const authListeners = new Set<() => void>();
+
+export function subscribeAuth(cb: () => void): () => void {
+  authListeners.add(cb);
+  return () => authListeners.delete(cb);
+}
+export function getAuthState(): GAuthState {
+  return authState;
+}
+function setAuth(patch: Partial<GAuthState>) {
+  authState = { ...authState, ...patch };
+  authListeners.forEach((l) => l());
+}
+
+/** Interactive connect (shows Google's account chooser). */
+export async function connectInteractive(): Promise<void> {
+  setAuth({ connecting: true, error: null });
+  try {
+    await connect(false);
+    setAuth({ connected: true, connecting: false });
+  } catch (e) {
+    setAuth({ connecting: false, error: errMessage(e, 'Could not connect to Google Calendar.') });
+  }
+}
+export function disconnectAll() {
+  disconnect();
+  setAuth({ connected: false, error: null });
+}
+/** Called when a range fetch fails — drop to the Connect prompt. */
+export function reportAuthError(message: string) {
+  setAuth({ connected: false, error: message });
+}
+
 interface GCalItem {
   id: string;
   summary?: string;
@@ -136,19 +183,17 @@ interface GCalItem {
   end?: { dateTime?: string; date?: string };
 }
 
-/** Pull events from now to `days` ahead on the primary calendar. */
-export async function fetchUpcoming(days = 14): Promise<AgendaEvent[]> {
+/** Pull events for an explicit [timeMin, timeMax) window on the primary
+ *  calendar — the caller passes whatever range is on screen. */
+export async function fetchRange(timeMinISO: string, timeMaxISO: string): Promise<AgendaEvent[]> {
   const token = await connect(true);
-  const timeMin = new Date();
-  timeMin.setHours(0, 0, 0, 0);
-  const timeMax = new Date(timeMin.getTime() + days * 86_400_000);
 
   const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
-  url.searchParams.set('timeMin', timeMin.toISOString());
-  url.searchParams.set('timeMax', timeMax.toISOString());
+  url.searchParams.set('timeMin', timeMinISO);
+  url.searchParams.set('timeMax', timeMaxISO);
   url.searchParams.set('singleEvents', 'true');
   url.searchParams.set('orderBy', 'startTime');
-  url.searchParams.set('maxResults', '50');
+  url.searchParams.set('maxResults', '250');
 
   const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 401 || res.status === 403) {

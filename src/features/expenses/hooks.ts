@@ -110,6 +110,14 @@ export function useImportStatement() {
   });
 }
 
+export function useLastStatementImport() {
+  return useQuery({
+    queryKey: ['expenses', 'ingestion', 'statement'] as const,
+    queryFn: api.getLastStatementImport,
+    staleTime: 60_000,
+  });
+}
+
 export function useUpdateTransaction() {
   const qc = useQueryClient();
   return useMutation({

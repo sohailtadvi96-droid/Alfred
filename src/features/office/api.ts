@@ -141,12 +141,15 @@ export async function listEventsOn(dayStartISO: string, dayEndISO: string): Prom
   return data as OfficeEvent[];
 }
 
-export async function listTasksDue(date: string): Promise<OfficeTask[]> {
-  const { data, error } = await supabase
-    .from('office_tasks')
-    .select('*')
-    .eq('due_date', date)
-    .order('status', { ascending: true })
+/** Tasks for one calendar day. When `includeOverdue`, also returns still-open
+ *  tasks whose due date has already passed (used on the *today* page). */
+export async function listDayTasks(date: string, includeOverdue: boolean): Promise<OfficeTask[]> {
+  let q = supabase.from('office_tasks').select('*');
+  q = includeOverdue
+    ? q.or(`due_date.eq.${date},and(status.eq.open,due_date.lt.${date})`)
+    : q.eq('due_date', date);
+  const { data, error } = await q
+    .order('due_date', { ascending: true })
     .order('priority', { ascending: false });
   if (error) throw error;
   return data as OfficeTask[];

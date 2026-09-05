@@ -2,9 +2,19 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tooltip } from '@/components/Tooltip';
 import { localDateKey } from './datetime';
-import { addMonths, monthGrid, monthKey, monthTitle, todayKey, WEEKDAYS } from './calendar';
+import {
+  addMonths,
+  dayEndISO,
+  dayStartISO,
+  monthGrid,
+  monthKey,
+  monthTitle,
+  todayKey,
+  WEEKDAYS,
+} from './calendar';
 import { useMonthActivity } from './hooks';
-import type { AgendaEvent, DaySummary } from './types';
+import { useGoogleEvents } from './useGoogleCalendar';
+import type { DaySummary } from './types';
 
 const EMPTY: DaySummary = { events: [], tasks: [], noteCount: 0, journal: null };
 
@@ -46,17 +56,19 @@ function CellTip({ s }: { s: DaySummary }) {
   );
 }
 
-export function OfficeCalendar({ googleEvents }: { googleEvents: AgendaEvent[] }) {
+export function OfficeCalendar() {
   const navigate = useNavigate();
   const [month, setMonth] = useState(monthKey);
   const grid = useMemo(() => monthGrid(month), [month]);
   const { data: activity } = useMonthActivity(grid.start, grid.end);
+  const { events: googleEvents } = useGoogleEvents(dayStartISO(grid.start), dayEndISO(grid.end));
 
   const googleByDay = useMemo(() => {
     const m = new Map<string, string[]>();
     for (const e of googleEvents) {
       const k = localDateKey(e.startsAt);
-      (m.get(k) ?? m.set(k, []).get(k)!).push(e.title);
+      const arr = m.get(k) ?? (m.set(k, []), m.get(k)!);
+      arr.push(e.title);
     }
     return m;
   }, [googleEvents]);

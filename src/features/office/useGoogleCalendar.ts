@@ -1,65 +1,49 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useSyncExternalStore } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { errMessage } from '@/lib/errors';
 import {
-  connect as gcalConnect,
-  disconnect as gcalDisconnect,
-  fetchUpcoming,
+  connectInteractive,
+  disconnectAll,
+  fetchRange,
+  getAuthState,
   isGoogleConfigured,
-  wasConnected,
+  reportAuthError,
+  subscribeAuth,
 } from './gcal';
 
-export function useGoogleCalendar(days = 14) {
-  const configured = isGoogleConfigured();
-  const [connected, setConnected] = useState(() => configured && wasConnected());
-  const [connecting, setConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+/** Global Google-Calendar connection state (shared across the calendar view
+ *  and every day page via a module store in gcal.ts). */
+export function useGoogleAuth() {
+  const state = useSyncExternalStore(subscribeAuth, getAuthState, getAuthState);
+  const qc = useQueryClient();
+  return {
+    configured: isGoogleConfigured(),
+    connected: state.connected,
+    connecting: state.connecting,
+    error: state.error,
+    connect: connectInteractive,
+    disconnect: disconnectAll,
+    refresh: () => qc.invalidateQueries({ queryKey: ['office', 'gcal'] }),
+  };
+}
+
+/** Events for an explicit window — pass ISO strings for whatever range is on
+ *  screen (the visible month grid, or a single day). Fetches only while
+ *  configured + connected; a failure drops the shared state to disconnected. */
+export function useGoogleEvents(timeMinISO: string | null, timeMaxISO: string | null) {
+  const { configured, connected } = useGoogleAuth();
 
   const q = useQuery({
-    queryKey: ['office', 'gcal', days],
-    queryFn: () => fetchUpcoming(days),
-    enabled: configured && connected,
+    queryKey: ['office', 'gcal', timeMinISO, timeMaxISO],
+    queryFn: () => fetchRange(timeMinISO as string, timeMaxISO as string),
+    enabled: configured && connected && !!timeMinISO && !!timeMaxISO,
     staleTime: 5 * 60_000,
     retry: false,
   });
 
   useEffect(() => {
-    if (!q.error) return;
-    setError(errMessage(q.error, 'Google Calendar sync failed.'));
-    // token/API failed — drop back to the Connect prompt (the persisted
-    // flag stays, so a later mount still attempts a silent reconnect first)
-    setConnected(false);
+    if (q.error) reportAuthError(errMessage(q.error, 'Google Calendar sync failed.'));
   }, [q.error]);
 
-  const connect = useCallback(async () => {
-    setConnecting(true);
-    setError(null);
-    try {
-      await gcalConnect(false);
-      setConnected(true);
-      await q.refetch();
-    } catch (e) {
-      setError(errMessage(e, 'Could not connect to Google Calendar.'));
-    } finally {
-      setConnecting(false);
-    }
-  }, [q]);
-
-  const disconnect = useCallback(() => {
-    gcalDisconnect();
-    setConnected(false);
-    setError(null);
-  }, []);
-
-  return {
-    configured,
-    connected,
-    connecting,
-    error,
-    events: q.data ?? [],
-    loading: q.isFetching,
-    connect,
-    disconnect,
-    refresh: () => q.refetch(),
-  };
+  return { events: q.data ?? [], loading: q.isFetching, refetch: q.refetch };
 }

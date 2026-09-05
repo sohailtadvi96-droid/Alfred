@@ -2,38 +2,33 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { errMessage } from '@/lib/errors';
 import { localEventId, mergeAgenda } from './agenda';
-import { addDays, dayTitle, todayKey } from './calendar';
+import { addDays, dayEndISO, dayStartISO, dayTitle, todayKey } from './calendar';
 import { localDateKey, timeLabel } from './datetime';
 import { EventDialog } from './EventDialog';
 import { JournalBox } from './JournalBox';
 import { TaskDialog } from './TaskDialog';
-import { useGoogleCalendar } from './useGoogleCalendar';
+import { TaskRow } from './TaskRow';
+import { useGoogleEvents } from './useGoogleCalendar';
 import {
   useAddNote,
   useDayEvents,
   useDayNotes,
+  useDayTasks,
   useDeleteEvent,
   useDeleteTask,
   useSetTaskStatus,
-  useTasksDue,
   useUpdateNote,
 } from './hooks';
-import type { AgendaEvent, OfficeEvent, OfficeTask, TaskPriority } from './types';
-
-const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  high: 'var(--neg)',
-  normal: 'var(--wip)',
-  low: 'var(--text-faint)',
-};
+import type { AgendaEvent, OfficeEvent, OfficeTask } from './types';
 
 function Schedule({ date }: { date: string }) {
   const { data: local, isLoading, error } = useDayEvents(date);
-  const gcal = useGoogleCalendar(14);
+  const { events: googleEvents } = useGoogleEvents(dayStartISO(date), dayEndISO(date));
   const del = useDeleteEvent();
   const [addOpen, setAddOpen] = useState(false);
   const [edit, setEdit] = useState<OfficeEvent | null>(null);
 
-  const googleForDay = gcal.events.filter((e) => localDateKey(e.startsAt) === date);
+  const googleForDay = googleEvents.filter((e) => localDateKey(e.startsAt) === date);
   const rows = mergeAgenda(local, googleForDay);
 
   return (
@@ -118,11 +113,28 @@ function Schedule({ date }: { date: string }) {
 }
 
 function DueTasks({ date }: { date: string }) {
-  const { data: tasks, isLoading, error } = useTasksDue(date);
+  const isToday = date === todayKey();
+  const { data: tasks, isLoading, error } = useDayTasks(date, isToday);
   const setStatus = useSetTaskStatus();
   const del = useDeleteTask();
   const [addOpen, setAddOpen] = useState(false);
   const [edit, setEdit] = useState<OfficeTask | null>(null);
+
+  const rows = tasks ?? [];
+  const overdue = isToday ? rows.filter((t) => t.due_date && t.due_date < date) : [];
+  const onDay = rows.filter((t) => t.due_date === date);
+
+  const row = (t: OfficeTask) => (
+    <TaskRow
+      key={t.id}
+      task={t}
+      onToggle={() =>
+        setStatus.mutate({ id: t.id, status: t.status === 'done' ? 'open' : 'done' })
+      }
+      onEdit={() => setEdit(t)}
+      onDelete={() => del.mutate(t.id)}
+    />
+  );
 
   return (
     <section className="office-section">
@@ -137,46 +149,23 @@ function DueTasks({ date }: { date: string }) {
           <div className="office-empty">Couldn’t load tasks.</div>
         ) : isLoading ? (
           <div className="office-empty">Loading…</div>
-        ) : (tasks?.length ?? 0) === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="office-empty">Nothing due this day.</div>
         ) : (
-          (tasks ?? []).map((t) => {
-            const done = t.status === 'done';
-            return (
-              <div className={`office-row${done ? ' done' : ''}`} key={t.id}>
-                <label className="office-check">
-                  <input
-                    type="checkbox"
-                    checked={done}
-                    onChange={() =>
-                      setStatus.mutate({ id: t.id, status: done ? 'open' : 'done' })
-                    }
-                    aria-label={`${t.title} done`}
-                  />
-                </label>
-                <button type="button" className="office-row-main office-row-click" onClick={() => setEdit(t)}>
-                  <span className="office-row-label">
-                    {!done && (
-                      <span
-                        className="office-pri-dot"
-                        style={{ ['--pri' as string]: PRIORITY_COLOR[t.priority] }}
-                      />
-                    )}
-                    {t.title}
-                  </span>
-                  {t.notes && <span className="office-row-sub"><span className="office-row-note">{t.notes}</span></span>}
-                </button>
-                <button
-                  className="row-x"
-                  onClick={() => del.mutate(t.id)}
-                  data-tip="Delete"
-                  aria-label={`Delete ${t.title}`}
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })
+          <>
+            {overdue.length > 0 && (
+              <>
+                <div className="office-group-label overdue">Overdue</div>
+                {overdue.map(row)}
+                <div className="office-group-label">Due today</div>
+              </>
+            )}
+            {onDay.length > 0 ? (
+              onDay.map(row)
+            ) : overdue.length > 0 ? (
+              <div className="office-empty">Nothing due today.</div>
+            ) : null}
+          </>
         )}
       </div>
       <TaskDialog open={addOpen} onOpenChange={setAddOpen} defaultDue={date} />

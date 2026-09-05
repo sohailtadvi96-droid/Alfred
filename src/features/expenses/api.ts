@@ -47,7 +47,40 @@ export async function importStatementRows(
     p_rows: payload,
   });
   if (error) throw error;
+
+  // record "last imported" (best effort — never fail the import over this)
+  try {
+    const stamp = { last_run_at: new Date().toISOString(), status: 'ok' };
+    const { data: existing } = await supabase
+      .from('ingestion_sources')
+      .select('id')
+      .eq('type', 'statement')
+      .limit(1)
+      .maybeSingle();
+    if (existing?.id) {
+      await supabase.from('ingestion_sources').update(stamp).eq('id', existing.id);
+    } else {
+      await supabase
+        .from('ingestion_sources')
+        .insert({ type: 'statement', name: 'Bank statement CSV', ...stamp });
+    }
+  } catch {
+    /* ignore */
+  }
+
   return (data as number) ?? 0;
+}
+
+/** When a bank-statement CSV was last imported (ISO), or null. */
+export async function getLastStatementImport(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('ingestion_sources')
+    .select('last_run_at')
+    .eq('type', 'statement')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.last_run_at as string | null) ?? null;
 }
 
 export async function updateTransaction(

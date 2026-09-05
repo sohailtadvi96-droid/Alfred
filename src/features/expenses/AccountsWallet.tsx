@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { money } from '@/lib/format';
+import { money, timeAgo } from '@/lib/format';
 import { Icon } from '@/components/Icon';
-import { useAccountBalances, useDeleteAccount } from './hooks';
+import { useAccountBalances, useDeleteAccount, useLastStatementImport } from './hooks';
 import { usePrivacy } from './privacy';
 import { AddAccountDialog } from './AddAccountDialog';
 import { ImportCsvDialog } from './ImportCsvDialog';
 
 export function AccountsWallet() {
   const { data: accounts, isLoading } = useAccountBalances();
+  const { data: lastImport } = useLastStatementImport();
   const { walletHidden, toggleWallet } = usePrivacy();
   const del = useDeleteAccount();
   const location = useLocation();
@@ -110,6 +111,10 @@ export function AccountsWallet() {
           Open ledger →
         </Link>
       </div>
+
+      {lastImport && (
+        <div className="wallet-lastimport">Last statement import · {timeAgo(lastImport)}</div>
+      )}
 
       <AddAccountDialog open={addOpen} onOpenChange={setAddOpen} />
       <ImportCsvDialog open={importOpen} onOpenChange={setImportOpen} />

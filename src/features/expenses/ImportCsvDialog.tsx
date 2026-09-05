@@ -21,6 +21,33 @@ const FIELDS: { key: keyof CsvColumnMap; label: string; hint: string }[] = [
   { key: 'amount', label: 'Single amount', hint: 'use if no debit/credit split' },
 ];
 
+// remember the last mapping so repeat uploads from the same bank are one-click
+const PREFS_KEY = 'alfred-csv-import-prefs';
+interface CsvPrefs {
+  map: CsvColumnMap;
+  dateFmt: DateFormat;
+  accountId: string;
+}
+function readPrefs(): CsvPrefs | null {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    return raw ? (JSON.parse(raw) as CsvPrefs) : null;
+  } catch {
+    return null;
+  }
+}
+function writePrefs(p: CsvPrefs) {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+  } catch {
+    /* ignore */
+  }
+}
+function mapFitsHeaders(map: CsvColumnMap, headers: string[]): boolean {
+  const set = new Set(headers);
+  return (Object.keys(map) as (keyof CsvColumnMap)[]).every((k) => !map[k] || set.has(map[k]));
+}
+
 export function ImportCsvDialog({
   open,
   onOpenChange,
@@ -61,7 +88,19 @@ export function ImportCsvDialog({
       }
       setFileName(file.name);
       setParsed(p);
-      setMap(guessColumnMap(p.headers));
+
+      const prefs = readPrefs();
+      if (prefs && mapFitsHeaders(prefs.map, p.headers)) {
+        setMap(prefs.map);
+        setDateFmt(prefs.dateFmt);
+        setAccountId(
+          prefs.accountId && (accounts ?? []).some((a) => a.id === prefs.accountId)
+            ? prefs.accountId
+            : '',
+        );
+      } else {
+        setMap(guessColumnMap(p.headers));
+      }
     } catch (err) {
       setError(errMessage(err, 'Could not read the CSV.'));
     }
@@ -73,13 +112,14 @@ export function ImportCsvDialog({
   }, [parsed, map, dateFmt]);
 
   async function onImport() {
-    if (!preview || preview.ok.length === 0) return;
+    if (!preview || preview.ok.length === 0 || !map) return;
     setError(null);
     try {
       const inserted = await importer.mutateAsync({
         rows: preview.ok as unknown as Record<string, unknown>[],
         accountId: accountId || null,
       });
+      writePrefs({ map, dateFmt, accountId });
       setResult({ inserted, total: preview.ok.length, skipped: preview.skipped });
     } catch (err) {
       setError(errMessage(err, 'Import failed.'));
@@ -125,9 +165,18 @@ export function ImportCsvDialog({
         <div className="csv-result">
           <div className="csv-result-big">{result.inserted}</div>
           <p>
-            Imported <b>{result.inserted}</b> new transaction{result.inserted === 1 ? '' : 's'}.
-            {result.total - result.inserted > 0 && ` ${result.total - result.inserted} were already on file.`}
-            {result.skipped > 0 && ` ${result.skipped} row${result.skipped === 1 ? '' : 's'} couldn’t be read and were skipped.`}
+            {result.inserted === 0 ? (
+              <>No new transactions — all {result.total} rows were already imported.</>
+            ) : (
+              <>
+                Imported <b>{result.inserted}</b> new transaction
+                {result.inserted === 1 ? '' : 's'}.
+                {result.total - result.inserted > 0 &&
+                  ` ${result.total - result.inserted} were already on file (skipped).`}
+              </>
+            )}
+            {result.skipped > 0 &&
+              ` ${result.skipped} row${result.skipped === 1 ? '' : 's'} couldn’t be read.`}
           </p>
         </div>
       ) : (

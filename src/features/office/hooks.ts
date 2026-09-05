@@ -5,7 +5,7 @@ import type { NewEvent, NewTask, OfficeNote, TaskStatus } from './types';
 
 const keys = {
   tasks: ['office', 'tasks'] as const,
-  tasksDue: (date: string) => ['office', 'tasksDue', date] as const,
+  dayTasks: (date: string, overdue: boolean) => ['office', 'dayTasks', date, overdue] as const,
   events: ['office', 'events'] as const,
   dayEvents: (date: string) => ['office', 'dayEvents', date] as const,
   notes: ['office', 'notes'] as const,
@@ -24,8 +24,12 @@ export function useTasks() {
   return useQuery({ queryKey: keys.tasks, queryFn: api.listTasks });
 }
 
-export function useTasksDue(date: string) {
-  return useQuery({ queryKey: keys.tasksDue(date), queryFn: () => api.listTasksDue(date), enabled: !!date });
+export function useDayTasks(date: string, includeOverdue: boolean) {
+  return useQuery({
+    queryKey: keys.dayTasks(date, includeOverdue),
+    queryFn: () => api.listDayTasks(date, includeOverdue),
+    enabled: !!date,
+  });
 }
 
 export function useSaveTask() {

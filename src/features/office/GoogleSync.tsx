@@ -1,9 +1,9 @@
-import type { useGoogleCalendar } from './useGoogleCalendar';
+import { useGoogleAuth } from './useGoogleCalendar';
 
-type Gcal = ReturnType<typeof useGoogleCalendar>;
+export function GoogleSync() {
+  const g = useGoogleAuth();
 
-export function GoogleSync({ gcal }: { gcal: Gcal }) {
-  if (!gcal.configured) {
+  if (!g.configured) {
     return (
       <div className="gsync gsync-setup">
         <span className="gsync-dot off" />
@@ -18,18 +18,16 @@ export function GoogleSync({ gcal }: { gcal: Gcal }) {
     );
   }
 
-  if (!gcal.connected) {
+  if (!g.connected) {
     return (
       <div className="gsync">
-        <span className={`gsync-dot ${gcal.error ? 'err' : 'off'}`} />
+        <span className={`gsync-dot ${g.error ? 'err' : 'off'}`} />
         <div className="gsync-text">
           <strong>Google Calendar</strong>
-          <span>
-            {gcal.error ?? 'Pull your upcoming events in alongside local meetings.'}
-          </span>
+          <span>{g.error ?? 'Pull your events in alongside local meetings.'}</span>
         </div>
-        <button className="btn primary sm" onClick={gcal.connect} disabled={gcal.connecting}>
-          {gcal.connecting ? 'Connecting…' : gcal.error ? 'Reconnect' : 'Connect'}
+        <button className="btn primary sm" onClick={g.connect} disabled={g.connecting}>
+          {g.connecting ? 'Connecting…' : g.error ? 'Reconnect' : 'Connect'}
         </button>
       </div>
     );
@@ -37,21 +35,15 @@ export function GoogleSync({ gcal }: { gcal: Gcal }) {
 
   return (
     <div className="gsync">
-      <span className={`gsync-dot ${gcal.error ? 'err' : 'on'}`} />
+      <span className={`gsync-dot ${g.error ? 'err' : 'on'}`} />
       <div className="gsync-text">
-        <strong>Google Calendar {gcal.error ? '— sync issue' : 'synced'}</strong>
-        {gcal.error ? (
-          <span>{gcal.error}</span>
-        ) : (
-          <span>
-            {gcal.events.length} event{gcal.events.length === 1 ? '' : 's'} in the next two weeks
-          </span>
-        )}
+        <strong>Google Calendar {g.error ? '— sync issue' : 'synced'}</strong>
+        <span>{g.error ?? 'Events show on the calendar and on each day.'}</span>
       </div>
-      <button className="btn ghost sm" onClick={() => gcal.refresh()} disabled={gcal.loading}>
-        {gcal.loading ? '…' : 'Refresh'}
+      <button className="btn ghost sm" onClick={g.refresh}>
+        Refresh
       </button>
-      <button className="btn ghost sm" onClick={gcal.disconnect}>
+      <button className="btn ghost sm" onClick={g.disconnect}>
         Disconnect
       </button>
     </div>

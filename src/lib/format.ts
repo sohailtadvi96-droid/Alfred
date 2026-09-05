@@ -57,6 +57,21 @@ export function fullDate(iso: string): string {
   return fullFmt.format(new Date(iso));
 }
 
+/** "just now" / "5 mins ago" / "2 days ago" — coarse, for freshness labels */
+export function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return 'never';
+  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min${m === 1 ? '' : 's'} ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d} day${d === 1 ? '' : 's'} ago`;
+  const mo = Math.floor(d / 30);
+  return `${mo} month${mo === 1 ? '' : 's'} ago`;
+}
+
 /** YYYY-MM for a Date (local) */
 export function monthKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
