@@ -173,6 +173,17 @@ export async function saveJournal(date: string, body: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Most recent non-empty journal entries, newest first. */
+export async function listRecentJournal(limit = 12): Promise<JournalEntry[]> {
+  const { data, error } = await supabase
+    .from('office_journal')
+    .select('*')
+    .order('entry_date', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data as JournalEntry[]).filter((e) => e.body.trim().length > 0);
+}
+
 // ---------- calendar month markers ----------
 /** For a date window (grid start .. grid end, inclusive date strings), a short
  *  summary of each day: meeting + task titles, note count, journal first line.

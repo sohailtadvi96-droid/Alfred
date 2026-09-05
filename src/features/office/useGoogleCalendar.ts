@@ -7,7 +7,7 @@ import {
   fetchRange,
   getAuthState,
   isGoogleConfigured,
-  reportAuthError,
+  reportSyncError,
   subscribeAuth,
 } from './gcal';
 
@@ -42,8 +42,15 @@ export function useGoogleEvents(timeMinISO: string | null, timeMaxISO: string | 
   });
 
   useEffect(() => {
-    if (q.error) reportAuthError(errMessage(q.error, 'Google Calendar sync failed.'));
+    if (!q.error) return;
+    // a 401/403 is already handled (disconnected + messaged) inside fetchRange
+    if (errMessage(q.error) === '__revoked__') return;
+    reportSyncError(errMessage(q.error, 'Google Calendar sync failed.'));
   }, [q.error]);
+
+  useEffect(() => {
+    if (q.isSuccess && getAuthState().error) reportSyncError('');
+  }, [q.isSuccess]);
 
   return { events: q.data ?? [], loading: q.isFetching, refetch: q.refetch };
 }

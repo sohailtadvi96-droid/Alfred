@@ -71,6 +71,14 @@ export async function importStatementRows(
   return (data as number) ?? 0;
 }
 
+/** Re-run categorisation rules over rows still on the fallback category.
+ *  Returns how many transactions were moved. */
+export async function recategorizeAll(): Promise<number> {
+  const { data, error } = await supabase.rpc('recategorize_all');
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
 /** When a bank-statement CSV was last imported (ISO), or null. */
 export async function getLastStatementImport(): Promise<string | null> {
   const { data, error } = await supabase

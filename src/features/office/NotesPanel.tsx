@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { errMessage } from '@/lib/errors';
+import { NoteCard } from './NoteCard';
 import { useAddNote, useNotes, useUpdateNote } from './hooks';
 
 export function NotesPanel() {
@@ -52,27 +53,13 @@ export function NotesPanel() {
           <div className="office-empty">No notes yet.</div>
         ) : (
           (notes ?? []).map((n) => (
-            <div className={`office-note${n.pinned ? ' pinned' : ''}`} key={n.id}>
-              <p>{n.body}</p>
-              <div className="office-note-actions">
-                <button
-                  className="office-note-btn"
-                  onClick={() => update.mutate({ id: n.id, patch: { pinned: !n.pinned } })}
-                  data-tip={n.pinned ? 'Unpin' : 'Pin'}
-                  aria-label={n.pinned ? 'Unpin note' : 'Pin note'}
-                >
-                  {n.pinned ? '★' : '☆'}
-                </button>
-                <button
-                  className="office-note-btn"
-                  onClick={() => update.mutate({ id: n.id, patch: { archived: true } })}
-                  data-tip="Archive"
-                  aria-label="Archive note"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
+            <NoteCard
+              key={n.id}
+              note={n}
+              onSave={(body) => update.mutate({ id: n.id, patch: { body } })}
+              onTogglePin={() => update.mutate({ id: n.id, patch: { pinned: !n.pinned } })}
+              onDelete={() => update.mutate({ id: n.id, patch: { archived: true } })}
+            />
           ))
         )}
       </div>

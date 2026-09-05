@@ -1204,6 +1204,29 @@ button {
   margin-bottom: 14px;
   font-size: 12px;
 }
+.pdf-pw {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.pdf-pw .field {
+  width: 100%;
+}
+.pdf-remember {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.pdf-remember input {
+  accent-color: var(--base);
+}
 .csv-map {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1228,6 +1251,45 @@ button {
   padding: 8px 12px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.csv-skip-toggle {
+  background: none;
+  border: none;
+  color: var(--base);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.csv-skipped {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px;
+  background: var(--surface-2);
+  max-height: 160px;
+  overflow-y: auto;
+}
+.csv-skipped ul {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.csv-skipped li {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.csv-recat {
+  margin-top: 14px;
 }
 .csv-preview table {
   width: 100%;
@@ -3303,6 +3365,12 @@ a.row-x {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+.office-cal-head-r {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
 }
 .office-cal-nav {
   width: 28px;
@@ -3325,7 +3393,6 @@ a.row-x {
   font-size: 16px;
 }
 .office-cal-today {
-  margin-left: auto;
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -3338,6 +3405,15 @@ a.row-x {
 .office-cal-today:hover {
   color: var(--base);
   border-color: var(--base-line);
+}
+.office-cal-today.primary {
+  background: var(--base);
+  border-color: var(--base);
+  color: var(--base-ink);
+}
+.office-cal-today.primary:hover {
+  filter: brightness(1.08);
+  color: var(--base-ink);
 }
 .office-cal-grid {
   display: grid;
@@ -3426,12 +3502,23 @@ a.row-x {
 }
 
 @media (max-width: 560px) {
+  .office-cal-grid {
+    gap: 3px;
+  }
   .office-cal-cell {
-    min-height: 48px;
-    padding: 4px 5px;
+    min-height: 46px;
+    padding: 4px;
+    border-radius: 8px;
   }
   .office-cal-num {
     font-size: 11px;
+  }
+  .office-cal-dot {
+    width: 5px;
+    height: 5px;
+  }
+  .office-cal-wd {
+    font-size: 8.5px;
   }
 }
 

@@ -6,6 +6,7 @@ import { addDays, dayEndISO, dayStartISO, dayTitle, todayKey } from './calendar'
 import { localDateKey, timeLabel } from './datetime';
 import { EventDialog } from './EventDialog';
 import { JournalBox } from './JournalBox';
+import { NoteCard } from './NoteCard';
 import { TaskDialog } from './TaskDialog';
 import { TaskRow } from './TaskRow';
 import { useGoogleEvents } from './useGoogleCalendar';
@@ -221,19 +222,12 @@ function DayNotes({ date }: { date: string }) {
           <div className="office-empty">No notes for this day.</div>
         ) : (
           (notes ?? []).map((n) => (
-            <div className="office-note" key={n.id}>
-              <p>{n.body}</p>
-              <div className="office-note-actions">
-                <button
-                  className="office-note-btn"
-                  onClick={() => update.mutate({ id: n.id, patch: { archived: true } })}
-                  data-tip="Remove"
-                  aria-label="Remove note"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
+            <NoteCard
+              key={n.id}
+              note={n}
+              onSave={(body) => update.mutate({ id: n.id, patch: { body } })}
+              onDelete={() => update.mutate({ id: n.id, patch: { archived: true } })}
+            />
           ))
         )}
       </div>

@@ -5,7 +5,7 @@ import { Icon } from '@/components/Icon';
 import { useAccountBalances, useDeleteAccount, useLastStatementImport } from './hooks';
 import { usePrivacy } from './privacy';
 import { AddAccountDialog } from './AddAccountDialog';
-import { ImportCsvDialog } from './ImportCsvDialog';
+import { ImportStatementDialog } from './ImportStatementDialog';
 
 export function AccountsWallet() {
   const { data: accounts, isLoading } = useAccountBalances();
@@ -101,7 +101,7 @@ export function AccountsWallet() {
 
       <div className="wallet-actions">
         <button className="btn sec sm" onClick={() => setImportOpen(true)}>
-          Import CSV
+          Import statement
         </button>
         <Link
           className="btn sec sm"
@@ -117,7 +117,7 @@ export function AccountsWallet() {
       )}
 
       <AddAccountDialog open={addOpen} onOpenChange={setAddOpen} />
-      <ImportCsvDialog open={importOpen} onOpenChange={setImportOpen} />
+      <ImportStatementDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   );
 }

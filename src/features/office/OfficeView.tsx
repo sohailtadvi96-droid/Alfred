@@ -1,4 +1,5 @@
 import { GoogleSync } from './GoogleSync';
+import { JournalArchive } from './JournalArchive';
 import { NotesPanel } from './NotesPanel';
 import { OfficeCalendar } from './OfficeCalendar';
 import { TaskBacklog } from './TaskBacklog';
@@ -10,6 +11,7 @@ export function OfficeView() {
       <OfficeCalendar />
       <TaskBacklog />
       <NotesPanel />
+      <JournalArchive />
     </div>
   );
 }

@@ -122,6 +122,13 @@ export function useJournal(date: string) {
   return useQuery({ queryKey: keys.journal(date), queryFn: () => api.getJournal(date), enabled: !!date });
 }
 
+export function useRecentJournal(limit = 12) {
+  return useQuery({
+    queryKey: ['office', 'journalRecent', limit],
+    queryFn: () => api.listRecentJournal(limit),
+  });
+}
+
 export function useSaveJournal(date: string) {
   const qc = useQueryClient();
   return useMutation({

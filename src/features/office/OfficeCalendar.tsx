@@ -93,11 +93,19 @@ export function OfficeCalendar() {
         >
           ›
         </button>
-        {month !== today.slice(0, 7) && (
-          <button className="office-cal-today" onClick={() => setMonth(monthKey())}>
-            This month
+        <div className="office-cal-head-r">
+          {month !== today.slice(0, 7) && (
+            <button className="office-cal-today" onClick={() => setMonth(monthKey())}>
+              This month
+            </button>
+          )}
+          <button
+            className="office-cal-today primary"
+            onClick={() => navigate(`/work/day/${today}`)}
+          >
+            Today
           </button>
-        )}
+        </div>
       </div>
 
       <div className="office-cal-grid" role="grid">

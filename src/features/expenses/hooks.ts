@@ -118,6 +118,14 @@ export function useLastStatementImport() {
   });
 }
 
+export function useRecategorizeAll() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.recategorizeAll,
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
 export function useUpdateTransaction() {
   const qc = useQueryClient();
   return useMutation({
