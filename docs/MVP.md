@@ -174,17 +174,34 @@ A private swipe file for visual references. **URLs only — no file uploads.**
 - Add/edit reference dialog has a live image preview and a board picker (so an item can be
   moved between boards on edit).
 
+### Discover (external search)
+- A **Boards | Discover** tab strip on the module. Discover is a search box over free image
+  APIs — **Unsplash, Pexels, Openverse** — via the `design-search` Edge Function (keys are
+  Supabase secrets, never in the client). Per-source toggles; a source with no key is skipped
+  and its chip shows "no key". Results are a CSS-columns masonry; **Save** on a result opens
+  the normal add-reference dialog pre-filled (image + source link + title + attribution note +
+  a source tag). "Load more" pages up to 20 deep. Results interleave by source.
+- **Not reachable:** Dribbble (OAuth, own-shots-only since search was removed), Behance (public
+  API retired 2020), Pinterest (own-pins/ads API only), Awwwards (no API). Adding them needs a
+  paid aggregator (SerpApi / Apify) dropped in as another provider in `providers.ts`.
+
 ### Data model
 - `design_boards` (id, name, description, created_at, updated_at)
 - `design_items` (id, board_id → boards **on delete cascade**, title, image_url, link_url,
   source, note, tags text[], created_at, updated_at) — GIN index on `tags`
 
 ### Routes
-`/design` (boards overview), `/design/:boardId` (a board; `:boardId = all` is the pooled view).
+`/design` (boards overview), `/design/discover` (external search), `/design/:boardId` (a board;
+`:boardId = all` is the pooled view).
+
+### Edge Function
+`design-search` — `{ q, sources?, page? }` → normalised `{ results, sources }`. Providers in
+`supabase/functions/design-search/providers.ts`; see that folder's README.
 
 ### Out of scope (for now)
 File/Storage uploads, drag-to-reorder, board covers you pick by hand, palette/font extraction,
-scraping a pasted page URL for its preview image, sharing.
+scraping a pasted page URL for its preview image, paid aggregators for Dribbble/Behance/Pinterest,
+sharing.
 
 ---
 
@@ -213,3 +230,4 @@ scraping a pasted page URL for its preview image, sharing.
 6. Design — inspiration library (migration 0011: `design_boards`, `design_items`)
    - ✅ Boards overview (`/design`) — card grid with mosaic covers + reference counts, new/edit-board dialog, "All references" pooled link.
    - ✅ Board page (`/design/:boardId`, `all` = pooled) — CSS-columns masonry of reference cards (image URL, optional source link / title / note, tags), tag-bar filter (match-any, counts), add/edit/remove reference, edit/delete board. Add dialog has a live image preview and a board picker.
+   - ✅ **Discover** tab (`/design/discover`) — search over free image APIs (Unsplash / Pexels / Openverse) through the `design-search` Edge Function; per-source toggles, Save-to-board pre-fills the add dialog, "Load more" paging. Dribbble/Behance/Pinterest/Awwwards need a paid aggregator (not built).

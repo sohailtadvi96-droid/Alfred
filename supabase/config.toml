@@ -84,3 +84,9 @@ enable_confirmations = false
 
 [analytics]
 enabled = false
+
+# Design module — external image search. Keys are set with
+# `supabase secrets set UNSPLASH_ACCESS_KEY=... PEXELS_API_KEY=...`
+# (OPENVERSE_TOKEN optional — raises the anonymous rate limit).
+[functions.design-search]
+verify_jwt = true

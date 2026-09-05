@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { DesignTabs } from '@/features/design/DesignTabs';
 import { DesignView } from '@/features/design/DesignView';
 import { useBoards } from '@/features/design/hooks';
 
@@ -32,6 +33,7 @@ export function DesignPage() {
         }
       />
       <div className="wrap design-wrap">
+        <DesignTabs />
         <DesignView
           newBoardOpen={newBoardOpen}
           onNewBoardOpenChange={setNewBoardOpen}

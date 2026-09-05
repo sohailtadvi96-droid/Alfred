@@ -1,5 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import * as api from './api';
+import { searchInspiration, type SourceId } from './discover';
 import { ALL_BOARD, type NewBoard, type NewItem } from './types';
 
 const keys = {
@@ -54,5 +60,21 @@ export function useDeleteItem() {
   return useMutation({
     mutationFn: (id: string) => api.deleteItem(id),
     onSuccess: () => refresh(qc),
+  });
+}
+
+// ---------- discover (external image search) ----------
+const PAGE_CAP = 20; // matches the Edge Function's clamp
+
+/** Paged search across the free image APIs. `q` empty → idle (no request). */
+export function useInspirationSearch(q: string, sources: SourceId[]) {
+  return useInfiniteQuery({
+    queryKey: ['design', 'search', q, [...sources].sort().join(',')],
+    queryFn: ({ pageParam }) => searchInspiration(q, sources, pageParam),
+    enabled: q.trim().length > 0 && sources.length > 0,
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.results.length === 0 || last.page >= PAGE_CAP ? undefined : last.page + 1,
+    staleTime: 5 * 60_000,
   });
 }

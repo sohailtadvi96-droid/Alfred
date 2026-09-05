@@ -3,7 +3,7 @@ import { Dialog } from '@/components/Dialog';
 import { errMessage } from '@/lib/errors';
 import { useSaveItem } from './hooks';
 import { parseTags, tagsToInput } from './tags';
-import type { BoardWithCover, DesignItem } from './types';
+import type { BoardWithCover, DesignItem, NewItem } from './types';
 
 export function ItemFormDialog({
   open,
@@ -11,6 +11,7 @@ export function ItemFormDialog({
   boards,
   defaultBoardId,
   edit,
+  prefill,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -18,6 +19,8 @@ export function ItemFormDialog({
   /** board pre-selected when adding from a board page */
   defaultBoardId?: string;
   edit?: DesignItem;
+  /** seed the fields when adding (e.g. from a Discover search result) */
+  prefill?: Partial<Pick<NewItem, 'image_url' | 'link_url' | 'title' | 'note' | 'tags'>>;
 }) {
   const save = useSaveItem();
   const [boardId, setBoardId] = useState('');
@@ -32,14 +35,16 @@ export function ItemFormDialog({
   useEffect(() => {
     if (!open) return;
     setBoardId(edit?.board_id ?? defaultBoardId ?? boards[0]?.id ?? '');
-    setImageUrl(edit?.image_url ?? '');
-    setLinkUrl(edit?.link_url ?? '');
-    setTitle(edit?.title ?? '');
-    setNote(edit?.note ?? '');
-    setTags(edit ? tagsToInput(edit.tags) : '');
+    setImageUrl(edit?.image_url ?? prefill?.image_url ?? '');
+    setLinkUrl(edit?.link_url ?? prefill?.link_url ?? '');
+    setTitle(edit?.title ?? prefill?.title ?? '');
+    setNote(edit?.note ?? prefill?.note ?? '');
+    setTags(
+      edit ? tagsToInput(edit.tags) : prefill?.tags ? tagsToInput(prefill.tags) : '',
+    );
     setError(null);
     setPreviewBad(false);
-  }, [open, edit, defaultBoardId, boards]);
+  }, [open, edit, defaultBoardId, boards, prefill]);
 
   useEffect(() => {
     setPreviewBad(false);

@@ -7,6 +7,7 @@ import { TransactionsPage } from './TransactionsPage';
 import { SecretsPage } from './SecretsPage';
 import { WorkPage } from './WorkPage';
 import { DesignPage } from './DesignPage';
+import { DesignDiscoverPage } from './DesignDiscoverPage';
 import { DesignBoardPage } from './DesignBoardPage';
 import { ProjectDetailPage } from './ProjectDetailPage';
 import { OfficeDayPage } from './OfficeDayPage';
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { path: 'expenses/transactions', element: <TransactionsPage /> },
       { path: 'secrets', element: <SecretsPage /> },
       { path: 'design', element: <DesignPage /> },
+      { path: 'design/discover', element: <DesignDiscoverPage /> },
       { path: 'design/:boardId', element: <DesignBoardPage /> },
       { path: 'work', element: <WorkPage /> },
       { path: 'work/day/:date', element: <OfficeDayPage /> },

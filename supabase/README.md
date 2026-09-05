@@ -48,6 +48,19 @@ Not needed yet. When building Expenses ingestion:
   emails into `NormalizedTxn[]` and calls `select ingest_transactions('gmail', $1)`.
 - Schedule it with `pg_cron` (every 15 min) or Supabase scheduled functions.
 
+## 6. (Design) Discover search — Edge Function
+
+The Design module's **Discover** tab searches free image APIs through the
+`design-search` Edge Function. See [`functions/design-search/README.md`](functions/design-search/README.md).
+
+```bash
+supabase functions deploy design-search
+supabase secrets set UNSPLASH_ACCESS_KEY=xxx PEXELS_API_KEY=xxx   # Openverse needs no key
+```
+
+Until it's deployed, the Discover tab shows a setup note; the rest of the Design
+module (boards, saved references) works without it.
+
 ## Schema map
 
 | Module | Tables |
@@ -61,3 +74,5 @@ Not needed yet. When building Expenses ingestion:
 
 RPCs: `ingest_transactions(text, jsonb)`, `categorize(text, text)`, `secret_upsert(...)`,
 `secret_reveal(uuid)`, `next_invoice_number()`.
+
+Edge Functions: `design-search` (Design → Discover; Unsplash / Pexels / Openverse).

@@ -3820,3 +3820,156 @@ textarea.office-journal {
   height: 100%;
   object-fit: contain;
 }
+
+/* ---- Design: Boards | Discover tab strip ---- */
+.design-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.design-tabs a {
+  padding: 8px 18px;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 12px;
+  text-decoration: none;
+}
+.design-tabs a:first-child {
+  border-left: none;
+}
+.design-tabs a:hover {
+  color: var(--text);
+}
+.design-tabs a.on {
+  background: var(--base);
+  color: var(--base-ink);
+}
+
+/* ---- Design: Discover (external image search) ---- */
+.discover {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.discover-bar {
+  display: flex;
+  gap: 8px;
+}
+.discover-bar .input {
+  flex: 1;
+}
+.discover-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.result-card {
+  break-inside: avoid;
+  margin: 0 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.result-frame {
+  position: relative;
+  line-height: 0;
+  background: var(--surface-2);
+}
+.result-frame img {
+  width: 100%;
+  display: block;
+}
+.result-actions {
+  position: absolute;
+  inset: auto 7px 7px auto;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.result-card:hover .result-actions,
+.result-card:focus-within .result-actions {
+  opacity: 1;
+}
+.result-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 11px 11px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.result-src {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  color: var(--text-faint);
+}
+.result-author a {
+  color: var(--text-dim);
+}
+.result-author a:hover {
+  color: var(--base);
+}
+.result-lic {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+/* ---- office: editable notes + journal archive ---- */
+.office-note-body {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: var(--text);
+  cursor: text;
+}
+.office-note-btn.strong {
+  color: var(--base);
+  font-weight: 700;
+}
+
+.office-jr-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-soft);
+  text-decoration: none;
+  color: inherit;
+}
+.office-jr-row:first-child {
+  border-top: none;
+}
+.office-jr-row:hover .office-jr-date {
+  color: var(--base);
+}
+.office-jr-date {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.office-jr-snip {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
