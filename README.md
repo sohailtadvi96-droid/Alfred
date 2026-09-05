@@ -1,6 +1,6 @@
 # ALFRED
 
-A personal butler for one. Modules: **Expenses · Secrets · Work** (more later).
+A personal butler for one. Modules: **Expenses · Secrets · Work · Design** (more later).
 
 - Spec: [`docs/MVP.md`](docs/MVP.md)
 - Design system: published Artifact (dark/light "technical dossier", 12 owner-swappable backgrounds)

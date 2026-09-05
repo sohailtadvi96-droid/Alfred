@@ -56,6 +56,8 @@ Not needed yet. When building Expenses ingestion:
 | Expenses | `accounts`, `ingestion_sources`, `category_rules`, `transactions`, `gmail_sync_state` |
 | Secrets | `secrets`, `webauthn_credentials`, `secret_access_log` |
 | Work | `clients`, `projects`, `project_assets`, `deliverables`, `time_entries`, `invoices`, `invoice_line_items`, `invoice_counters` |
+| Work / Office | `office_tasks`, `office_events`, `office_notes`, `office_journal` |
+| Design | `design_boards`, `design_items` |
 
 RPCs: `ingest_transactions(text, jsonb)`, `categorize(text, text)`, `secret_upsert(...)`,
 `secret_reveal(uuid)`, `next_invoice_number()`.

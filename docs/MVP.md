@@ -2,7 +2,8 @@
 
 **App:** ALFRED — a single-user "personal butler" web app.
 **MVP modules:** Expenses · Secrets · Work (Freelance tab only)
-**Deferred:** Office work, Design Inspiration, Investment, Health, Entertainment, suggestions engine, chatbot.
+**Deferred:** Investment, Health, Entertainment, suggestions engine, chatbot.
+**Post-MVP, shipped:** Office work (Phase 5), Design inspiration library (Phase 6).
 
 ## Locked decisions
 
@@ -155,6 +156,38 @@ Recurring invoices, payment-gateway integration, contracts / e-sign, per-project
 
 ---
 
+## Module 4 — Design (inspiration library)
+
+A private swipe file for visual references. **URLs only — no file uploads.**
+
+### Features
+- **Boards** — named moodboards (name + optional description). Overview is a card grid;
+  each card shows a mosaic cover from its four most recent images and a reference count.
+- **References** — captured by **image URL**, with an optional **source link** back to the
+  page it came from, an optional title and note, and free-form **tags**. `source` (the
+  link's hostname) is derived on save for the little chip.
+- **Tags cross-cut every board.** On a board (or the "All references" view) a tag bar shows
+  each tag with its count; selecting tags filters the grid (match-any). Clicking a tag on a
+  card adds it to the filter.
+- **All references** — one pseudo-board (`/design/all`) that pools every item across boards.
+- Item grid is a CSS-columns masonry; broken image URLs show an inline "didn't load" tile.
+- Add/edit reference dialog has a live image preview and a board picker (so an item can be
+  moved between boards on edit).
+
+### Data model
+- `design_boards` (id, name, description, created_at, updated_at)
+- `design_items` (id, board_id → boards **on delete cascade**, title, image_url, link_url,
+  source, note, tags text[], created_at, updated_at) — GIN index on `tags`
+
+### Routes
+`/design` (boards overview), `/design/:boardId` (a board; `:boardId = all` is the pooled view).
+
+### Out of scope (for now)
+File/Storage uploads, drag-to-reorder, board covers you pick by hand, palette/font extraction,
+scraping a pasted page URL for its preview image, sharing.
+
+---
+
 ## App shell (MVP)
 - Left nav: **Expenses · Secrets · Work**. Top bar with page title + primary action.
 - Dark theme only.
@@ -176,3 +209,6 @@ Recurring invoices, payment-gateway integration, contracts / e-sign, per-project
    - ✅ Journal calendar as the landing: a Monday-first month grid with per-day dots (meeting / task due / note / journal), month + Today nav, plus a running **Quick notes** panel (undated, pin/archive) and the Google-sync strip.
    - ✅ Per-day page `/work/day/:date` — Schedule (local meetings + that day's Google events, add/edit local), Due (tasks with that due date, add pre-dated), Journal (one free-text entry per day, autosaves on blur), Notes (short notes filed to that date). Prev/next-day nav.
    - ✅ Optional Google Calendar read-only sync via GIS token client (`VITE_GOOGLE_CLIENT_ID`); events merged into calendar dots + the day schedule, never stored. Degrades to a setup note when unconfigured.
+6. Design — inspiration library (migration 0011: `design_boards`, `design_items`)
+   - ✅ Boards overview (`/design`) — card grid with mosaic covers + reference counts, new/edit-board dialog, "All references" pooled link.
+   - ✅ Board page (`/design/:boardId`, `all` = pooled) — CSS-columns masonry of reference cards (image URL, optional source link / title / note, tags), tag-bar filter (match-any, counts), add/edit/remove reference, edit/delete board. Add dialog has a live image preview and a board picker.

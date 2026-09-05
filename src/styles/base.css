@@ -3479,3 +3479,320 @@ textarea.office-journal {
   opacity: 0.55;
   margin-bottom: 1px;
 }
+
+/* ============ Design — inspiration library ============ */
+.design-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.design,
+.design-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.design-intro {
+  color: var(--text-dim);
+  font-size: 13.5px;
+  max-width: 62ch;
+}
+.design-empty {
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+  background: var(--surface);
+}
+.design-all-link {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  align-self: flex-start;
+}
+.design-all-link:hover {
+  color: var(--base);
+}
+
+/* ---- board grid ---- */
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 16px;
+}
+.board-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.13s ease, transform 0.1s ease;
+}
+.board-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--base-line);
+}
+.board-card-link {
+  display: block;
+  color: inherit;
+}
+.board-cover {
+  display: grid;
+  gap: 2px;
+  aspect-ratio: 16 / 10;
+  background: var(--surface-2);
+}
+.board-cover.n0 {
+  place-items: center;
+}
+.board-cover.n1 {
+  grid-template-columns: 1fr;
+}
+.board-cover.n2 {
+  grid-template-columns: 1fr 1fr;
+}
+.board-cover.n3,
+.board-cover.n4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.board-cover.n3 img:first-child {
+  grid-row: span 2;
+}
+.board-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.board-cover-empty {
+  color: var(--text-faint);
+}
+.board-card-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+.board-card-meta:has(+ .board-card-desc) {
+  padding-bottom: 0;
+}
+.board-card-name {
+  font-weight: 800;
+  font-size: 14px;
+}
+.board-card-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  flex: none;
+}
+.board-card-desc {
+  padding: 4px 14px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.board-card-edit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(3px);
+  color: var(--text-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.board-card:hover .board-card-edit {
+  opacity: 1;
+}
+.board-card-edit:hover {
+  color: var(--base);
+  border-color: var(--base-line);
+}
+
+/* ---- board detail head ---- */
+.design-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.design-detail-head h2 {
+  font-size: 20px;
+  font-weight: 800;
+}
+.design-detail-desc {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-top: 4px;
+  max-width: 60ch;
+}
+.design-detail-count {
+  display: inline-block;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.design-detail-actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+/* ---- tag filter ---- */
+.tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+.tag .tag-n {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-left: 1px;
+}
+.tag.as-button.on {
+  color: var(--base-ink);
+  background: var(--base);
+  border-color: var(--base);
+}
+.tag-filter-clear {
+  background: none;
+  border: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.tag-filter-clear:hover {
+  color: var(--text);
+}
+
+/* ---- item grid (masonry via CSS columns) ---- */
+.item-grid {
+  column-width: 248px;
+  column-gap: 16px;
+}
+.item-card {
+  break-inside: avoid;
+  margin: 0 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.item-card-frame {
+  position: relative;
+  line-height: 0;
+  background: var(--surface-2);
+}
+.item-card-frame img {
+  width: 100%;
+  display: block;
+}
+.item-card-broken {
+  padding: 40px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.4;
+}
+.item-card-actions {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.item-card:hover .item-card-actions {
+  opacity: 1;
+}
+.item-card-btn {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: blur(3px);
+  color: var(--text-dim);
+  font-size: 15px;
+  cursor: pointer;
+}
+.item-card-btn:hover {
+  color: var(--base);
+  border-color: var(--base-line);
+}
+.item-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 12px;
+}
+.item-card-title {
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.item-card-note {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.item-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+.item-card-src {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  color: var(--text-faint);
+  margin-right: 2px;
+}
+
+/* ---- add/edit reference: image preview ---- */
+.di-preview {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.di-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

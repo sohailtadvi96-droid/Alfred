@@ -15,10 +15,10 @@ const MODULES: NavItem[] = [
   { to: '/expenses', label: 'Expenses', index: '01', icon: 'expenses', tip: 'Money in and out, by category' },
   { to: '/secrets', label: 'Secrets', index: '02', icon: 'secrets', tip: 'Passwords and keys, encrypted at rest' },
   { to: '/work', label: 'Work', index: '03', icon: 'work', tip: 'Freelance projects and invoices · office tasks, meetings and notes' },
+  { to: '/design', label: 'Design', index: '04', icon: 'design', tip: 'Inspiration library — references on boards, cross-cut by tags' },
 ];
 
 const LATER: NavItem[] = [
-  { to: '#', label: 'Design', index: '04', icon: 'design', tip: 'Planned — not in the first build' },
   { to: '#', label: 'Invest', index: '05', icon: 'invest', tip: 'Planned — not in the first build' },
   { to: '#', label: 'Health', index: '06', icon: 'health', tip: 'Planned — not in the first build' },
 ];
