@@ -90,3 +90,8 @@ enabled = false
 # (OPENVERSE_TOKEN optional — raises the anonymous rate limit).
 [functions.design-search]
 verify_jwt = true
+
+# Expenses — AI fallback for the ~0.1% of transactions the rule engine can't
+# classify. `supabase secrets set ANTHROPIC_API_KEY=...`
+[functions.categorise-ai]
+verify_jwt = true

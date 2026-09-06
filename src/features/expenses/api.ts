@@ -367,6 +367,137 @@ export async function pinMerchant(input: {
   return { moved: res.moved };
 }
 
+// ---------- AI fallback (last resort, ~0.1% of rows) ----------
+
+export interface AiCandidate {
+  key: string; // the merchant_rules match_value (VPA as-is, counterparty uppercased)
+  matchType: 'vpa' | 'counterparty';
+  matchValue: string; // original casing, for the re-categorise query
+  merchant: string | null;
+  counterparty: string | null;
+  vpa: string | null;
+  remark: string | null;
+  channel: string | null;
+  amount: number;
+  direction: Direction;
+}
+
+/** Low-confidence rows the engine couldn't place, minus anything already pinned
+ *  in merchant_rules — deduped to one per merchant key. */
+export async function listAiCandidates(limit = 30): Promise<AiCandidate[]> {
+  const [txnRes, ruleRes] = await Promise.all([
+    supabase
+      .from('transactions')
+      .select(
+        'direction,amount_cents,merchant_raw,counterparty,vpa,remark,channel,category',
+      )
+      .eq('confidence', 'low'),
+    supabase.from('merchant_rules').select('match_value'),
+  ]);
+  if (txnRes.error) throw txnRes.error;
+  if (ruleRes.error) throw ruleRes.error;
+
+  const pinned = new Set((ruleRes.data ?? []).map((r) => String(r.match_value)));
+  const seen = new Set<string>();
+  const out: AiCandidate[] = [];
+
+  for (const t of (txnRes.data ?? []) as Array<{
+    direction: Direction;
+    amount_cents: number;
+    merchant_raw: string | null;
+    counterparty: string | null;
+    vpa: string | null;
+    remark: string | null;
+    channel: string | null;
+    category: string;
+  }>) {
+    if (t.category === 'bank_charges') continue; // needsAI() excludes it
+    const vpa = (t.vpa ?? '').trim();
+    const cp = (t.counterparty ?? '').trim();
+    const matchType: 'vpa' | 'counterparty' = vpa ? 'vpa' : 'counterparty';
+    const matchValue = vpa || cp;
+    if (!matchValue) continue;
+    const key = matchType === 'counterparty' ? matchValue.toUpperCase() : matchValue;
+    if (pinned.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      key,
+      matchType,
+      matchValue,
+      merchant: t.merchant_raw,
+      counterparty: t.counterparty,
+      vpa: t.vpa,
+      remark: t.remark,
+      channel: t.channel,
+      amount: t.amount_cents / 100,
+      direction: t.direction,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+export interface AiRunResult {
+  candidates: number;
+  answered: number;
+  pinned: number;
+  moved: number;
+  notConfigured?: boolean;
+}
+
+/** One batched Claude call for the leftover rows; write each answer as a
+ *  merchant_rules pin so the same merchant is never sent again. */
+export async function runAiFallback(limit = 30): Promise<AiRunResult> {
+  const cands = await listAiCandidates(limit);
+  if (!cands.length) return { candidates: 0, answered: 0, pinned: 0, moved: 0 };
+
+  const items = cands.map((c) => ({
+    key: c.key,
+    merchant: c.merchant ?? '',
+    counterparty: c.counterparty ?? '',
+    vpa: c.vpa ?? '',
+    remark: c.remark ?? '',
+    channel: c.channel ?? '',
+    amount: c.amount,
+    direction: c.direction,
+  }));
+
+  const { data, error } = await supabase.functions.invoke<{
+    answers?: { key: string; category: string; merchant: string }[];
+  }>('categorise-ai', { body: { items } });
+
+  if (error) {
+    let notConfigured = false;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      const b = ctx && (await ctx.json());
+      if (b?.error === 'not configured') notConfigured = true;
+    } catch {
+      /* fall through */
+    }
+    if (notConfigured) return { candidates: cands.length, answered: 0, pinned: 0, moved: 0, notConfigured: true };
+    throw error;
+  }
+
+  const answers = data?.answers ?? [];
+  const byKey = new Map(cands.map((c) => [c.key, c]));
+  let pinned = 0;
+  let moved = 0;
+  for (const a of answers) {
+    const c = byKey.get(a.key);
+    if (!c) continue;
+    const res = await pinMerchant({
+      matchType: c.matchType,
+      matchValue: c.matchValue,
+      categorySlug: a.category,
+      merchant: a.merchant || c.merchant,
+    });
+    pinned += 1;
+    moved += res.moved;
+  }
+  return { candidates: cands.length, answered: answers.length, pinned, moved };
+}
+
 /** When a bank-statement CSV was last imported (ISO), or null. */
 export async function getLastStatementImport(): Promise<string | null> {
   const { data, error } = await supabase

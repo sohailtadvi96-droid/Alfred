@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { shortDate, signedMoney } from '@/lib/format';
-import { useReviewQueue } from './hooks';
+import { errMessage } from '@/lib/errors';
+import { useAiCandidates, useAiFallback, useReviewQueue } from './hooks';
 import { PinCategoryMenu } from './PinCategoryMenu';
 import type { ReviewTxn } from './types';
 
@@ -26,8 +27,31 @@ interface Group {
 
 export function ReviewQueue() {
   const { data: rows, isLoading } = useReviewQueue();
+  const { data: aiCandidates } = useAiCandidates();
+  const ai = useAiFallback();
   const [scope, setScope] = useState<Scope>('all');
   const [grouped, setGrouped] = useState(true);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
+
+  const aiCount = aiCandidates?.length ?? 0;
+
+  async function runAi() {
+    setAiMsg(null);
+    try {
+      const r = await ai.mutateAsync();
+      if (r.notConfigured) {
+        setAiMsg('AI fallback isn’t set up — deploy the categorise-ai function and set ANTHROPIC_API_KEY.');
+      } else if (r.candidates === 0) {
+        setAiMsg('Nothing left for the AI — every low-confidence row is already pinned.');
+      } else {
+        setAiMsg(
+          `Asked about ${r.candidates}, pinned ${r.pinned}, moved ${r.moved} transaction${r.moved === 1 ? '' : 's'}.`,
+        );
+      }
+    } catch (e) {
+      setAiMsg(errMessage(e, 'AI fallback failed.'));
+    }
+  }
 
   const filtered = useMemo(
     () => (rows ?? []).filter((r) => (scope === 'all' ? true : r.category === scope)),
@@ -78,6 +102,20 @@ export function ReviewQueue() {
           {totalToReview} low/medium-confidence rows
         </span>
       </div>
+
+      {(aiCount > 0 || aiMsg) && (
+        <div className="ai-fallback">
+          <span className="tlabel">
+            {aiCount > 0
+              ? `${aiCount} row${aiCount === 1 ? '' : 's'} the engine couldn’t place`
+              : 'AI fallback'}
+          </span>
+          <button className="btn sec sm" onClick={runAi} disabled={ai.isPending || aiCount === 0}>
+            {ai.isPending ? 'Asking Claude…' : `Ask AI to sort ${aiCount || ''}`.trim()}
+          </button>
+          {aiMsg && <span className="tlabel">{aiMsg}</span>}
+        </div>
+      )}
 
       <div className="ledger">
         {isLoading ? (

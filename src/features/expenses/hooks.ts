@@ -178,6 +178,23 @@ export function usePinMerchant() {
   });
 }
 
+export function useAiCandidates() {
+  return useQuery({
+    queryKey: ['expenses', 'aiCandidates'] as const,
+    queryFn: () => api.listAiCandidates(),
+    staleTime: 60_000,
+  });
+}
+
+/** Run the batched AI fallback over the leftover low-confidence rows. */
+export function useAiFallback() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.runAiFallback(),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
 export function useRecategorizeAll() {
   const qc = useQueryClient();
   return useMutation({
