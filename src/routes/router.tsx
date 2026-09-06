@@ -4,6 +4,7 @@ import { RequireAuth } from '@/auth/RequireAuth';
 import { LoginPage } from '@/auth/LoginPage';
 import { ExpensesPage } from './ExpensesPage';
 import { TransactionsPage } from './TransactionsPage';
+import { PeoplePage } from './PeoplePage';
 import { SecretsPage } from './SecretsPage';
 import { WorkPage } from './WorkPage';
 import { DesignPage } from './DesignPage';
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/expenses" replace /> },
       { path: 'expenses', element: <ExpensesPage /> },
       { path: 'expenses/transactions', element: <TransactionsPage /> },
+      { path: 'expenses/people', element: <PeoplePage /> },
       { path: 'secrets', element: <SecretsPage /> },
       { path: 'design', element: <DesignPage /> },
       { path: 'design/discover', element: <DesignDiscoverPage /> },

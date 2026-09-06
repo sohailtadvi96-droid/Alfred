@@ -4060,3 +4060,87 @@ textarea.office-journal {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---- family & Ferrari-shop manager ---- */
+.people-mgr {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 860px;
+}
+.people-sec-h {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.people-sec-h h3 {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+}
+.people-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.people-tbl th {
+  text-align: left;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+.people-tbl td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text-dim);
+  vertical-align: middle;
+}
+.people-tbl tbody tr:last-child td {
+  border-bottom: none;
+}
+.people-tbl .mono {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.people-tbl .am {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.people-tbl .am.in {
+  color: var(--pos);
+}
+.row-tag {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-family: var(--mono);
+}
+.row-tag:hover {
+  color: var(--base);
+  background: color-mix(in srgb, var(--base) 12%, transparent);
+}
+.row-tag[data-on='true'] {
+  color: var(--base);
+}
+.ledger .am-actions {
+  width: auto;
+  white-space: nowrap;
+}

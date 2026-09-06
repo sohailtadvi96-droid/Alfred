@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
 import { Icon } from '@/components/Icon';
 import { money } from '@/lib/format';
@@ -89,6 +90,12 @@ export function ExpensesPage() {
           <button className="btn sec sm" onClick={() => setCatOpen(true)}>
             Add category
           </button>
+          <Link
+            className="btn sec sm"
+            to={{ pathname: '/expenses/people', search: window.location.search }}
+          >
+            Family &amp; shops
+          </Link>
         </div>
 
         <MonthDashboard month={month} flow={flow} />

@@ -127,6 +127,36 @@ export function useEngineLists() {
   });
 }
 
+export function usePeople() {
+  return useQuery({ queryKey: ['expenses', 'people'] as const, queryFn: api.listPeople });
+}
+
+export function useFerrariShops() {
+  return useQuery({ queryKey: ['expenses', 'ferrariShops'] as const, queryFn: api.listFerrariShops });
+}
+
+export function useCounterparties() {
+  return useQuery({
+    queryKey: ['expenses', 'counterparties'] as const,
+    queryFn: api.listCounterparties,
+    staleTime: 60_000,
+  });
+}
+
+/** Tag/untag a VPA as family or a Ferrari shop, and re-categorise its rows. */
+export function useCommitVpaTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      vpa: string;
+      displayName: string | null;
+      kind: 'family' | 'ferrari';
+      next: boolean;
+    }) => api.commitVpaTag(args.vpa, args.displayName, args.kind, args.next),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
 export function useRecategorizeAll() {
   const qc = useQueryClient();
   return useMutation({

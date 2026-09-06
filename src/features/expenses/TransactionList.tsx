@@ -1,6 +1,7 @@
 import { shortDate, signedMoney } from '@/lib/format';
 import type { Direction } from './categories';
 import { RecategoriseMenu } from './RecategoriseMenu';
+import { VpaTagButton } from './VpaTagButton';
 import { useAccounts, useCategories, useDeleteTransaction, useTransactions } from './hooks';
 import type { TxnFilter } from './api';
 
@@ -102,6 +103,7 @@ export function TransactionList({
                     {signedMoney(t.amount_cents, t.direction)}
                   </td>
                   <td className="am-actions">
+                    {t.vpa && <VpaTagButton vpa={t.vpa} name={t.counterparty ?? t.merchant_raw} />}
                     <button
                       className="row-x"
                       onClick={() => {

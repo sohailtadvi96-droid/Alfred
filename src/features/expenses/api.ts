@@ -2,8 +2,18 @@ import { supabase } from '@/lib/supabase';
 import { addMonths, monthRange } from '@/lib/format';
 import type { Direction, RawCategoryRow } from './categories';
 import type { Lists } from './categorize';
-import { recategoriseStored, type StoredTxn } from './engineImport';
-import type { Account, AccountBalance, CategoryRule, MonthSummary, NewTransaction, Transaction } from './types';
+import { recategoriseStored, type RecategoriseUpdate, type StoredTxn } from './engineImport';
+import type {
+  Account,
+  AccountBalance,
+  CategoryRule,
+  Counterparty,
+  FerrariShop,
+  MonthSummary,
+  NewTransaction,
+  Person,
+  Transaction,
+} from './types';
 
 export interface TxnFilter {
   month: string;
@@ -131,34 +141,169 @@ export async function recategorizeAllClient(lists: Lists): Promise<number> {
     const rows = (data ?? []) as StoredTxn[];
     if (!rows.length) break;
 
-    const updates = recategoriseStored(rows, lists);
-    for (let i = 0; i < updates.length; i += 50) {
-      const chunk = updates.slice(i, i + 50);
-      const res = await Promise.all(
-        chunk.map((u) =>
-          supabase
-            .from('transactions')
-            .update({
-              category: u.category,
-              channel: u.channel,
-              counterparty: u.counterparty,
-              vpa: u.vpa,
-              remark: u.remark,
-              matched_by: u.matched_by,
-              confidence: u.confidence,
-            })
-            .eq('id', u.id),
-        ),
-      );
-      const failed = res.find((r) => r.error);
-      if (failed?.error) throw failed.error;
-      moved += chunk.length;
-    }
+    moved += await applyRecategoriseUpdates(recategoriseStored(rows, lists));
 
     if (rows.length < PAGE) break;
     from += PAGE;
   }
   return moved;
+}
+
+/** Patch a batch of re-categorise updates back to `transactions`, in chunks. */
+async function applyRecategoriseUpdates(updates: RecategoriseUpdate[]): Promise<number> {
+  for (let i = 0; i < updates.length; i += 50) {
+    const chunk = updates.slice(i, i + 50);
+    const res = await Promise.all(
+      chunk.map((u) =>
+        supabase
+          .from('transactions')
+          .update({
+            category: u.category,
+            channel: u.channel,
+            counterparty: u.counterparty,
+            vpa: u.vpa,
+            remark: u.remark,
+            matched_by: u.matched_by,
+            confidence: u.confidence,
+          })
+          .eq('id', u.id),
+      ),
+    );
+    const failed = res.find((r) => r.error);
+    if (failed?.error) throw failed.error;
+  }
+  return updates.length;
+}
+
+// ---------- people / ferrari shops (family & pinned-shop lists) ----------
+
+export async function listPeople(): Promise<Person[]> {
+  const { data, error } = await supabase
+    .from('people')
+    .select('id,vpa,display_name,is_family,note,created_at,updated_at')
+    .order('display_name', { nullsFirst: false });
+  if (error) throw error;
+  return (data ?? []) as Person[];
+}
+
+export async function listFerrariShops(): Promise<FerrariShop[]> {
+  const { data, error } = await supabase
+    .from('ferrari_shops')
+    .select('id,vpa,display_name,added_by,created_at')
+    .order('display_name', { nullsFirst: false });
+  if (error) throw error;
+  return (data ?? []) as FerrariShop[];
+}
+
+/** Distinct counterparties seen in transactions, aggregated by VPA. Powers the
+ *  "add someone not yet tagged" search on the manage screen. */
+export async function listCounterparties(): Promise<Counterparty[]> {
+  const rows: { vpa: string | null; counterparty: string | null; direction: Direction; amount_cents: number }[] =
+    [];
+  const PAGE = 1000;
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('vpa,counterparty,direction,amount_cents')
+      .not('vpa', 'is', null)
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as typeof rows;
+    rows.push(...page);
+    if (page.length < PAGE) break;
+    from += PAGE;
+  }
+
+  const byVpa = new Map<string, Counterparty>();
+  for (const r of rows) {
+    const vpa = (r.vpa ?? '').trim();
+    if (!vpa) continue;
+    const e = byVpa.get(vpa) ?? { vpa, name: r.counterparty ?? vpa, txnCount: 0, netCents: 0 };
+    e.txnCount += 1;
+    e.netCents += r.direction === 'credit' ? r.amount_cents : -r.amount_cents;
+    if (!e.name && r.counterparty) e.name = r.counterparty;
+    byVpa.set(vpa, e);
+  }
+  return [...byVpa.values()].sort((a, b) => b.txnCount - a.txnCount);
+}
+
+/** Upsert a `people` row's family flag. The row is kept on un-family so the
+ *  display name and note survive; only an explicit un-set clears the flag. */
+export async function setFamilyMember(
+  vpa: string,
+  displayName: string | null,
+  isFamily: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from('people')
+    .upsert(
+      { vpa, display_name: displayName, is_family: isFamily },
+      { onConflict: 'user_id,vpa' },
+    );
+  if (error) throw error;
+}
+
+/** Pin or unpin a Ferrari shop. Unpinning removes the row (re-add to restore). */
+export async function setFerrariShop(
+  vpa: string,
+  displayName: string | null,
+  pinned: boolean,
+): Promise<void> {
+  if (pinned) {
+    const { error } = await supabase
+      .from('ferrari_shops')
+      .upsert({ vpa, display_name: displayName, added_by: 'manual' }, { onConflict: 'user_id,vpa' });
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from('ferrari_shops').delete().eq('vpa', vpa);
+    if (error) throw error;
+  }
+}
+
+/** Re-classify just the transactions for one VPA against the given Lists.
+ *  `dryRun` returns the count that would move without writing. */
+export async function recategoriseByVpa(
+  vpa: string,
+  lists: Lists,
+  dryRun = false,
+): Promise<{ scanned: number; moved: number }> {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('id,direction,amount_cents,raw_snippet,category')
+    .eq('vpa', vpa);
+  if (error) throw error;
+
+  const rows = (data ?? []) as StoredTxn[];
+  const updates = recategoriseStored(rows, lists);
+  if (!dryRun) await applyRecategoriseUpdates(updates);
+  return { scanned: rows.length, moved: updates.length };
+}
+
+/** How many of a VPA's transactions would move if it were (un)tagged. */
+export async function previewVpaTag(
+  vpa: string,
+  kind: 'family' | 'ferrari',
+  next: boolean,
+): Promise<{ scanned: number; moved: number }> {
+  const lists = await loadEngineLists();
+  const set = kind === 'family' ? lists.familyVpas : lists.ferrariShops;
+  if (next) set.add(vpa);
+  else set.delete(vpa);
+  return recategoriseByVpa(vpa, lists, true);
+}
+
+/** Tag/untag a VPA and re-categorise its existing transactions. */
+export async function commitVpaTag(
+  vpa: string,
+  displayName: string | null,
+  kind: 'family' | 'ferrari',
+  next: boolean,
+): Promise<{ scanned: number; moved: number }> {
+  if (kind === 'family') await setFamilyMember(vpa, displayName, next);
+  else await setFerrariShop(vpa, displayName, next);
+  const lists = await loadEngineLists(); // re-read: now reflects the change
+  return recategoriseByVpa(vpa, lists, false);
 }
 
 /** When a bank-statement CSV was last imported (ISO), or null. */

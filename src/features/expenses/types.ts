@@ -15,6 +15,42 @@ export interface Transaction {
   note: string | null;
   created_at: string;
   updated_at: string;
+  // engine fields (migration 0013) — null on pre-engine rows
+  channel: string | null;
+  counterparty: string | null;
+  vpa: string | null;
+  remark: string | null;
+  matched_by: string | null;
+  confidence: string | null;
+}
+
+/** people row — the user-managed family list, keyed on VPA (migration 0013). */
+export interface Person {
+  id: string;
+  vpa: string;
+  display_name: string | null;
+  is_family: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** ferrari_shops row — pinned merchant QRs for the "My Ferrari" tier. */
+export interface FerrariShop {
+  id: string;
+  vpa: string;
+  display_name: string | null;
+  added_by: 'seed' | 'manual' | 'detector';
+  created_at: string;
+}
+
+/** A counterparty seen in transactions, aggregated by VPA — feeds the
+ *  "tag someone not yet on the list" search. */
+export interface Counterparty {
+  vpa: string;
+  name: string;
+  txnCount: number;
+  netCents: number; // credits − debits
 }
 
 export interface Account {
