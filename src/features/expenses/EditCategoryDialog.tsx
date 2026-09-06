@@ -3,43 +3,46 @@ import { Dialog } from '@/components/Dialog';
 import { errMessage } from '@/lib/errors';
 import { CATEGORY_PALETTE } from '@/lib/color';
 import type { Category, Direction } from './categories';
-import { useDeleteCategory, useUpsertCategory } from './hooks';
+import { useCategories, useDeleteCategory, useUpsertCategory } from './hooks';
 
-export function EditCategoryDialog({
-  cat,
-  onClose,
-}: {
-  cat: Category;
-  onClose: () => void;
-}) {
+type DirChoice = 'debit' | 'credit' | 'both';
+
+export function EditCategoryDialog({ cat, onClose }: { cat: Category; onClose: () => void }) {
   const up = useUpsertCategory();
   const del = useDeleteCategory();
+  const cats = useCategories();
+
+  const siblingExists = cats.all.some((c) => c.slug === cat.slug && c.direction !== cat.direction);
+  const initialDir: DirChoice = siblingExists ? 'both' : cat.direction;
+
   const [label, setLabel] = useState(cat.label);
   const [color, setColor] = useState(cat.color);
-  const [direction, setDirection] = useState<Direction>(cat.direction);
+  const [dir, setDir] = useState<DirChoice>(initialDir);
   const [error, setError] = useState<string | null>(null);
 
-  const dirChanged = direction !== cat.direction;
+  const dirChanged = dir !== initialDir;
   const canRemove = cat.isOverride || !cat.hasSystemDefault;
   const removeLabel = cat.hasSystemDefault ? 'Reset to default' : 'Delete category';
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    const base = { slug: cat.slug, label: label.trim() || cat.slug, color, sort: cat.sort };
     try {
-      await up.mutateAsync({
-        slug: cat.slug,
-        label: label.trim() || cat.slug,
-        direction,
-        color,
-        sort: cat.sort,
-      });
-      // moving flow: drop the old-direction override so it doesn't linger
-      if (dirChanged && cat.isOverride) {
-        try {
-          await del.mutateAsync({ slug: cat.slug, direction: cat.direction });
-        } catch {
-          /* best effort */
+      if (dir === 'both') {
+        await up.mutateAsync({ ...base, direction: 'debit' });
+        await up.mutateAsync({ ...base, direction: 'credit' });
+      } else {
+        await up.mutateAsync({ ...base, direction: dir });
+        // drop the other flow's copy if it's one the owner added
+        const other: Direction = dir === 'debit' ? 'credit' : 'debit';
+        const otherCat = cats.all.find((c) => c.slug === cat.slug && c.direction === other);
+        if (otherCat && (otherCat.isOverride || !otherCat.hasSystemDefault)) {
+          try {
+            await del.mutateAsync({ slug: cat.slug, direction: other });
+          } catch {
+            /* best effort */
+          }
         }
       }
       onClose();
@@ -50,12 +53,14 @@ export function EditCategoryDialog({
 
   async function onRemove() {
     setError(null);
-    try {
-      await del.mutateAsync({ slug: cat.slug, direction: cat.direction });
-      onClose();
-    } catch (err) {
-      setError(errMessage(err, 'Could not remove the category.'));
+    for (const d of ['debit', 'credit'] as const) {
+      try {
+        await del.mutateAsync({ slug: cat.slug, direction: d });
+      } catch {
+        /* not present / built-in */
+      }
     }
+    onClose();
   }
 
   return (
@@ -79,7 +84,12 @@ export function EditCategoryDialog({
           <button className="btn ghost sm" type="button" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn primary sm" type="submit" form="edit-cat-form" disabled={up.isPending || !label.trim()}>
+          <button
+            className="btn primary sm"
+            type="submit"
+            form="edit-cat-form"
+            disabled={up.isPending || !label.trim()}
+          >
             {up.isPending ? 'Saving…' : 'Save'}
           </button>
         </>
@@ -87,11 +97,14 @@ export function EditCategoryDialog({
     >
       <form id="edit-cat-form" onSubmit={onSave}>
         <div className="seg">
-          <button type="button" className={direction === 'debit' ? 'on' : ''} onClick={() => setDirection('debit')}>
+          <button type="button" className={dir === 'debit' ? 'on' : ''} onClick={() => setDir('debit')}>
             Money out
           </button>
-          <button type="button" className={direction === 'credit' ? 'on' : ''} onClick={() => setDirection('credit')}>
+          <button type="button" className={dir === 'credit' ? 'on' : ''} onClick={() => setDir('credit')}>
             Money in
+          </button>
+          <button type="button" className={dir === 'both' ? 'on' : ''} onClick={() => setDir('both')}>
+            Both
           </button>
         </div>
 
@@ -126,7 +139,12 @@ export function EditCategoryDialog({
           </div>
         </div>
 
-        {dirChanged && (
+        {dir === 'both' && (
+          <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '4px 0 0' }}>
+            Appears as a card in both the Money out and Money in flows.
+          </p>
+        )}
+        {dir !== 'both' && dirChanged && (
           <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '4px 0 0' }}>
             Past transactions keep their current flow — only new ones use this.
           </p>

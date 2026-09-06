@@ -5,6 +5,8 @@ import { CATEGORY_PALETTE } from '@/lib/color';
 import { slugify, type Direction } from './categories';
 import { useCategories, useUpsertCategory } from './hooks';
 
+type DirChoice = 'debit' | 'credit' | 'both';
+
 export function AddCategoryDialog({
   open,
   onOpenChange,
@@ -16,13 +18,13 @@ export function AddCategoryDialog({
   const cats = useCategories();
 
   const [label, setLabel] = useState('');
-  const [direction, setDirection] = useState<Direction>('debit');
+  const [dir, setDir] = useState<DirChoice>('debit');
   const [color, setColor] = useState(CATEGORY_PALETTE[0]);
   const [error, setError] = useState<string | null>(null);
 
   function reset() {
     setLabel('');
-    setDirection('debit');
+    setDir('debit');
     setColor(CATEGORY_PALETTE[0]);
     setError(null);
   }
@@ -31,13 +33,24 @@ export function AddCategoryDialog({
     e.preventDefault();
     setError(null);
     const slug = slugify(label);
-    if (cats.forDirection(direction).some((c) => c.slug === slug)) {
-      setError('A category with that name already exists for this flow.');
-      return;
+    const targets: Direction[] = dir === 'both' ? ['debit', 'credit'] : [dir];
+
+    for (const t of targets) {
+      if (cats.forDirection(t).some((c) => c.slug === slug)) {
+        setError(
+          `A category named “${label.trim()}” already exists for ${
+            t === 'debit' ? 'money out' : 'money in'
+          }.`,
+        );
+        return;
+      }
     }
-    const maxSort = Math.max(0, ...cats.forDirection(direction).map((c) => c.sort));
+
     try {
-      await up.mutateAsync({ slug, label: label.trim(), direction, color, sort: maxSort + 10 });
+      for (const t of targets) {
+        const maxSort = Math.max(0, ...cats.forDirection(t).map((c) => c.sort));
+        await up.mutateAsync({ slug, label: label.trim(), direction: t, color, sort: maxSort + 10 });
+      }
       reset();
       onOpenChange(false);
     } catch (err) {
@@ -58,7 +71,12 @@ export function AddCategoryDialog({
           <button className="btn ghost sm" type="button" onClick={() => onOpenChange(false)}>
             Cancel
           </button>
-          <button className="btn primary sm" type="submit" form="add-cat-form" disabled={up.isPending || !label.trim()}>
+          <button
+            className="btn primary sm"
+            type="submit"
+            form="add-cat-form"
+            disabled={up.isPending || !label.trim()}
+          >
             {up.isPending ? 'Adding…' : 'Add category'}
           </button>
         </>
@@ -66,11 +84,14 @@ export function AddCategoryDialog({
     >
       <form id="add-cat-form" onSubmit={onSubmit}>
         <div className="seg">
-          <button type="button" className={direction === 'debit' ? 'on' : ''} onClick={() => setDirection('debit')}>
+          <button type="button" className={dir === 'debit' ? 'on' : ''} onClick={() => setDir('debit')}>
             Money out
           </button>
-          <button type="button" className={direction === 'credit' ? 'on' : ''} onClick={() => setDirection('credit')}>
+          <button type="button" className={dir === 'credit' ? 'on' : ''} onClick={() => setDir('credit')}>
             Money in
+          </button>
+          <button type="button" className={dir === 'both' ? 'on' : ''} onClick={() => setDir('both')}>
+            Both
           </button>
         </div>
 
@@ -81,7 +102,7 @@ export function AddCategoryDialog({
             className="input"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="e.g. Subscriptions"
+            placeholder="e.g. Family, Subscriptions"
             autoFocus
           />
           {error && <span className="err">{error}</span>}
@@ -105,6 +126,12 @@ export function AddCategoryDialog({
             </label>
           </div>
         </div>
+
+        {dir === 'both' && (
+          <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '4px 0 0' }}>
+            Creates a card in both the Money out and Money in flows — e.g. Family.
+          </p>
+        )}
       </form>
     </Dialog>
   );

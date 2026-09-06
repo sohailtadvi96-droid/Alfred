@@ -29,6 +29,8 @@ export interface RawCategoryRow {
   sort: number;
   is_system: boolean;
   user_id: string | null;
+  /** migration 0014: retired slug, kept for resolution but hidden from the picker */
+  archived?: boolean;
 }
 
 const sys = (
@@ -64,8 +66,10 @@ export function slugify(input: string): string {
 }
 
 /** Fold system + user rows into one list; a user row shadows a system row. */
-export function resolveCategories(rows: RawCategoryRow[]): Category[] {
-  if (!rows.length) return FALLBACK_CATEGORIES;
+export function resolveCategories(allRows: RawCategoryRow[]): Category[] {
+  if (!allRows.length) return FALLBACK_CATEGORIES;
+
+  const rows = allRows.filter((r) => !r.archived);
 
   const systemKeys = new Set<string>();
   for (const r of rows) if (r.user_id == null) systemKeys.add(`${r.direction}:${r.slug}`);
