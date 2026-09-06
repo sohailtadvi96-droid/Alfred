@@ -61,6 +61,20 @@ supabase secrets set UNSPLASH_ACCESS_KEY=xxx PEXELS_API_KEY=xxx   # Openverse ne
 Until it's deployed, the Discover tab shows a setup note; the rest of the Design
 module (boards, saved references) works without it.
 
+## 7. (Expenses) AI categorisation fallback — Edge Function
+
+The rule engine categorises ~99.9% of statement transactions client-side. The
+`categorise-ai` Edge Function mops up the low-confidence tail with one batched
+Claude call. See [`functions/categorise-ai/README.md`](functions/categorise-ai/README.md).
+
+```bash
+supabase functions deploy categorise-ai
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   # console.anthropic.com → API Keys
+```
+
+Until it's deployed, the review-queue "Ask AI to sort N" panel shows a setup
+hint; every other part of Expenses works without it.
+
 ## Schema map
 
 | Module | Tables |
@@ -75,4 +89,5 @@ module (boards, saved references) works without it.
 RPCs: `ingest_transactions(text, jsonb)`, `categorize(text, text)`, `secret_upsert(...)`,
 `secret_reveal(uuid)`, `next_invoice_number()`.
 
-Edge Functions: `design-search` (Design → Discover; Unsplash / Pexels / Openverse).
+Edge Functions: `design-search` (Design → Discover; Unsplash / Pexels / Openverse),
+`categorise-ai` (Expenses → review queue; Anthropic Claude fallback classifier).
