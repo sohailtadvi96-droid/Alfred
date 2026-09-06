@@ -727,8 +727,40 @@ button {
   gap: 14px;
   flex-wrap: wrap;
 }
-.expenses-head .btn {
+/* Family & shops + Review queue sit together, pushed to the far right */
+.expenses-head-nav {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* "Add category" collapses to a "+" and expands on hover/focus */
+.cat-add {
+  overflow: hidden;
+}
+.cat-add-plus {
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 500;
+}
+.cat-add-text {
+  display: inline-block;
+  max-width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    max-width 0.18s ease,
+    margin-left 0.18s ease,
+    opacity 0.18s ease;
+}
+.cat-add:hover .cat-add-text,
+.cat-add:focus-visible .cat-add-text {
+  max-width: 130px;
+  margin-left: 6px;
+  opacity: 1;
 }
 
 /* ---- flow toggle ---- */

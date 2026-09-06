@@ -87,21 +87,31 @@ export function ExpensesPage() {
         <div className="expenses-head">
           <MonthNav month={month} onChange={setMonth} />
           <FlowToggle value={flow} onChange={setFlow} />
-          <button className="btn sec sm" onClick={() => setCatOpen(true)}>
-            Add category
+          <button
+            className="btn sec sm cat-add"
+            onClick={() => setCatOpen(true)}
+            data-tip="Add category"
+            aria-label="Add category"
+          >
+            <span className="cat-add-plus" aria-hidden="true">
+              +
+            </span>
+            <span className="cat-add-text">Add category</span>
           </button>
-          <Link
-            className="btn sec sm"
-            to={{ pathname: '/expenses/people', search: window.location.search }}
-          >
-            Family &amp; shops
-          </Link>
-          <Link
-            className="btn sec sm"
-            to={{ pathname: '/expenses/review', search: window.location.search }}
-          >
-            Review queue
-          </Link>
+          <div className="expenses-head-nav">
+            <Link
+              className="btn sec sm"
+              to={{ pathname: '/expenses/people', search: window.location.search }}
+            >
+              Family &amp; shops
+            </Link>
+            <Link
+              className="btn sec sm"
+              to={{ pathname: '/expenses/review', search: window.location.search }}
+            >
+              Review queue
+            </Link>
+          </div>
         </div>
 
         <MonthDashboard month={month} flow={flow} />
