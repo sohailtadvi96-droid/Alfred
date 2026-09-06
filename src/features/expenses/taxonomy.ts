@@ -39,8 +39,12 @@ export const ENGINE_CATEGORY_SLUG: Record<string, string> = {
   Uncategorised: 'uncategorised',
 };
 
-export function slugForCategory(name: string): string {
-  return ENGINE_CATEGORY_SLUG[name] ?? 'uncategorised';
+/** Engine result category -> ALFRED slug. The engine's own rules emit category
+ *  *names* ("Local Merchant"); a Tier-0 override (merchant_rules) emits whatever
+ *  string is stored there. We store slugs in merchant_rules, so pass through
+ *  anything that already looks like a slug (incl. user-created categories). */
+export function slugForCategory(value: string): string {
+  return ENGINE_CATEGORY_SLUG[value] ?? (/^[a-z][a-z0-9_]*$/.test(value) ? value : 'uncategorised');
 }
 
 /** Row shape the client import flow sends to ingest_transactions('statement', …). */

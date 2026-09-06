@@ -53,6 +53,20 @@ export interface Counterparty {
   netCents: number; // credits − debits
 }
 
+/** A row in the review queue — engine-classified, low/medium confidence. */
+export interface ReviewTxn {
+  id: string;
+  occurred_at: string;
+  direction: Direction;
+  amount_cents: number;
+  category: string;
+  merchant_raw: string | null;
+  counterparty: string | null;
+  vpa: string | null;
+  confidence: string | null;
+  matched_by: string | null;
+}
+
 export interface Account {
   id: string;
   name: string;

@@ -157,6 +157,27 @@ export function useCommitVpaTag() {
   });
 }
 
+export function useReviewQueue() {
+  return useQuery({
+    queryKey: ['expenses', 'reviewQueue'] as const,
+    queryFn: () => api.listReviewQueue(),
+  });
+}
+
+/** Pin a merchant → category (engine Tier 0) and re-categorise matches. */
+export function usePinMerchant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      matchType: 'vpa' | 'counterparty';
+      matchValue: string;
+      categorySlug: string;
+      merchant: string | null;
+    }) => api.pinMerchant(args),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
 export function useRecategorizeAll() {
   const qc = useQueryClient();
   return useMutation({

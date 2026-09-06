@@ -96,6 +96,12 @@ export function ExpensesPage() {
           >
             Family &amp; shops
           </Link>
+          <Link
+            className="btn sec sm"
+            to={{ pathname: '/expenses/review', search: window.location.search }}
+          >
+            Review queue
+          </Link>
         </div>
 
         <MonthDashboard month={month} flow={flow} />

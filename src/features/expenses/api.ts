@@ -12,6 +12,7 @@ import type {
   MonthSummary,
   NewTransaction,
   Person,
+  ReviewTxn,
   Transaction,
 } from './types';
 
@@ -261,17 +262,19 @@ export async function setFerrariShop(
   }
 }
 
-/** Re-classify just the transactions for one VPA against the given Lists.
- *  `dryRun` returns the count that would move without writing. */
-export async function recategoriseByVpa(
-  vpa: string,
+/** Re-classify the transactions matching a VPA or counterparty against the
+ *  given Lists. `dryRun` returns the count that would move without writing. */
+export async function recategoriseMatching(
+  match: { vpa?: string; counterparty?: string },
   lists: Lists,
   dryRun = false,
 ): Promise<{ scanned: number; moved: number }> {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('id,direction,amount_cents,raw_snippet,category')
-    .eq('vpa', vpa);
+  let q = supabase.from('transactions').select('id,direction,amount_cents,raw_snippet,category');
+  if (match.vpa) q = q.eq('vpa', match.vpa);
+  else if (match.counterparty) q = q.ilike('counterparty', match.counterparty);
+  else return { scanned: 0, moved: 0 };
+
+  const { data, error } = await q;
   if (error) throw error;
 
   const rows = (data ?? []) as StoredTxn[];
@@ -279,6 +282,7 @@ export async function recategoriseByVpa(
   if (!dryRun) await applyRecategoriseUpdates(updates);
   return { scanned: rows.length, moved: updates.length };
 }
+
 
 /** How many of a VPA's transactions would move if it were (un)tagged. */
 export async function previewVpaTag(
@@ -290,7 +294,7 @@ export async function previewVpaTag(
   const set = kind === 'family' ? lists.familyVpas : lists.ferrariShops;
   if (next) set.add(vpa);
   else set.delete(vpa);
-  return recategoriseByVpa(vpa, lists, true);
+  return recategoriseMatching({ vpa }, lists, true);
 }
 
 /** Tag/untag a VPA and re-categorise its existing transactions. */
@@ -303,7 +307,64 @@ export async function commitVpaTag(
   if (kind === 'family') await setFamilyMember(vpa, displayName, next);
   else await setFerrariShop(vpa, displayName, next);
   const lists = await loadEngineLists(); // re-read: now reflects the change
-  return recategoriseByVpa(vpa, lists, false);
+  return recategoriseMatching({ vpa }, lists, false);
+}
+
+// ---------- review queue ----------
+
+const CONFIDENCE_RANK: Record<string, number> = { low: 0, medium: 1, high: 2 };
+
+/** Engine-classified rows that want a human look: low/medium confidence,
+ *  confidence ascending then amount descending (04a-BUILD-BRIEF Task 4). */
+export async function listReviewQueue(limit = 300): Promise<ReviewTxn[]> {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select(
+      'id,occurred_at,direction,amount_cents,category,merchant_raw,counterparty,vpa,confidence,matched_by',
+    )
+    .in('confidence', ['low', 'medium']);
+  if (error) throw error;
+
+  const rows = (data ?? []) as ReviewTxn[];
+  rows.sort(
+    (a, b) =>
+      (CONFIDENCE_RANK[a.confidence ?? 'medium'] ?? 1) -
+        (CONFIDENCE_RANK[b.confidence ?? 'medium'] ?? 1) || b.amount_cents - a.amount_cents,
+  );
+  return rows.slice(0, limit);
+}
+
+/** Pin a merchant to a category (engine Tier 0) and re-categorise every
+ *  matching transaction, so the correction compounds. Keyed on VPA when the
+ *  row has one, else the counterparty name. */
+export async function pinMerchant(input: {
+  matchType: 'vpa' | 'counterparty';
+  matchValue: string;
+  categorySlug: string;
+  merchant: string | null;
+}): Promise<{ moved: number }> {
+  const stored =
+    input.matchType === 'counterparty' ? input.matchValue.toUpperCase() : input.matchValue;
+
+  const { error } = await supabase.from('merchant_rules').upsert(
+    {
+      match_type: input.matchType,
+      match_value: stored,
+      category: input.categorySlug, // slug; slugForCategory() passes slugs through
+      merchant: input.merchant,
+      source: 'manual',
+    },
+    { onConflict: 'user_id,match_type,match_value' },
+  );
+  if (error) throw error;
+
+  const lists = await loadEngineLists(); // now includes the new override
+  const res = await recategoriseMatching(
+    input.matchType === 'vpa' ? { vpa: input.matchValue } : { counterparty: input.matchValue },
+    lists,
+    false,
+  );
+  return { moved: res.moved };
 }
 
 /** When a bank-statement CSV was last imported (ISO), or null. */
