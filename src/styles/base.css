@@ -1797,6 +1797,10 @@ button {
   padding: 6px;
   box-shadow: var(--sh);
   z-index: 120;
+  /* long category lists scroll inside the menu instead of running off-screen */
+  max-height: min(340px, var(--radix-dropdown-menu-content-available-height, 340px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .menu-label {
   font-family: var(--mono);
