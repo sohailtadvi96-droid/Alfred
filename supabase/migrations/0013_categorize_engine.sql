@@ -65,6 +65,7 @@ cross join (values
   ('jahangir.tadvi','Jahangir Tadvi',true,  'seeded'),
   ('shounaktadvi-1','Shounak Tadvi', true,  'seeded'),
   ('nayanatadvi196','Nayana Tadvi',  true,  'seeded'),
+  ('sahil.tadvi@bo','Sahil Tadvi',   true,  'seeded'),
   ('adwaithshetty4','Adwaith',       false, null),
   ('prachibaveja20','Prachi',        false, null),
   ('prithvideshmuk','Pruthvi',       false, null),
@@ -141,23 +142,23 @@ do $$ begin
   end if;
 end $$;
 
-insert into public.merchant_rules (user_id, match_type, match_value, category, merchant, source)
-select u.id, s.match_type, s.match_value, s.category, s.merchant, 'seed'
-from auth.users u
-cross join (values
-  ('vpa','8169849526@axl','Rent & Household','Priyanka (household/rent)'),
-  ('vpa','poptatestimess','Dineout & Stays','Pop Tates'),
-  ('vpa','poptatessakina','Dineout & Stays','Pop Tates'),
-  ('vpa','q136970485@ybl','Dineout & Stays','Faraaz Lucknowi'),
-  ('vpa','imperiasalonan','Health & Personal','Imperia Salon'),
-  ('vpa','paytmqr5846oq0','Dineout & Stays','House of Flavours'),
-  ('vpa','eazypay.ntb110','Dineout & Stays','M S Mondys'),
-  ('vpa','paytmqr6b72oj@','Dineout & Stays','Chak De Belgium'),
-  ('vpa','q150216065@ybl','Dineout & Stays','Baba Restaurant'),
-  ('counterparty','JAIHIND','Dineout & Stays','Jai Hind'),
-  ('counterparty','SAI LAXMI E','Local Merchant','Sai Laxmi')
-) as s(match_type, match_value, category, merchant)
-on conflict (user_id, match_type, match_value) do nothing;
+-- NOT seeded. The pack's 02a-schema.sql pre-fills 11 merchant pins, but the
+-- fixture's 1,804 categorised rows were produced without them (zero `override`
+-- rows in statement-categorised.csv) and the acceptance totals assume that:
+-- e.g. the one expected "Card — Unclassified" is SAI LAXMI E, which a
+-- counterparty pin would reclassify. merchant_rules fills from the review
+-- queue (Task 4) instead. Left here as a reference of what the pack suggests:
+--   vpa 8169849526@axl        -> Rent & Household  (Priyanka; remark truncation
+--                                 makes /expens/ miss "june expen"/"vasu expen")
+--   vpa poptatestimess/…sakina-> Dineout & Stays   (Pop Tates)
+--   vpa q136970485@ybl        -> Dineout & Stays   (Faraaz Lucknowi)
+--   vpa imperiasalonan        -> Health & Personal (Imperia Salon)
+--   vpa paytmqr5846oq0        -> Dineout & Stays   (House of Flavours)
+--   vpa eazypay.ntb110        -> Dineout & Stays   (M S Mondys)
+--   vpa paytmqr6b72oj@        -> Dineout & Stays   (Chak De Belgium)
+--   vpa q150216065@ybl        -> Dineout & Stays   (Baba Restaurant)
+--   cp  JAIHIND               -> Dineout & Stays   (Jai Hind)
+--   cp  SAI LAXMI E           -> Local Merchant    (Sai Laxmi)
 
 -- ============================================================
 -- 5. categories — add `kind`, seed the engine taxonomy as system slugs

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { errMessage } from '@/lib/errors';
 import { money, shortDate } from '@/lib/format';
-import { useAccounts, useImportStatement, useRecategorizeAll } from './hooks';
+import { useAccounts, useEngineLists, useImportStatement, useRecategorizeAll } from './hooks';
 import {
   guessColumnMap,
   mapRows,
@@ -10,9 +10,12 @@ import {
   type CsvColumnMap,
   type ParsedCsv,
 } from './csv';
+import { EMPTY_LISTS } from './categorize';
 import type { DateFormat, ParseResult } from './statement';
 // pdf.ts pulls in pdfjs-dist (~1 MB) — load it only when a PDF is actually picked
 const loadPdf = () => import('./pdf');
+const loadEngine = () => import('./engineImport');
+const loadIcici = () => import('./icici');
 
 const DATE_FORMATS: DateFormat[] = ['auto', 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MMM-YYYY'];
 const FIELDS: { key: keyof CsvColumnMap; label: string; hint: string }[] = [
@@ -70,6 +73,7 @@ export function ImportStatementDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const { data: accounts } = useAccounts();
+  const { data: engineLists } = useEngineLists();
   const importer = useImportStatement();
   const recat = useRecategorizeAll();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -91,6 +95,7 @@ export function ImportStatementDialog({
   const [rememberPw, setRememberPw] = useState(() => read(PDF_PW_KEY) !== '');
   const [pdfResult, setPdfResult] = useState<ParseResult | null>(null);
   const [reading, setReading] = useState(false);
+  const [engineInfo, setEngineInfo] = useState<{ warnings: string[] } | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ inserted: number; total: number; skipped: number } | null>(
@@ -106,6 +111,7 @@ export function ImportStatementDialog({
     setPdfFile(null);
     setPdfResult(null);
     setReading(false);
+    setEngineInfo(null);
     setError(null);
     setResult(null);
     setShowSkipped(false);
@@ -124,7 +130,7 @@ export function ImportStatementDialog({
       setMap(null);
       setPdfFile(file);
       setPdfResult(null);
-      if (password) void readPdf(file, password);
+      void readPdf(file, password);
       return;
     }
 
@@ -153,6 +159,7 @@ export function ImportStatementDialog({
     setError(null);
     setReading(true);
     setPdfResult(null);
+    setEngineInfo(null);
     try {
       const { extractPdfLines, parseStatementLines } = await loadPdf();
       const ex = await extractPdfLines(file, pw);
@@ -163,7 +170,18 @@ export function ImportStatementDialog({
         else setError(ex.message || 'Could not read the PDF.');
         return;
       }
-      const res = parseStatementLines(ex.lines);
+
+      const { isIciciStatement, buildEngineRows } = await loadEngine();
+      let res: ParseResult;
+      if (isIciciStatement(ex.lines)) {
+        const { parseIciciStatement } = await loadIcici();
+        const parsed = parseIciciStatement(ex.lines);
+        res = buildEngineRows(parsed.txns, engineLists ?? EMPTY_LISTS);
+        setEngineInfo({ warnings: parsed.warnings });
+      } else {
+        res = parseStatementLines(ex.lines);
+      }
+
       setPdfResult(res);
       if (res.ok.length === 0) {
         setError(
@@ -310,7 +328,9 @@ export function ImportStatementDialog({
               {kind === 'pdf' && (
                 <div className="pdf-pw">
                   <div className="field" style={{ marginBottom: 8 }}>
-                    <label htmlFor="pdf-pw">PDF password</label>
+                    <label htmlFor="pdf-pw">
+                      PDF password <span className="hint">only if the file is protected</span>
+                    </label>
                     <input
                       id="pdf-pw"
                       className="input"
@@ -319,7 +339,7 @@ export function ImportStatementDialog({
                       autoFocus
                       onChange={(e) => setPassword(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && pdfFile && password) void readPdf(pdfFile, password);
+                        if (e.key === 'Enter' && pdfFile) void readPdf(pdfFile, password);
                       }}
                       placeholder="one-time password on the statement email"
                     />
@@ -335,8 +355,8 @@ export function ImportStatementDialog({
                   <button
                     className="btn sec sm"
                     type="button"
-                    onClick={() => pdfFile && password && readPdf(pdfFile, password)}
-                    disabled={!pdfFile || !password || reading}
+                    onClick={() => pdfFile && readPdf(pdfFile, password)}
+                    disabled={!pdfFile || reading}
                   >
                     {reading ? 'Reading…' : pdfResult ? 'Re-read' : 'Read PDF'}
                   </button>
@@ -402,6 +422,14 @@ export function ImportStatementDialog({
                     </div>
                   ))}
                 </div>
+              )}
+
+              {engineInfo && (
+                <p className="tlabel" style={{ marginTop: 10 }}>
+                  ICICI statement — categorised on this device.
+                  {engineInfo.warnings.length > 0 &&
+                    ` ${engineInfo.warnings.length} parser note${engineInfo.warnings.length === 1 ? '' : 's'}.`}
+                </p>
               )}
 
               {preview && (

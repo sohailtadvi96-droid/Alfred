@@ -118,10 +118,22 @@ export function useLastStatementImport() {
   });
 }
 
+/** Family / Ferrari / merchant-override lists for the client-side engine. */
+export function useEngineLists() {
+  return useQuery({
+    queryKey: ['expenses', 'engineLists'] as const,
+    queryFn: api.loadEngineLists,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useRecategorizeAll() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: api.recategorizeAll,
+    mutationFn: async () => {
+      const lists = await api.loadEngineLists();
+      return api.recategorizeAllClient(lists);
+    },
     onSuccess: () => invalidateAll(qc),
   });
 }

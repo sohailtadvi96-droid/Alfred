@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { addMonths, monthRange } from '@/lib/format';
 import type { Direction, RawCategoryRow } from './categories';
+import type { Lists } from './categorize';
+import { recategoriseStored, type StoredTxn } from './engineImport';
 import type { Account, AccountBalance, CategoryRule, MonthSummary, NewTransaction, Transaction } from './types';
 
 export interface TxnFilter {
@@ -77,6 +79,86 @@ export async function recategorizeAll(): Promise<number> {
   const { data, error } = await supabase.rpc('recategorize_all');
   if (error) throw error;
   return (data as number) ?? 0;
+}
+
+// ---------- engine (client-side categorisation) ----------
+
+/** Load the engine's Lists (family VPAs, Ferrari shops, merchant overrides)
+ *  from Supabase. Falls back to empty if the engine tables aren't there yet. */
+export async function loadEngineLists(): Promise<Lists> {
+  const empty: Lists = { familyVpas: new Set(), ferrariShops: new Set(), overrides: new Map() };
+  try {
+    const [people, ferrari, rules] = await Promise.all([
+      supabase.from('people').select('vpa').eq('is_family', true),
+      supabase.from('ferrari_shops').select('vpa'),
+      supabase.from('merchant_rules').select('match_type,match_value,category,merchant'),
+    ]);
+    if (people.error || ferrari.error || rules.error) return empty;
+    return {
+      familyVpas: new Set((people.data ?? []).map((r) => r.vpa as string)),
+      ferrariShops: new Set((ferrari.data ?? []).map((r) => r.vpa as string)),
+      overrides: new Map(
+        (rules.data ?? []).map((r) => [
+          r.match_type === 'counterparty'
+            ? String(r.match_value).toUpperCase()
+            : String(r.match_value),
+          { category: r.category as string, merchant: (r.merchant as string | null) ?? undefined },
+        ]),
+      ),
+    };
+  } catch {
+    return empty;
+  }
+}
+
+/** Re-categorise every statement transaction in the browser with the current
+ *  Lists, and write back only the ones whose slug changed. The engine module
+ *  never touches the network — rows are paged out, classified, patched back. */
+export async function recategorizeAllClient(lists: Lists): Promise<number> {
+  const PAGE = 1000;
+  let from = 0;
+  let moved = 0;
+
+  for (;;) {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id,direction,amount_cents,raw_snippet,category')
+      .eq('source_type', 'statement')
+      .order('occurred_at', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+
+    const rows = (data ?? []) as StoredTxn[];
+    if (!rows.length) break;
+
+    const updates = recategoriseStored(rows, lists);
+    for (let i = 0; i < updates.length; i += 50) {
+      const chunk = updates.slice(i, i + 50);
+      const res = await Promise.all(
+        chunk.map((u) =>
+          supabase
+            .from('transactions')
+            .update({
+              category: u.category,
+              channel: u.channel,
+              counterparty: u.counterparty,
+              vpa: u.vpa,
+              remark: u.remark,
+              matched_by: u.matched_by,
+              confidence: u.confidence,
+            })
+            .eq('id', u.id),
+        ),
+      );
+      const failed = res.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+      moved += chunk.length;
+    }
+
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return moved;
 }
 
 /** When a bank-statement CSV was last imported (ISO), or null. */
