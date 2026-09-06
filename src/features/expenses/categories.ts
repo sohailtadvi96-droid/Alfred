@@ -29,8 +29,6 @@ export interface RawCategoryRow {
   sort: number;
   is_system: boolean;
   user_id: string | null;
-  /** migration 0014: retired slug, kept for resolution but hidden from the picker */
-  archived?: boolean;
 }
 
 const sys = (
@@ -41,17 +39,36 @@ const sys = (
   sort: number,
 ): Category => ({ slug, label, direction, color, sort, isSystem: true, isOverride: false, hasSystemDefault: true });
 
-/** Used while the categories query is loading or if it fails / before migration 0007. */
+/** Shown only while the categories query is loading or if it fails. Mirrors the
+ *  engine taxonomy seeded in migration 0013. */
 export const FALLBACK_CATEGORIES: Category[] = [
-  sys('online_shopping', 'Online shopping', 'debit', '#7E97AB', 10),
-  sys('dineout', 'Dineout', 'debit', '#BC6250', 20),
-  sys('grocery', 'Grocery', 'debit', '#8D9E79', 30),
-  sys('alcohol', 'Alcohol', 'debit', '#93839F', 40),
-  sys('person', 'Person', 'debit', '#BF8B84', 50),
-  sys('ticket_booking', 'Ticket booking', 'debit', '#D6994F', 60),
-  sys('misc', 'Misc', 'debit', '#6E8CA8', 70),
-  sys('person', 'Person', 'credit', '#BF8B84', 10),
-  sys('refund', 'Refund', 'credit', '#6E9B5F', 20),
+  sys('rent_household', 'Rent & Household', 'debit', '#BC6250', 10),
+  sys('dineout_stays', 'Dineout & Stays', 'debit', '#C86B54', 11),
+  sys('food_delivery', 'Food Delivery', 'debit', '#D6994F', 12),
+  sys('grocery', 'Grocery', 'debit', '#8D9E79', 13),
+  sys('alcohol', 'Alcohol', 'debit', '#93839F', 14),
+  sys('my_ferrari', 'My Ferrari', 'debit', '#B5524A', 15),
+  sys('daily_spends', 'Daily Spends', 'debit', '#7E97AB', 16),
+  sys('local_merchant', 'Local Merchant', 'debit', '#BF8B84', 17),
+  sys('cab_transport', 'Cab & Transport', 'debit', '#6E8CA8', 18),
+  sys('ticket_booking', 'Ticket Booking', 'debit', '#D99A5B', 19),
+  sys('online_shopping', 'Online Shopping', 'debit', '#7E97AB', 20),
+  sys('subscriptions', 'Subscriptions', 'debit', '#93839F', 21),
+  sys('work_software', 'Work & Software', 'debit', '#6E9B5F', 22),
+  sys('bills_recharge', 'Bills & Recharge', 'debit', '#C08E5A', 23),
+  sys('health_personal', 'Health & Personal', 'debit', '#A9736B', 24),
+  sys('entertainment', 'Entertainment', 'debit', '#9683A8', 25),
+  sys('fuel', 'Fuel', 'debit', '#C08E5A', 26),
+  sys('bank_charges', 'Bank Charges', 'debit', '#8195A6', 27),
+  sys('cash_withdrawal', 'Cash Withdrawal', 'debit', '#8195A6', 40),
+  sys('family', 'Family', 'debit', '#BF8B84', 41),
+  sys('person_transactions', 'Person Transactions', 'debit', '#B98A86', 42),
+  sys('uncategorised', 'Uncategorised', 'debit', '#6E6656', 99),
+  sys('salary', 'Salary', 'credit', '#6E9B5F', 1),
+  sys('income', 'Income', 'credit', '#6E9B5F', 2),
+  sys('money_received', 'Money Received', 'credit', '#7FA86B', 3),
+  sys('family', 'Family', 'credit', '#BF8B84', 41),
+  sys('uncategorised', 'Uncategorised', 'credit', '#6E6656', 99),
 ];
 
 export function slugify(input: string): string {
@@ -66,10 +83,8 @@ export function slugify(input: string): string {
 }
 
 /** Fold system + user rows into one list; a user row shadows a system row. */
-export function resolveCategories(allRows: RawCategoryRow[]): Category[] {
-  if (!allRows.length) return FALLBACK_CATEGORIES;
-
-  const rows = allRows.filter((r) => !r.archived);
+export function resolveCategories(rows: RawCategoryRow[]): Category[] {
+  if (!rows.length) return FALLBACK_CATEGORIES;
 
   const systemKeys = new Set<string>();
   for (const r of rows) if (r.user_id == null) systemKeys.add(`${r.direction}:${r.slug}`);
