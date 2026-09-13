@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { casualDayMonth, money, monthKey } from '@/lib/format';
+import { addMonths, casualDayMonth, money, monthKey, monthLabel } from '@/lib/format';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SeatedEnter } from '@/components/SeatedEnter';
+import { BurnCurve } from './BurnCurve';
+import { buildBurnSeries } from './burnSeries';
 import { CategoryCard, type RecentEntry } from './CategoryCard';
 import { EditCategoryDialog } from './EditCategoryDialog';
 import { AccountsWallet } from './AccountsWallet';
@@ -25,6 +27,8 @@ export function MonthDashboard({
 }) {
   const { data, isLoading } = useMonthSummary(month);
   const { data: monthTxns } = useTransactions({ month });
+  const prevMonth = addMonths(month, -1);
+  const { data: prevMonthTxns } = useTransactions({ month: prevMonth });
   const cats = useCategories();
   const navigate = useNavigate();
   const { hidden } = usePrivacy();
@@ -44,6 +48,9 @@ export function MonthDashboard({
     }
     return max;
   }, [monthTxns]);
+
+  const currentBurn = useMemo(() => buildBurnSeries(monthTxns), [monthTxns]);
+  const priorBurn = useMemo(() => buildBurnSeries(prevMonthTxns), [prevMonthTxns]);
 
   const { data: comparison } = usePeriodComparison(month, lastTxnDay);
   const { data: ledgerLastTxnDate } = useLedgerStaleness();
@@ -138,6 +145,13 @@ export function MonthDashboard({
             </span>
           )}
         </div>
+
+        <BurnCurve
+          current={currentBurn}
+          prior={priorBurn}
+          currentLabel={monthLabel(month)}
+          priorLabel={monthLabel(prevMonth)}
+        />
 
         <SeatedEnter className="catgrid">
           {activeCards.map(({ cat, cents, count: n }, i) => {

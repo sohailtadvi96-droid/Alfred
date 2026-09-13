@@ -1005,6 +1005,114 @@ button {
   color: var(--text);
 }
 
+/* ============ burn curve ============ */
+.burncurve {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 16px 18px 8px;
+}
+.burncurve-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+.burncurve-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+.burncurve-lg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.burncurve-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  font-style: normal;
+}
+.burncurve-swatch--current {
+  background: var(--base);
+}
+.burncurve-swatch--prior {
+  background: var(--text-faint);
+}
+.burncurve-plot {
+  position: relative;
+}
+.burncurve-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.burncurve-grid {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+}
+.burncurve-ylabel,
+.burncurve-xlabel {
+  font-family: var(--mono);
+  font-size: 9px;
+  fill: var(--text-faint);
+}
+.burncurve-line {
+  fill: none;
+  stroke-width: 2;
+}
+.burncurve-line--current {
+  stroke: var(--base);
+}
+.burncurve-line--prior {
+  stroke: var(--text-faint);
+  stroke-dasharray: 4 3;
+}
+.burncurve-cursor {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.burncurve-dot {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+.burncurve-dot--current {
+  fill: var(--base);
+}
+.burncurve-dot--prior {
+  fill: var(--text-faint);
+}
+.burncurve-tip {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--sh-sm);
+}
+.burncurve-tip-day {
+  color: var(--text-faint);
+  margin-bottom: 2px;
+}
+.burncurve-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+
 /* front panel — the card face (brown band + green body); the receipt lives
    inside it, between the band and the body */
 .catcard-front {
