@@ -1,5 +1,10 @@
 export type Direction = 'debit' | 'credit';
 export type CategoryKind = 'expense' | 'income' | 'transfer';
+/** Whether an expense was optional. Applies to expense-kind categories
+ *  only — null means "not applicable" (income/transfer) or "not yet
+ *  resolved" (a low-confidence catch-all, or person_transactions until
+ *  Phase 3 resolves individual counterparties), never "forgot to set". */
+export type CategoryBucket = 'need' | 'want' | 'obligation' | 'invest';
 
 export const ACCOUNT_TYPES = ['bank', 'credit', 'cash', 'wallet'] as const;
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
@@ -17,6 +22,11 @@ export interface Category {
   /** expense/income/transfer — defaults by direction when the row predates
    *  the `kind` column being backfilled (mirrors transaction_flows' SQL fallback). */
   kind: CategoryKind;
+  /** null = not applicable (income/transfer) or not yet resolved — never
+   *  falls back to a system default the way `kind` does. A user row
+   *  shadowing a system row carries its own bucket, including null if
+   *  they haven't set one. */
+  bucket: CategoryBucket | null;
   /** the resolved row's is_system flag (false once a user row shadows it) */
   isSystem: boolean;
   /** a user-owned row exists for this slug + direction */
@@ -34,6 +44,7 @@ export interface RawCategoryRow {
   is_system: boolean;
   user_id: string | null;
   kind: CategoryKind | null;
+  bucket: CategoryBucket | null;
 }
 
 const sys = (
@@ -43,39 +54,51 @@ const sys = (
   color: string,
   sort: number,
   kind: CategoryKind,
-): Category => ({ slug, label, direction, color, sort, kind, isSystem: true, isOverride: false, hasSystemDefault: true });
+  bucket: CategoryBucket | null = null,
+): Category => ({
+  slug,
+  label,
+  direction,
+  color,
+  sort,
+  kind,
+  bucket,
+  isSystem: true,
+  isOverride: false,
+  hasSystemDefault: true,
+});
 
 /** Shown only while the categories query is loading or if it fails. Mirrors the
  *  engine taxonomy seeded in migration 0013. */
 export const FALLBACK_CATEGORIES: Category[] = [
-  sys('rent_household', 'Rent & Household', 'debit', '#BC6250', 10, 'expense'),
-  sys('dineout_stays', 'Dineout & Stays', 'debit', '#C86B54', 11, 'expense'),
-  sys('food_delivery', 'Food Delivery', 'debit', '#D6994F', 12, 'expense'),
-  sys('grocery', 'Grocery', 'debit', '#8D9E79', 13, 'expense'),
-  sys('alcohol', 'Alcohol', 'debit', '#93839F', 14, 'expense'),
-  sys('my_ferrari', 'My Ferrari', 'debit', '#B5524A', 15, 'expense'),
-  sys('daily_spends', 'Daily Spends', 'debit', '#7E97AB', 16, 'expense'),
-  sys('local_merchant', 'Local Merchant', 'debit', '#BF8B84', 17, 'expense'),
-  sys('cab_transport', 'Cab & Transport', 'debit', '#6E8CA8', 18, 'expense'),
-  sys('ticket_booking', 'Ticket Booking', 'debit', '#D99A5B', 19, 'expense'),
-  sys('online_shopping', 'Online Shopping', 'debit', '#7E97AB', 20, 'expense'),
-  sys('subscriptions', 'Subscriptions', 'debit', '#93839F', 21, 'expense'),
-  sys('work_software', 'Work & Software', 'debit', '#6E9B5F', 22, 'expense'),
-  sys('bills_recharge', 'Bills & Recharge', 'debit', '#C08E5A', 23, 'expense'),
-  sys('health_personal', 'Health & Personal', 'debit', '#A9736B', 24, 'expense'),
-  sys('entertainment', 'Entertainment', 'debit', '#9683A8', 25, 'expense'),
-  sys('fuel', 'Fuel', 'debit', '#C08E5A', 26, 'expense'),
-  sys('bank_charges', 'Bank Charges', 'debit', '#8195A6', 27, 'expense'),
+  sys('rent_household', 'Rent & Household', 'debit', '#BC6250', 10, 'expense', 'need'),
+  sys('dineout_stays', 'Dineout & Stays', 'debit', '#C86B54', 11, 'expense', 'want'),
+  sys('food_delivery', 'Food Delivery', 'debit', '#D6994F', 12, 'expense', 'want'),
+  sys('grocery', 'Grocery', 'debit', '#8D9E79', 13, 'expense', 'need'),
+  sys('alcohol', 'Alcohol', 'debit', '#93839F', 14, 'expense', 'want'),
+  sys('my_ferrari', 'My Ferrari', 'debit', '#B5524A', 15, 'expense', 'want'),
+  sys('daily_spends', 'Daily Spends', 'debit', '#7E97AB', 16, 'expense', 'want'),
+  sys('local_merchant', 'Local Merchant', 'debit', '#BF8B84', 17, 'expense', 'want'),
+  sys('cab_transport', 'Cab & Transport', 'debit', '#6E8CA8', 18, 'expense', 'need'),
+  sys('ticket_booking', 'Ticket Booking', 'debit', '#D99A5B', 19, 'expense', 'want'),
+  sys('online_shopping', 'Online Shopping', 'debit', '#7E97AB', 20, 'expense', 'want'),
+  sys('subscriptions', 'Subscriptions', 'debit', '#93839F', 21, 'expense', 'want'),
+  sys('work_software', 'Work & Software', 'debit', '#6E9B5F', 22, 'expense', 'need'),
+  sys('bills_recharge', 'Bills & Recharge', 'debit', '#C08E5A', 23, 'expense', 'need'),
+  sys('health_personal', 'Health & Personal', 'debit', '#A9736B', 24, 'expense', 'need'),
+  sys('entertainment', 'Entertainment', 'debit', '#9683A8', 25, 'expense', 'want'),
+  sys('fuel', 'Fuel', 'debit', '#C08E5A', 26, 'expense', 'need'),
+  sys('bank_charges', 'Bank Charges', 'debit', '#8195A6', 27, 'expense', 'obligation'),
   sys('cash_withdrawal', 'Cash Withdrawal', 'debit', '#8195A6', 40, 'transfer'),
   sys('self_transfer', 'Self Transfer', 'debit', '#8195A6', 43, 'transfer'),
   sys('credit_card_payment', 'Credit Card Payment', 'debit', '#8195A6', 44, 'transfer'),
-  sys('family', 'Family', 'debit', '#BF8B84', 41, 'expense'),
+  sys('family', 'Family', 'debit', '#BF8B84', 41, 'expense', 'obligation'),
   sys('person_transactions', 'Person Transactions', 'debit', '#B98A86', 42, 'expense'),
   sys('uncategorised', 'Uncategorised', 'debit', '#6E6656', 99, 'expense'),
   sys('salary', 'Salary', 'credit', '#6E9B5F', 1, 'income'),
   sys('income', 'Income', 'credit', '#6E9B5F', 2, 'income'),
   sys('money_received', 'Money Received', 'credit', '#7FA86B', 3, 'income'),
-  sys('family', 'Family', 'credit', '#BF8B84', 41, 'expense'),
+  sys('family', 'Family', 'credit', '#BF8B84', 41, 'expense', 'obligation'),
   sys('uncategorised', 'Uncategorised', 'credit', '#6E6656', 99, 'expense'),
 ];
 
@@ -107,6 +130,7 @@ export function resolveCategories(rows: RawCategoryRow[]): Category[] {
       color: r.color,
       sort: r.sort,
       kind: r.kind ?? (r.direction === 'credit' ? 'income' : 'expense'),
+      bucket: r.bucket,
       isSystem: r.is_system,
       isOverride: r.user_id != null,
       hasSystemDefault: systemKeys.has(key),

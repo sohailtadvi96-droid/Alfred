@@ -736,7 +736,7 @@ export async function applyCategoryToMatching(input: {
 export async function listCategories(): Promise<RawCategoryRow[]> {
   const { data, error } = await supabase
     .from('categories')
-    .select('slug,label,direction,color,sort,is_system,user_id,kind')
+    .select('slug,label,direction,color,sort,is_system,user_id,kind,bucket')
     .order('sort');
   if (error) throw error;
   return data as RawCategoryRow[];

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { addMonths, casualDayMonth, money, monthKey, monthLabel } from '@/lib/format';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SeatedEnter } from '@/components/SeatedEnter';
+import { BucketBar } from './BucketBar';
+import { buildBucketSummary } from './bucketSummary';
 import { BurnCurve } from './BurnCurve';
 import { buildBurnSeries } from './burnSeries';
 import { CategoryCard, type RecentEntry } from './CategoryCard';
@@ -37,6 +39,7 @@ export function MonthDashboard({
 
   const currentBurn = useMemo(() => buildBurnSeries(monthTxns), [monthTxns]);
   const priorBurn = useMemo(() => buildBurnSeries(prevMonthTxns), [prevMonthTxns]);
+  const bucketTotals = useMemo(() => buildBucketSummary(monthTxns, cats.all), [monthTxns, cats.all]);
 
   // day-of-month of the last transaction IN THIS MONTH (not today's date) —
   // computed once, server-side, in getMonthSummary and shared with Home's
@@ -137,6 +140,8 @@ export function MonthDashboard({
           currentLabel={monthLabel(month)}
           priorLabel={monthLabel(prevMonth)}
         />
+
+        <BucketBar totals={bucketTotals} />
 
         <SeatedEnter className="catgrid">
           {activeCards.map(({ cat, cents, count: n }, i) => {
