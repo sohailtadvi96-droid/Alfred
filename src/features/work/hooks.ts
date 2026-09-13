@@ -14,6 +14,7 @@ const keys = {
   project: (id: string) => ['work', 'project', id] as const,
   assets: (id: string) => ['work', 'assets', id] as const,
   deliverables: (id: string) => ['work', 'deliverables', id] as const,
+  upcomingDeliverables: (days: number) => ['work', 'upcomingDeliverables', days] as const,
   time: (id: string) => ['work', 'time', id] as const,
   invoices: ['work', 'invoices'] as const,
   projectInvoices: (id: string) => ['work', 'invoices', 'project', id] as const,
@@ -122,6 +123,13 @@ export function useDeliverables(projectId: string) {
   });
 }
 
+export function useUpcomingDeliverables(days = 14) {
+  return useQuery({
+    queryKey: keys.upcomingDeliverables(days),
+    queryFn: () => api.listUpcomingDeliverables(days),
+  });
+}
+
 export function useAddDeliverable(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -131,12 +139,14 @@ export function useAddDeliverable(projectId: string) {
   });
 }
 
-export function useSetDeliverableStatus(projectId: string) {
+export function useSetDeliverableStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: DeliverableStatus }) =>
       api.setDeliverableStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.deliverables(projectId) }),
+    // broad invalidation — a deliverable's status also feeds Home's
+    // cross-project upcomingDeliverables query, not just this project's.
+    onSuccess: () => invalidateAll(qc),
   });
 }
 

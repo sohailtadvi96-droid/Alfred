@@ -1,4 +1,4 @@
-/** The 12 shipped ground presets. Append here to add more — the picker
+/** The shipped ground presets. Append here to add more — the picker
  *  and ThemeProvider read this list. `id` matches the [data-ground] value
  *  and the CSS selectors in styles/tokens.css. */
 export interface Ground {

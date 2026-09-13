@@ -23,10 +23,18 @@ export default {
         'c-slate': 'var(--c-slate)',
         'c-clay': 'var(--c-clay)',
         'c-plum': 'var(--c-plum)',
+        'm-expenses': 'var(--m-expenses)',
+        'm-invest': 'var(--m-invest)',
+        'm-work': 'var(--m-work)',
+        'm-design': 'var(--m-design)',
+        'm-health': 'var(--m-health)',
+        'm-goals': 'var(--m-goals)',
+        'm-travel': 'var(--m-travel)',
       },
       fontFamily: {
         sans: ['Archivo', 'Helvetica Neue', 'Arial', 'sans-serif'],
         mono: ['"Spline Sans Mono"', 'ui-monospace', 'Menlo', 'monospace'],
+        home: ['Inter', 'Helvetica Neue', 'Arial', 'sans-serif'],
       },
       borderRadius: {
         xs: '6px',

@@ -33,6 +33,16 @@
   --pos: #6e9b5f;
   --neg: #c56350;
   --wip: #6e8ca8;
+
+  /* ---- Home module identity colors — fixed on every ground. Used ONLY as
+     a tile's 3px left edge and its icon-chip background, never a fill. ---- */
+  --m-expenses: #c4674a;
+  --m-invest: #4a6fa5;
+  --m-work: #5c6670;
+  --m-design: #6e5a8a;
+  --m-health: #7a9471;
+  --m-goals: #8a5a83;
+  --m-travel: #c9963f;
 }
 
 /* ===================== 12 GROUND PRESETS ===================== */

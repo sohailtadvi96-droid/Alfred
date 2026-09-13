@@ -8,6 +8,7 @@ import type {
   InvoiceStatus,
   NewClient,
   NewProject,
+  Project,
   ProjectAsset,
   ProjectWithClient,
   SaveInvoiceInput,
@@ -164,6 +165,24 @@ export async function setDeliverableStatus(id: string, status: DeliverableStatus
 export async function deleteDeliverable(id: string): Promise<void> {
   const { error } = await supabase.from('deliverables').delete().eq('id', id);
   if (error) throw error;
+}
+
+/** Pending deliverables due within `days`, across every project — feeds the
+ *  Home dashboard's Rail and Work tile. */
+export async function listUpcomingDeliverables(
+  days = 14,
+): Promise<(Deliverable & { project: Pick<Project, 'id' | 'name'> })[]> {
+  const until = new Date();
+  until.setDate(until.getDate() + days);
+  const untilKey = until.toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from('deliverables')
+    .select('*, project:projects(id,name)')
+    .eq('status', 'pending')
+    .lte('due_date', untilKey)
+    .order('due_date', { ascending: true });
+  if (error) throw error;
+  return data as (Deliverable & { project: Pick<Project, 'id' | 'name'> })[];
 }
 
 // ---------- time entries ----------

@@ -1,6 +1,10 @@
 /** Woodcut icon set — solid fills, one hard offset shadow applied by the
  *  consumer via CSS `filter: var(--cut)` where wanted. */
 const PATHS: Record<string, string> = {
+  home: 'M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-9Z',
+  check: 'M9.55 18 3.85 12.3l1.425-1.425L9.55 15.15l9.175-9.175L20.15 7.4Z',
+  goals: 'M6 2h2v20H6V2Zm2 1h11l-2.5 4L19 11H8V3Z',
+  travel: 'M3 12 21 4l-4 18-5-6-5 4Z',
   expenses:
     'M4 5h13l3 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2 6v2h9v-2H6Zm0 4v2h6v-2H6Z',
   secrets:
@@ -23,10 +27,16 @@ export function Icon({
   name,
   size = 18,
   className,
+  strokeOverlay = false,
 }: {
   name: IconName;
   size?: number;
   className?: string;
+  /** Layers a second, stroke-only copy of the glyph on top (class
+   *  `icon-stroke`) for a "redraws itself" hover treatment — the base
+   *  icons are solid fills, so this is a decorative outline, not a
+   *  replacement rendering. */
+  strokeOverlay?: boolean;
 }) {
   return (
     <svg
@@ -42,6 +52,17 @@ export function Icon({
       className={className}
     >
       <path d={PATHS[name]} />
+      {strokeOverlay && (
+        <path
+          className="icon-stroke"
+          d={PATHS[name]}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          pathLength={100}
+          strokeDasharray={100}
+        />
+      )}
     </svg>
   );
 }

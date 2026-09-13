@@ -16,11 +16,12 @@ const MODULES: NavItem[] = [
   { to: '/secrets', label: 'Secrets', index: '02', icon: 'secrets', tip: 'Passwords and keys, encrypted at rest' },
   { to: '/work', label: 'Work', index: '03', icon: 'work', tip: 'Freelance projects and invoices · office tasks, meetings and notes' },
   { to: '/design', label: 'Design', index: '04', icon: 'design', tip: 'Inspiration library — references on boards, cross-cut by tags' },
+  { to: '/goals', label: 'Goals', index: '05', icon: 'goals', tip: 'Targets, pace, and the weekly review — reads progress, never stores it' },
 ];
 
-const LATER: NavItem[] = [
-  { to: '#', label: 'Invest', index: '05', icon: 'invest', tip: 'Planned — not in the first build' },
-  { to: '#', label: 'Health', index: '06', icon: 'health', tip: 'Planned — not in the first build' },
+export const LATER: NavItem[] = [
+  { to: '#', label: 'Invest', index: '06', icon: 'invest', tip: 'Planned — not in the first build' },
+  { to: '#', label: 'Health', index: '07', icon: 'health', tip: 'Planned — not in the first build' },
 ];
 
 export function Sidebar({
@@ -36,11 +37,13 @@ export function Sidebar({
   return (
     <aside className="side">
       <div className="logo">
-        <span className="mark">A</span>
-        <span>
-          <b>ALFRED</b>
-          <small>PERSONAL BUTLER</small>
-        </span>
+        <NavLink to="/home" className="logo-link" data-tip={collapsed ? 'Home' : undefined} aria-label="Home">
+          <span className="mark">A</span>
+          <span>
+            <b>ALFRED</b>
+            <small>PERSONAL BUTLER</small>
+          </span>
+        </NavLink>
         {!collapsed && (
           <button
             className="railtoggle"

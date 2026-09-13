@@ -17,7 +17,7 @@ function dueMeta(due: string | null, delivered: boolean): { text: string; overdu
 export function DeliverablesList({ projectId }: { projectId: string }) {
   const { data: items, isLoading } = useDeliverables(projectId);
   const add = useAddDeliverable(projectId);
-  const setStatus = useSetDeliverableStatus(projectId);
+  const setStatus = useSetDeliverableStatus();
   const del = useDeleteDeliverable(projectId);
 
   const [label, setLabel] = useState('');

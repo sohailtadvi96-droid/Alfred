@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { RequireAuth } from '@/auth/RequireAuth';
 import { LoginPage } from '@/auth/LoginPage';
+import { HomePage } from './HomePage';
 import { ExpensesPage } from './ExpensesPage';
 import { TransactionsPage } from './TransactionsPage';
 import { PeoplePage } from './PeoplePage';
@@ -11,6 +12,7 @@ import { WorkPage } from './WorkPage';
 import { DesignPage } from './DesignPage';
 import { DesignDiscoverPage } from './DesignDiscoverPage';
 import { DesignBoardPage } from './DesignBoardPage';
+import { GoalsPage } from './GoalsPage';
 import { ProjectDetailPage } from './ProjectDetailPage';
 import { OfficeDayPage } from './OfficeDayPage';
 import { InvoicesPage } from './InvoicesPage';
@@ -27,7 +29,8 @@ export const router = createBrowserRouter([
       </RequireAuth>
     ),
     children: [
-      { index: true, element: <Navigate to="/expenses" replace /> },
+      { index: true, element: <Navigate to="/home" replace /> },
+      { path: 'home', element: <HomePage /> },
       { path: 'expenses', element: <ExpensesPage /> },
       { path: 'expenses/transactions', element: <TransactionsPage /> },
       { path: 'expenses/people', element: <PeoplePage /> },
@@ -41,6 +44,7 @@ export const router = createBrowserRouter([
       { path: 'work/invoices', element: <InvoicesPage /> },
       { path: 'work/invoices/:invoiceId', element: <InvoiceViewPage /> },
       { path: 'work/:projectId', element: <ProjectDetailPage /> },
+      { path: 'goals', element: <GoalsPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
   },
