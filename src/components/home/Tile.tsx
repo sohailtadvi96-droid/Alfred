@@ -1,4 +1,3 @@
-import { useCallback, useState, type CSSProperties, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -20,18 +19,11 @@ export function Tile({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: snapshot.module,
   });
-  const [glow, setGlow] = useState<{ x: number; y: number } | null>(null);
 
-  const handleMouseMove = useCallback((e: MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setGlow({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  }, []);
-
-  const style: CSSProperties & Record<`--${string}`, string | number> = {
+  const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.6 : 1,
-    ...(glow ? { '--hx': `${glow.x}px`, '--hy': `${glow.y}px` } : {}),
   };
 
   // sm = basic info only; md = + moreStats and the primary action; lg = + detail and every action.
@@ -45,16 +37,7 @@ export function Tile({
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="home-tile"
-      data-span={size}
-      data-module={snapshot.module}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => setGlow(null)}
-    >
-      <div className="home-tile-glow" aria-hidden="true" />
+    <div ref={setNodeRef} style={style} className="home-tile" data-span={size} data-module={snapshot.module}>
       <div className="home-tile-head">
         <span className="home-tile-icon" data-module={snapshot.module}>
           <Icon name={snapshot.icon} size={14} strokeOverlay />
