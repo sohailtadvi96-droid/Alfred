@@ -22,6 +22,11 @@ export interface Transaction {
   remark: string | null;
   matched_by: string | null;
   confidence: string | null;
+  // transaction_flows (0018) — present when read from that view, which is
+  // now every read path; kept optional so ad-hoc `transactions` selects
+  // (that don't request these) still satisfy the type.
+  flow_kind?: 'expense' | 'income' | 'transfer';
+  excluded_from_spend?: boolean;
 }
 
 /** people row — the user-managed family list, keyed on VPA (migration 0013). */

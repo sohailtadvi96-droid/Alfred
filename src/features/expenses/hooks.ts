@@ -34,6 +34,22 @@ export function useMonthSummary(month: string) {
   });
 }
 
+export function usePeriodComparison(month: string, lastTxnDay: number | null) {
+  return useQuery({
+    queryKey: ['expenses', 'periodComparison', month, lastTxnDay],
+    queryFn: () => api.getPeriodComparison(month, lastTxnDay as number),
+    enabled: lastTxnDay != null,
+  });
+}
+
+export function useLedgerStaleness() {
+  return useQuery({
+    queryKey: ['expenses', 'ledgerLastTxnDate'],
+    queryFn: api.getLedgerLastTxnDate,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useAccounts() {
   return useQuery({ queryKey: keys.accounts, queryFn: api.listAccounts });
 }

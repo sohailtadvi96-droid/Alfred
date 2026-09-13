@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { money, monthKey } from '@/lib/format';
+import { casualDayMonth, money, monthKey } from '@/lib/format';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SeatedEnter } from '@/components/SeatedEnter';
 import { CategoryCard, type RecentEntry } from './CategoryCard';
 import { EditCategoryDialog } from './EditCategoryDialog';
 import { AccountsWallet } from './AccountsWallet';
-import { useCategories, useMonthSummary, useTransactions } from './hooks';
+import {
+  useCategories,
+  useLedgerStaleness,
+  useMonthSummary,
+  usePeriodComparison,
+  useTransactions,
+} from './hooks';
 import { usePrivacy, MASK } from './privacy';
 import type { Category, Direction } from './categories';
 
@@ -25,13 +31,36 @@ export function MonthDashboard({
   const [editCat, setEditCat] = useState<Category | null>(null);
   const [showEmpty, setShowEmpty] = useState(false);
 
+  // day-of-month of the LAST transaction IN THIS MONTH — not today's date.
+  // For the current/latest month this naturally lands on the ledger's
+  // actual cutoff (e.g. 5 for a ledger that runs to 5 Sept); for a fully
+  // populated past month it lands on that month's real last day.
+  const lastTxnDay = useMemo(() => {
+    if (!monthTxns || monthTxns.length === 0) return null;
+    let max = 0;
+    for (const t of monthTxns) {
+      const d = new Date(t.occurred_at).getDate();
+      if (d > max) max = d;
+    }
+    return max;
+  }, [monthTxns]);
+
+  const { data: comparison } = usePeriodComparison(month, lastTxnDay);
+  const { data: ledgerLastTxnDate } = useLedgerStaleness();
+  const daysStale =
+    ledgerLastTxnDate != null
+      ? Math.floor((Date.now() - new Date(ledgerLastTxnDate).getTime()) / 86_400_000)
+      : null;
+
   if (isLoading || !data) {
     return <div className="bento-skeleton" aria-busy="true" />;
   }
 
-  const { spendCents, incomeCents, transfersCents, transfersCount, prevSpendCents, count } = data;
-  const delta =
-    prevSpendCents > 0 ? Math.round(((spendCents - prevSpendCents) / prevSpendCents) * 100) : null;
+  const { spendCents, incomeCents, transfersCents, transfersCount, count } = data;
+  const cmpPct =
+    comparison && comparison.priorExpenseCents ? Math.round(
+      ((comparison.currentExpenseCents - comparison.priorExpenseCents) / comparison.priorExpenseCents) * 100,
+    ) : null;
   const creditCount = data.byCategory
     .filter((c) => c.direction === 'credit')
     .reduce((s, c) => s + c.count, 0);
@@ -80,17 +109,34 @@ export function MonthDashboard({
             <AnimatedNumber value={spendCents} format={(c) => money(c, true)} />
           </span>
           <span className="sumcard-s">
-            {delta !== null ? (
+            {comparison && comparison.priorExpenseCents != null && (
               <>
-                {delta >= 0 ? '▲' : '▼'} <AnimatedNumber value={Math.abs(delta)} format={String} />%
-                vs last month
+                <span
+                  data-tip={
+                    comparison.clamped
+                      ? `Last month only has ${comparison.priorToDay} days — comparison clamped to that`
+                      : undefined
+                  }
+                >
+                  {comparison.priorExpenseCents > 0 && (
+                    <>
+                      {cmpPct! >= 0 ? '▲' : '▼'} <AnimatedNumber value={Math.abs(cmpPct!)} format={String} />%{' '}
+                    </>
+                  )}
+                  vs same days last month ({money(comparison.currentExpenseCents, true)} vs{' '}
+                  {money(comparison.priorExpenseCents, true)})
+                </span>
+                {' · '}
               </>
-            ) : (
-              'no last-month data'
             )}
-            {' · '}
             <AnimatedNumber value={count} format={String} /> {count === 1 ? 'entry' : 'entries'}
           </span>
+          {daysStale !== null && daysStale > 0 && ledgerLastTxnDate && (
+            <span className={`sumcard-s sumcard-stale${daysStale > 3 ? ' amber' : ''}`}>
+              Ledger current to {casualDayMonth(ledgerLastTxnDate)} · {daysStale} day{daysStale === 1 ? '' : 's'}{' '}
+              unimported
+            </span>
+          )}
         </div>
 
         <SeatedEnter className="catgrid">

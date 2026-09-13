@@ -26,7 +26,7 @@ export interface TxnFilter {
 export async function listTransactions(filter: TxnFilter): Promise<Transaction[]> {
   const { start, end } = monthRange(filter.month);
   let q = supabase
-    .from('transactions')
+    .from('transaction_flows')
     .select('*')
     .gte('occurred_at', start)
     .lt('occurred_at', end)
@@ -599,6 +599,80 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
       }))
       .sort((a, b) => b.cents - a.cents),
   };
+}
+
+// ---------- period comparisons (Phase 4 — honest comparisons) ----------
+
+export interface PeriodFlowTotal {
+  flow_kind: 'expense' | 'income' | 'transfer';
+  total_cents: number;
+  txn_count: number;
+}
+
+/** RPC wrapper — reads transaction_flows server-side, date range inclusive. */
+async function periodSummary(from: string, to: string): Promise<PeriodFlowTotal[]> {
+  const { data, error } = await supabase.rpc('period_summary', { p_from: from, p_to: to });
+  if (error) throw error;
+  return (data ?? []) as PeriodFlowTotal[];
+}
+
+export interface PeriodComparison {
+  lastTxnDay: number;
+  currentExpenseCents: number;
+  /** null = no prior-month data at all (any flow_kind) — show nothing */
+  priorExpenseCents: number | null;
+  /** the prior window was clamped because that month is shorter than lastTxnDay */
+  clamped: boolean;
+  priorToDay: number;
+}
+
+/** Day-matched comparison: days 1..lastTxnDay of `month` vs the same day
+ *  span in the prior month. `lastTxnDay` must come from the caller (the
+ *  day-of-month of the last transaction IN THIS MONTH, not today's date —
+ *  see MonthDashboard, which derives it from the already-fetched month's
+ *  transaction list). Expense only; transfers are never folded into this. */
+export async function getPeriodComparison(month: string, lastTxnDay: number): Promise<PeriodComparison> {
+  const [y, m] = month.split('-').map(Number);
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  const currentFrom = `${month}-01`;
+  const currentTo = `${month}-${pad(lastTxnDay)}`;
+
+  const priorFirst = new Date(y, m - 2, 1); // m is 1-based; -1 more for "prior month"
+  const priorYear = priorFirst.getFullYear();
+  const priorMonthNum = priorFirst.getMonth() + 1;
+  const priorDaysInMonth = new Date(priorYear, priorMonthNum, 0).getDate();
+  const priorToDay = Math.min(lastTxnDay, priorDaysInMonth);
+  const priorFrom = `${priorYear}-${pad(priorMonthNum)}-01`;
+  const priorTo = `${priorYear}-${pad(priorMonthNum)}-${pad(priorToDay)}`;
+
+  const [curRows, priorRows] = await Promise.all([
+    periodSummary(currentFrom, currentTo),
+    periodSummary(priorFrom, priorTo),
+  ]);
+
+  const expenseOf = (rows: PeriodFlowTotal[]) => rows.find((r) => r.flow_kind === 'expense')?.total_cents ?? 0;
+
+  return {
+    lastTxnDay,
+    currentExpenseCents: expenseOf(curRows),
+    priorExpenseCents: priorRows.length > 0 ? expenseOf(priorRows) : null,
+    clamped: lastTxnDay > priorDaysInMonth,
+    priorToDay,
+  };
+}
+
+/** Most recent transaction date across the whole ledger (any month) —
+ *  drives the "Ledger current to X" staleness line. */
+export async function getLedgerLastTxnDate(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('occurred_at')
+    .order('occurred_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.occurred_at as string | null) ?? null;
 }
 
 export async function listAccounts(): Promise<Account[]> {

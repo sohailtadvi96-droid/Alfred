@@ -49,12 +49,17 @@ export function parseAmountToCents(input: string): number | null {
 
 const dayFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
 const fullFmt = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+const casualDayMonthFmt = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' });
 
 export function shortDate(iso: string): string {
   return dayFmt.format(new Date(iso)).toUpperCase();
 }
 export function fullDate(iso: string): string {
   return fullFmt.format(new Date(iso));
+}
+/** "5 Sept" — sentence case, no zero-padding. For prose, not table cells. */
+export function casualDayMonth(iso: string): string {
+  return casualDayMonthFmt.format(new Date(iso));
 }
 
 /** "just now" / "5 mins ago" / "2 days ago" — coarse, for freshness labels */
