@@ -8,7 +8,7 @@ import { useGoogleEvents } from '@/features/office/useGoogleCalendar';
 import * as officeApi from '@/features/office/api';
 import { useInvoices, useProjects, useUpcomingDeliverables } from '@/features/work/hooks';
 import * as workApi from '@/features/work/api';
-import { useMonthSummary } from '@/features/expenses/hooks';
+import { useMonthSummary, usePeriodComparison } from '@/features/expenses/hooks';
 import { useBoards } from '@/features/design/hooks';
 import { useGoalsWithPace } from '@/features/goals/hooks';
 import { monthKey } from '@/lib/format';
@@ -65,13 +65,22 @@ export function useCompleteRailItem() {
 
 export function useHomeBoard(): Snapshot[] {
   const { data: monthSummary } = useMonthSummary(monthKey());
+  const { data: periodComparison } = usePeriodComparison(monthKey(), monthSummary?.lastTxnDay ?? null);
   const { data: projects } = useProjects();
   const { data: upcomingDeliverables } = useUpcomingDeliverables(7);
   const { data: boards } = useBoards();
   const { goalsWithPace } = useGoalsWithPace();
 
   return useMemo(
-    () => buildBoardSnapshots({ monthSummary, projects, upcomingDeliverables, boards, goalsWithPace }),
-    [monthSummary, projects, upcomingDeliverables, boards, goalsWithPace],
+    () =>
+      buildBoardSnapshots({
+        monthSummary,
+        periodComparison,
+        projects,
+        upcomingDeliverables,
+        boards,
+        goalsWithPace,
+      }),
+    [monthSummary, periodComparison, projects, upcomingDeliverables, boards, goalsWithPace],
   );
 }

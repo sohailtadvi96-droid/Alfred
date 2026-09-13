@@ -2,10 +2,11 @@ import { dueLabel, localDateKey } from '@/features/office/datetime';
 import { tasksDueToday } from '@/features/office/agenda';
 import type { AgendaEvent, OfficeTask } from '@/features/office/types';
 import type { Deliverable, InvoiceRow, Project, ProjectWithClient } from '@/features/work/types';
-import type { GapMarker, NowMarker, RailRow, Snapshot, SpacerMarker, TimeBound } from './types';
+import type { GapMarker, NowMarker, RailRow, Snapshot, SnapshotStat, SpacerMarker, TimeBound } from './types';
 import { PLACEHOLDER_SNAPSHOTS } from './placeholders';
 import { money, monthLabel, shortDate } from '@/lib/format';
 import type { MonthSummary } from '@/features/expenses/types';
+import type { PeriodComparison } from '@/features/expenses/api';
 import type { BoardWithCover } from '@/features/design/types';
 import { fractionLabel } from '@/features/goals/format';
 import type { Goal, Pace, StreakPace } from '@/features/goals/types';
@@ -203,9 +204,16 @@ export function insertNowMarker(
   return out;
 }
 
-function pct(delta: number, base: number): string {
-  if (base === 0) return delta === 0 ? '0%' : '—';
-  return `${delta >= 0 ? '▲' : '▼'} ${Math.abs(Math.round((delta / base) * 100))}%`;
+/** "▲ 12%" / "▼ 20%", or null when there's nothing sensible to show —
+ *  same rule as Expenses' dashboard: no prior data at all means hide it,
+ *  not a bogus percentage. */
+function comparisonStat(comparison: PeriodComparison | undefined): SnapshotStat | null {
+  if (!comparison || comparison.priorExpenseCents == null) return null;
+  const value =
+    comparison.pct != null
+      ? `${comparison.pct >= 0 ? '▲' : '▼'} ${Math.abs(comparison.pct)}%`
+      : money(comparison.currentExpenseCents, true);
+  return { label: 'vs same days last month', value };
 }
 
 function isGoalOnTrack(pace: Pace | StreakPace): boolean {
@@ -245,13 +253,15 @@ export function goalsToSnapshot(goalsWithPace: { goal: Goal; pace: Pace | Streak
 
 export function buildBoardSnapshots(input: {
   monthSummary: MonthSummary | undefined;
+  periodComparison: PeriodComparison | undefined;
   projects: ProjectWithClient[] | undefined;
   upcomingDeliverables: (Deliverable & { project: Pick<Project, 'id' | 'name'> })[] | undefined;
   boards: BoardWithCover[] | undefined;
   goalsWithPace: { goal: Goal; pace: Pace | StreakPace }[] | undefined;
 }): Snapshot[] {
-  const { monthSummary, projects, upcomingDeliverables, boards, goalsWithPace } = input;
+  const { monthSummary, periodComparison, projects, upcomingDeliverables, boards, goalsWithPace } = input;
 
+  const cmpStat = comparisonStat(periodComparison);
   const expenses: Snapshot = {
     module: 'expenses',
     title: 'Expenses',
@@ -264,9 +274,7 @@ export function buildBoardSnapshots(input: {
         value: money(monthSummary?.spendCents ?? 0, true),
       },
     ],
-    moreStats: monthSummary
-      ? [{ label: 'vs last month', value: pct(monthSummary.spendCents - monthSummary.prevSpendCents, monthSummary.prevSpendCents) }]
-      : [],
+    moreStats: cmpStat ? [cmpStat] : [],
     detail: monthSummary ? `${monthSummary.count} transactions this month` : null,
     actions: [
       { label: 'Transactions', href: '/expenses/transactions' },
