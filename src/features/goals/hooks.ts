@@ -107,3 +107,28 @@ export function useToggleMilestone() {
     onSuccess: () => refresh(qc),
   });
 }
+
+export function useAddMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ goal, label }: { goal: Goal; label: string }) => {
+      const next: Milestone[] = [
+        ...(goal.milestones ?? []),
+        { id: crypto.randomUUID(), label: label.trim(), order: goal.milestones?.length ?? 0, done: false, done_at: null },
+      ];
+      return api.setMilestones(goal.id, next);
+    },
+    onSuccess: () => refresh(qc),
+  });
+}
+
+export function useRemoveMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ goal, milestoneId }: { goal: Goal; milestoneId: string }) => {
+      const next = (goal.milestones ?? []).filter((m) => m.id !== milestoneId);
+      return api.setMilestones(goal.id, next);
+    },
+    onSuccess: () => refresh(qc),
+  });
+}

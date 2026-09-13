@@ -1,18 +1,6 @@
 import { dateKey } from './pace';
 import type { Goal, GoalProgress, GoalProgressInput } from './types';
 
-function fmtNum(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
-}
-
-/** "8 / 12 books" — the raw fraction a goal row/tile always pairs with any
- *  percentage, per the "never a bare percentage" rule. Not meaningful for
- *  streak goals — callers show current/best streak instead. */
-export function fractionLabel(goal: Goal, actual: number): string {
-  const target = goal.type === 'milestone' ? (goal.milestones?.length ?? goal.target) : goal.target;
-  return `${fmtNum(actual)} / ${fmtNum(target)}${goal.unit ? ` ${goal.unit}` : ''}`;
-}
-
 /** Shapes the raw `goal_progress` ledger (plus, for milestone goals, the
  *  goal's own checklist) into what `computePace` needs — the one place that
  *  knows how each goal type turns a log into a current "actual". */

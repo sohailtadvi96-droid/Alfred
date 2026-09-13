@@ -7,7 +7,7 @@ import { PLACEHOLDER_SNAPSHOTS } from './placeholders';
 import { money, monthLabel, shortDate } from '@/lib/format';
 import type { MonthSummary } from '@/features/expenses/types';
 import type { BoardWithCover } from '@/features/design/types';
-import { fractionLabel } from '@/features/goals/progress';
+import { fractionLabel } from '@/features/goals/format';
 import type { Goal, Pace, StreakPace } from '@/features/goals/types';
 
 function dueAt(dateOnly: string): string {

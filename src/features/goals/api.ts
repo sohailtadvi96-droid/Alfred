@@ -19,29 +19,39 @@ export async function listAllProgress(): Promise<GoalProgress[]> {
 }
 
 export async function saveGoal(input: NewGoal): Promise<void> {
-  const milestones =
-    input.type === 'milestone'
-      ? (input.milestones ?? []).map((m, i) => ({
-          id: crypto.randomUUID(),
-          label: m.label,
-          order: m.order ?? i,
-          done: false,
-          done_at: null,
-        }))
-      : null;
-  const row = {
+  const row: Record<string, unknown> = {
     title: input.title.trim(),
     type: input.type,
-    // a milestone goal's target is its checklist length, not a free number
-    target: input.type === 'milestone' ? Math.max(1, milestones?.length ?? 1) : input.target,
     unit: input.unit?.trim() || null,
     direction: input.direction,
     start_date: input.start_date,
     target_date: input.target_date,
     module_id: input.module_id,
-    milestones,
     source: { kind: 'manual' },
   };
+
+  // Milestone checklists are owned by setMilestones (toggle/add/remove),
+  // which keeps `target` in sync with the list length. Only set
+  // milestones/target here when a checklist was actually supplied — i.e.
+  // creation — never on a plain field edit of an existing milestone goal
+  // (GoalRow's inline "Save changes" never passes `milestones`), or this
+  // would silently wipe the checklist back to empty.
+  if (input.type === 'milestone') {
+    if (input.milestones) {
+      const milestones = input.milestones.map((m, i) => ({
+        id: crypto.randomUUID(),
+        label: m.label,
+        order: m.order ?? i,
+        done: false,
+        done_at: null,
+      }));
+      row.milestones = milestones;
+      row.target = Math.max(1, milestones.length);
+    }
+  } else {
+    row.target = input.target;
+  }
+
   if (input.id) {
     const { error } = await supabase.from('goals').update(row).eq('id', input.id);
     if (error) throw error;
@@ -59,8 +69,13 @@ export async function setGoalStatus(id: string, status: GoalStatus): Promise<voi
   if (error) throw error;
 }
 
+/** Also keeps `target` in sync with the checklist length — a milestone
+ *  goal's target IS its step count, so adding/removing a step must move it. */
 export async function setMilestones(id: string, milestones: Milestone[]): Promise<void> {
-  const { error } = await supabase.from('goals').update({ milestones }).eq('id', id);
+  const { error } = await supabase
+    .from('goals')
+    .update({ milestones, target: Math.max(1, milestones.length) })
+    .eq('id', id);
   if (error) throw error;
 }
 

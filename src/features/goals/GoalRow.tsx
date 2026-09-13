@@ -2,13 +2,16 @@ import { FormEvent, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { errMessage } from '@/lib/errors';
 import { dateKey } from './pace';
-import { fractionLabel, sparklineSeries } from './progress';
+import { fractionLabel } from './format';
+import { sparklineSeries } from './progress';
 import { PaceDot } from './PaceDot';
 import { ProgressBar } from './ProgressBar';
 import { Sparkline } from './Sparkline';
 import {
+  useAddMilestone,
   useAddProgress,
   useDeleteGoal,
+  useRemoveMilestone,
   useSaveGoal,
   useSetGoalStatus,
   useToggleMilestone,
@@ -43,13 +46,19 @@ export function GoalRow({
   progress: GoalProgress[];
 }) {
   const [open, setOpen] = useState(false);
+  const todayKey = dateKey(new Date());
   const [logAmount, setLogAmount] = useState('1');
+  const [logDate, setLogDate] = useState(todayKey);
+  const [streakDate, setStreakDate] = useState(todayKey);
+  const [newMilestone, setNewMilestone] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const addProgress = useAddProgress();
   const setStatus = useSetGoalStatus();
   const deleteGoal = useDeleteGoal();
   const toggleMilestone = useToggleMilestone();
+  const addMilestone = useAddMilestone();
+  const removeMilestone = useRemoveMilestone();
   const toggleStreak = useToggleStreakDay();
   const saveGoal = useSaveGoal();
 
@@ -62,12 +71,14 @@ export function GoalRow({
   const doneCount = goal.type === 'milestone' ? (goal.milestones ?? []).filter((m) => m.done).length : 0;
   const actual = isStreak ? doneCount : (pace as Pace).actual;
   const target_ = goal.type === 'milestone' ? (goal.milestones?.length ?? goal.target) : goal.target;
-  const todayKey = dateKey(new Date());
   const doneToday = progress.some((r) => r.goal_id === goal.id && r.occurred_on === todayKey);
+  const streakDateDone = progress.some((r) => r.goal_id === goal.id && r.occurred_on === streakDate);
 
+  // milestone target is derived from the checklist length (kept in sync by
+  // setMilestones) and its input stays disabled, so it's never part of "dirty"
   const dirty =
     title.trim() !== goal.title ||
-    Number(target) !== goal.target ||
+    (goal.type !== 'milestone' && Number(target) !== goal.target) ||
     (unit || null) !== goal.unit ||
     (targetDate || null) !== goal.target_date;
 
@@ -78,7 +89,7 @@ export function GoalRow({
         id: goal.id,
         title,
         type: goal.type,
-        target: Number(target) || goal.target,
+        target: goal.type === 'milestone' ? goal.target : Number(target) || goal.target,
         unit: unit || null,
         direction: goal.direction,
         start_date: goal.start_date,
@@ -96,10 +107,22 @@ export function GoalRow({
     const value = Number(logAmount);
     if (!Number.isFinite(value) || value === 0) return;
     try {
-      await addProgress.mutateAsync({ goalId: goal.id, value, occurredOn: todayKey });
+      await addProgress.mutateAsync({ goalId: goal.id, value, occurredOn: logDate });
       setLogAmount('1');
     } catch (err) {
       setError(errMessage(err, 'Could not log progress.'));
+    }
+  }
+
+  async function submitMilestone(e: FormEvent) {
+    e.preventDefault();
+    if (!newMilestone.trim()) return;
+    setError(null);
+    try {
+      await addMilestone.mutateAsync({ goal, label: newMilestone });
+      setNewMilestone('');
+    } catch (err) {
+      setError(errMessage(err, 'Could not add the step.'));
     }
   }
 
@@ -137,24 +160,49 @@ export function GoalRow({
           <p className="goal-row-source">Source: Manual</p>
 
           {goal.type === 'milestone' && (
-            <ul className="goal-milestones">
-              {(goal.milestones ?? [])
-                .slice()
-                .sort((a, b) => a.order - b.order)
-                .map((m) => (
-                  <li key={m.id}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={m.done}
-                        disabled={goal.status !== 'active'}
-                        onChange={() => toggleMilestone.mutate({ goal, milestoneId: m.id })}
-                      />
-                      {m.label}
-                    </label>
-                  </li>
-                ))}
-            </ul>
+            <>
+              <ul className="goal-milestones">
+                {(goal.milestones ?? [])
+                  .slice()
+                  .sort((a, b) => a.order - b.order)
+                  .map((m) => (
+                    <li key={m.id}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={m.done}
+                          disabled={goal.status !== 'active'}
+                          onChange={() => toggleMilestone.mutate({ goal, milestoneId: m.id })}
+                        />
+                        {m.label}
+                      </label>
+                      {goal.status === 'active' && (
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          aria-label={`Remove ${m.label}`}
+                          onClick={() => removeMilestone.mutate({ goal, milestoneId: m.id })}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+              {goal.status === 'active' && (
+                <form className="goal-log" onSubmit={submitMilestone}>
+                  <input
+                    className="input"
+                    value={newMilestone}
+                    onChange={(e) => setNewMilestone(e.target.value)}
+                    placeholder="Add a step"
+                  />
+                  <button className="btn sec sm" type="submit" disabled={addMilestone.isPending || !newMilestone.trim()}>
+                    Add
+                  </button>
+                </form>
+              )}
+            </>
           )}
 
           {(goal.type === 'count' || goal.type === 'value') && goal.status === 'active' && (
@@ -167,6 +215,14 @@ export function GoalRow({
                 onChange={(e) => setLogAmount(e.target.value)}
                 aria-label="Amount to log"
               />
+              <input
+                className="input goal-log-date"
+                type="date"
+                value={logDate}
+                max={todayKey}
+                onChange={(e) => setLogDate(e.target.value)}
+                aria-label="Date to log against"
+              />
               <button className="btn sec sm" type="submit" disabled={addProgress.isPending}>
                 Log progress
               </button>
@@ -174,14 +230,32 @@ export function GoalRow({
           )}
 
           {goal.type === 'streak' && goal.status === 'active' && (
-            <button
-              type="button"
-              className={doneToday ? 'btn primary sm' : 'btn sec sm'}
-              onClick={() => toggleStreak.mutate({ goalId: goal.id, occurredOn: todayKey })}
-              disabled={toggleStreak.isPending}
-            >
-              {doneToday ? 'Done today ✓' : 'Mark today done'}
-            </button>
+            <div className="goal-log">
+              <button
+                type="button"
+                className={doneToday ? 'btn primary sm' : 'btn sec sm'}
+                onClick={() => toggleStreak.mutate({ goalId: goal.id, occurredOn: todayKey })}
+                disabled={toggleStreak.isPending}
+              >
+                {doneToday ? 'Done today ✓' : 'Mark today done'}
+              </button>
+              <input
+                className="input goal-log-date"
+                type="date"
+                value={streakDate}
+                max={todayKey}
+                onChange={(e) => setStreakDate(e.target.value)}
+                aria-label="Another day to mark"
+              />
+              <button
+                type="button"
+                className="btn ghost sm"
+                onClick={() => toggleStreak.mutate({ goalId: goal.id, occurredOn: streakDate })}
+                disabled={toggleStreak.isPending || streakDate === todayKey}
+              >
+                {streakDateDone ? 'Unmark that day' : 'Mark that day done'}
+              </button>
+            </div>
           )}
 
           <div className="goal-edit field-row">
@@ -195,7 +269,7 @@ export function GoalRow({
                 id={`target-${goal.id}`}
                 className="input"
                 type="number"
-                value={target}
+                value={goal.type === 'milestone' ? goal.target : target}
                 disabled={goal.type === 'milestone'}
                 onChange={(e) => setTarget(e.target.value)}
               />

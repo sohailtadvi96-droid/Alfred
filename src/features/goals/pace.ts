@@ -1,3 +1,4 @@
+import { formatAmount } from './format';
 import type { Goal, GoalDirection, GoalProgressInput, Pace, PaceStatus, StreakPace } from './types';
 
 const MS_PER_DAY = 86_400_000;
@@ -42,10 +43,6 @@ function statusFromRatio(ratio: number): PaceStatus {
   return 'at-risk';
 }
 
-function formatRate(n: number): string {
-  return n >= 10 ? Math.round(n).toString() : n.toFixed(1);
-}
-
 function computeValuePace(goal: Goal, actual: number, lastUpdatedAt: string | null, today: Date): Pace {
   const stale = isStale(lastUpdatedAt, today);
 
@@ -84,7 +81,7 @@ function computeValuePace(goal: Goal, actual: number, lastUpdatedAt: string | nu
     const remainingMonths = Math.max(daysBetween(today, end), 1) / DAYS_PER_MONTH;
     const remaining = goal.direction === 'up' ? goal.target - actual : actual - goal.target;
     requiredRate = Math.max(0, remaining) / remainingMonths;
-    requiredRateLabel = `${formatRate(requiredRate)} ${goal.unit ?? 'units'}/month to finish on time`;
+    requiredRateLabel = `${formatAmount(requiredRate, goal.unit ?? 'units')}/month to finish on time`;
   }
 
   return { status, paceRatio, actual, expected, requiredRate, requiredRateLabel, stale };
