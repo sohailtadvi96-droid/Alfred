@@ -92,7 +92,7 @@ export function TransactionList({
                 <tr key={t.id}>
                   <td className="dt">{shortDate(t.occurred_at)}</td>
                   <td className="mc">
-                    {t.merchant_raw || <span style={{ color: 'var(--text-faint)' }}>—</span>}
+                    {t.merchant_display || <span style={{ color: 'var(--text-faint)' }}>—</span>}
                     {t.note && <span className="mc-note">{t.note}</span>}
                   </td>
                   <td>
@@ -103,7 +103,7 @@ export function TransactionList({
                     {signedMoney(t.amount_cents, t.direction)}
                   </td>
                   <td className="am-actions">
-                    {t.vpa && <VpaTagButton vpa={t.vpa} name={t.counterparty ?? t.merchant_raw} />}
+                    {t.vpa_prefix && <VpaTagButton vpa={t.vpa_prefix} name={t.counterparty ?? t.merchant_display} />}
                     <button
                       className="row-x"
                       onClick={() => {

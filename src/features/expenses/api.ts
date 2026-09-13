@@ -162,7 +162,7 @@ async function applyRecategoriseUpdates(updates: RecategoriseUpdate[]): Promise<
             category: u.category,
             channel: u.channel,
             counterparty: u.counterparty,
-            vpa: u.vpa,
+            vpa_prefix: u.vpa_prefix,
             remark: u.remark,
             matched_by: u.matched_by,
             confidence: u.confidence,
@@ -199,15 +199,15 @@ export async function listFerrariShops(): Promise<FerrariShop[]> {
 /** Distinct counterparties seen in transactions, aggregated by VPA. Powers the
  *  "add someone not yet tagged" search on the manage screen. */
 export async function listCounterparties(): Promise<Counterparty[]> {
-  const rows: { vpa: string | null; counterparty: string | null; direction: Direction; amount_cents: number }[] =
+  const rows: { vpa_prefix: string | null; counterparty: string | null; direction: Direction; amount_cents: number }[] =
     [];
   const PAGE = 1000;
   let from = 0;
   for (;;) {
     const { data, error } = await supabase
       .from('transactions')
-      .select('vpa,counterparty,direction,amount_cents')
-      .not('vpa', 'is', null)
+      .select('vpa_prefix,counterparty,direction,amount_cents')
+      .not('vpa_prefix', 'is', null)
       .range(from, from + PAGE - 1);
     if (error) throw error;
     const page = (data ?? []) as typeof rows;
@@ -218,7 +218,7 @@ export async function listCounterparties(): Promise<Counterparty[]> {
 
   const byVpa = new Map<string, Counterparty>();
   for (const r of rows) {
-    const vpa = (r.vpa ?? '').trim();
+    const vpa = (r.vpa_prefix ?? '').trim();
     if (!vpa) continue;
     const e = byVpa.get(vpa) ?? { vpa, name: r.counterparty ?? vpa, txnCount: 0, netCents: 0 };
     e.txnCount += 1;
@@ -270,7 +270,7 @@ export async function recategoriseMatching(
   dryRun = false,
 ): Promise<{ scanned: number; moved: number }> {
   let q = supabase.from('transactions').select('id,direction,amount_cents,raw_snippet,category');
-  if (match.vpa) q = q.eq('vpa', match.vpa);
+  if (match.vpa) q = q.eq('vpa_prefix', match.vpa);
   else if (match.counterparty) q = q.ilike('counterparty', match.counterparty);
   else return { scanned: 0, moved: 0 };
 
@@ -320,7 +320,7 @@ export async function listReviewQueue(limit = 300): Promise<ReviewTxn[]> {
   const { data, error } = await supabase
     .from('transactions')
     .select(
-      'id,occurred_at,direction,amount_cents,category,merchant_raw,counterparty,vpa,confidence,matched_by',
+      'id,occurred_at,direction,amount_cents,category,merchant_display,counterparty,vpa_prefix,confidence,matched_by',
     )
     .in('confidence', ['low', 'medium']);
   if (error) throw error;
@@ -389,7 +389,7 @@ export async function listAiCandidates(limit = 30): Promise<AiCandidate[]> {
     supabase
       .from('transactions')
       .select(
-        'direction,amount_cents,merchant_raw,counterparty,vpa,remark,channel,category',
+        'direction,amount_cents,merchant_display,counterparty,vpa_prefix,remark,channel,category',
       )
       .eq('confidence', 'low'),
     supabase.from('merchant_rules').select('match_value'),
@@ -404,15 +404,15 @@ export async function listAiCandidates(limit = 30): Promise<AiCandidate[]> {
   for (const t of (txnRes.data ?? []) as Array<{
     direction: Direction;
     amount_cents: number;
-    merchant_raw: string | null;
+    merchant_display: string | null;
     counterparty: string | null;
-    vpa: string | null;
+    vpa_prefix: string | null;
     remark: string | null;
     channel: string | null;
     category: string;
   }>) {
     if (t.category === 'bank_charges') continue; // needsAI() excludes it
-    const vpa = (t.vpa ?? '').trim();
+    const vpa = (t.vpa_prefix ?? '').trim();
     const cp = (t.counterparty ?? '').trim();
     const matchType: 'vpa' | 'counterparty' = vpa ? 'vpa' : 'counterparty';
     const matchValue = vpa || cp;
@@ -424,9 +424,9 @@ export async function listAiCandidates(limit = 30): Promise<AiCandidate[]> {
       key,
       matchType,
       matchValue,
-      merchant: t.merchant_raw,
+      merchant: t.merchant_display,
       counterparty: t.counterparty,
-      vpa: t.vpa,
+      vpa: t.vpa_prefix,
       remark: t.remark,
       channel: t.channel,
       amount: t.amount_cents / 100,
@@ -512,7 +512,7 @@ export async function getLastStatementImport(): Promise<string | null> {
 
 export async function updateTransaction(
   id: string,
-  patch: Partial<Pick<Transaction, 'category' | 'note' | 'account_id' | 'merchant_raw'>>,
+  patch: Partial<Pick<Transaction, 'category' | 'note' | 'account_id' | 'merchant_display'>>,
 ): Promise<void> {
   const { error } = await supabase.from('transactions').update(patch).eq('id', id);
   if (error) throw error;
@@ -631,7 +631,7 @@ export async function applyCategoryToMatching(input: {
     .from('transactions')
     .update({ category: input.category })
     .eq('direction', input.direction)
-    .ilike('merchant_raw', `%${input.pattern}%`);
+    .ilike('merchant_display', `%${input.pattern}%`);
   if (error) throw error;
 }
 

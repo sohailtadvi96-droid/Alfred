@@ -1,5 +1,3 @@
-import type { Result } from './categorize';
-
 /** The engine (categorize.ts) is stack-neutral and speaks "DR"/"CR" and
  *  human category names. ALFRED stores `debit`/`credit` and category *slugs*.
  *  This module is the only boundary that translates — the engine stays pure. */
@@ -45,54 +43,4 @@ export const ENGINE_CATEGORY_SLUG: Record<string, string> = {
  *  anything that already looks like a slug (incl. user-created categories). */
 export function slugForCategory(value: string): string {
   return ENGINE_CATEGORY_SLUG[value] ?? (/^[a-z][a-z0-9_]*$/.test(value) ? value : 'uncategorised');
-}
-
-/** Row shape the client import flow sends to ingest_transactions('statement', …). */
-export interface EngineTxnRow {
-  occurred_at: string;
-  amount_cents: number;
-  currency: 'INR';
-  direction: AlfredDirection;
-  external_ref: string;
-  raw_snippet: string;
-  // engine output
-  category: string; // slug
-  merchant_raw: string;
-  merchant_normalized: string;
-  channel: string;
-  counterparty: string;
-  vpa: string;
-  remark: string;
-  matched_by: string;
-  confidence: string;
-}
-
-export function toEngineTxnRow(
-  base: {
-    occurred_at: string;
-    amount_cents: number;
-    direction: AlfredDirection;
-    external_ref: string;
-    raw_snippet: string;
-  },
-  r: Result & {
-    channel: string;
-    counterparty: string;
-    vpa: string;
-    remark: string;
-  },
-): EngineTxnRow {
-  return {
-    ...base,
-    currency: 'INR',
-    category: slugForCategory(r.category),
-    merchant_raw: r.merchant,
-    merchant_normalized: r.merchant.toLowerCase(),
-    channel: r.channel,
-    counterparty: r.counterparty,
-    vpa: r.vpa,
-    remark: r.remark,
-    matched_by: r.matchedBy,
-    confidence: r.confidence,
-  };
 }

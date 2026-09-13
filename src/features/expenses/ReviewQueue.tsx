@@ -61,13 +61,13 @@ export function ReviewQueue() {
   const groups = useMemo(() => {
     const map = new Map<string, Group>();
     for (const r of filtered) {
-      const key = (r.vpa ?? r.counterparty ?? r.id).trim();
+      const key = (r.vpa_prefix ?? r.counterparty ?? r.id).trim();
       const g = map.get(key) ?? {
         key,
-        matchType: r.vpa ? 'vpa' : 'counterparty',
-        vpa: r.vpa,
+        matchType: r.vpa_prefix ? 'vpa' : 'counterparty',
+        vpa: r.vpa_prefix,
         counterparty: r.counterparty,
-        merchant: r.merchant_raw,
+        merchant: r.merchant_display,
         direction: r.direction,
         category: r.category,
         count: 0,
@@ -172,17 +172,17 @@ export function ReviewQueue() {
               {filtered.map((t) => (
                 <tr key={t.id}>
                   <td className="dt">{shortDate(t.occurred_at)}</td>
-                  <td className="mc">{t.merchant_raw || t.counterparty || '—'}</td>
-                  <td className="dt mono">{t.vpa ?? '—'}</td>
+                  <td className="mc">{t.merchant_display || t.counterparty || '—'}</td>
+                  <td className="dt mono">{t.vpa_prefix ?? '—'}</td>
                   <td className="dt">{t.confidence}</td>
                   <td className="am">{signedMoney(t.amount_cents, t.direction)}</td>
                   <td>
                     <PinCategoryMenu
                       direction={t.direction}
                       category={t.category}
-                      vpa={t.vpa}
+                      vpa={t.vpa_prefix}
                       counterparty={t.counterparty}
-                      merchant={t.merchant_raw}
+                      merchant={t.merchant_display}
                     />
                   </td>
                 </tr>

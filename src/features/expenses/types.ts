@@ -6,7 +6,7 @@ export interface Transaction {
   amount_cents: number;
   currency: string;
   direction: Direction;
-  merchant_raw: string | null;
+  merchant_display: string | null;
   merchant_normalized: string | null;
   category: string;
   account_id: string | null;
@@ -18,7 +18,7 @@ export interface Transaction {
   // engine fields (migration 0013) — null on pre-engine rows
   channel: string | null;
   counterparty: string | null;
-  vpa: string | null;
+  vpa_prefix: string | null;
   remark: string | null;
   matched_by: string | null;
   confidence: string | null;
@@ -60,9 +60,9 @@ export interface ReviewTxn {
   direction: Direction;
   amount_cents: number;
   category: string;
-  merchant_raw: string | null;
+  merchant_display: string | null;
   counterparty: string | null;
-  vpa: string | null;
+  vpa_prefix: string | null;
   confidence: string | null;
   matched_by: string | null;
 }
@@ -100,7 +100,7 @@ export interface NewTransaction {
   occurred_at: string;
   amount_cents: number;
   direction: Direction;
-  merchant_raw: string;
+  merchant_display: string;
   category: string;
   account_id: string | null;
   note: string | null;

@@ -56,7 +56,7 @@ export function AddTransactionDialog({
         occurred_at: new Date(`${date}T12:00:00`).toISOString(),
         amount_cents: cents,
         direction,
-        merchant_raw: merchant.trim(),
+        merchant_display: merchant.trim(),
         category: category || (direction === 'credit' ? 'money_received' : 'uncategorised'),
         account_id: accountId || null,
         note: note.trim() || null,

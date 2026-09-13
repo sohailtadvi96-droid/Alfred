@@ -44,7 +44,7 @@ export function MonthDashboard({
     const k = `${t.direction}:${t.category}`;
     const arr = recentByKey.get(k) ?? [];
     if (arr.length < 2) {
-      arr.push({ merchant: t.merchant_raw, amountCents: t.amount_cents, direction: t.direction, date: t.occurred_at });
+      arr.push({ merchant: t.merchant_display, amountCents: t.amount_cents, direction: t.direction, date: t.occurred_at });
       recentByKey.set(k, arr);
     }
   }

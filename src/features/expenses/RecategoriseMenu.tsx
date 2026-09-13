@@ -6,7 +6,7 @@ export function RecategoriseMenu({ txn }: { txn: Transaction }) {
   const recat = useRecategorise();
   const cats = useCategories();
   const options = cats.forDirection(txn.direction);
-  const merchant = txn.merchant_raw?.trim();
+  const merchant = txn.merchant_display?.trim();
   const current = cats.get(txn.category, txn.direction);
 
   return (

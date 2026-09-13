@@ -105,7 +105,7 @@ export interface RecategoriseUpdate {
   category: string;
   channel: string;
   counterparty: string;
-  vpa: string;
+  vpa_prefix: string;
   remark: string;
   matched_by: string;
   confidence: string;
@@ -133,7 +133,7 @@ export function recategoriseStored(rows: StoredTxn[], lists: Lists): Recategoris
       category: slug,
       channel: c.channel,
       counterparty: c.counterparty,
-      vpa: c.vpa,
+      vpa_prefix: c.vpa,
       remark: c.remark,
       matched_by: c.matchedBy,
       confidence: c.confidence,

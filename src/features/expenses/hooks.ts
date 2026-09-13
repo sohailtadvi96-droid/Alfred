@@ -249,8 +249,8 @@ export function useRecategorise() {
       makeRule: boolean;
     }) => {
       await api.updateTransaction(args.txn.id, { category: args.category });
-      if (args.makeRule && args.txn.merchant_raw) {
-        const pattern = args.txn.merchant_raw.trim();
+      if (args.makeRule && args.txn.merchant_display) {
+        const pattern = args.txn.merchant_display.trim();
         await api.addCategoryRule({ pattern, direction: args.txn.direction, category: args.category });
         await api.applyCategoryToMatching({ pattern, direction: args.txn.direction, category: args.category });
       }
