@@ -523,32 +523,54 @@ export async function deleteTransaction(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Month dashboard: this month + previous month, aggregated client-side. */
+/** Month dashboard: this month + previous month, aggregated client-side.
+ *  Reads from transaction_flows, not transactions — flow_kind (not direction)
+ *  decides spend vs income, and excluded_from_spend (cash withdrawals,
+ *  self-transfers, credit card bill payments) is pulled into its own
+ *  transfers total rather than counted as spend or shown as a category. */
 export async function getMonthSummary(month: string): Promise<MonthSummary> {
   const cur = monthRange(month);
   const prev = monthRange(addMonths(month, -1));
 
   const [{ data: curRows, error: e1 }, { data: prevRows, error: e2 }] = await Promise.all([
     supabase
-      .from('transactions')
-      .select('amount_cents, direction, category')
+      .from('transaction_flows')
+      .select('amount_cents, direction, category, flow_kind, excluded_from_spend')
       .gte('occurred_at', cur.start)
       .lt('occurred_at', cur.end),
     supabase
-      .from('transactions')
-      .select('amount_cents, direction')
+      .from('transaction_flows')
+      .select('amount_cents, flow_kind')
       .gte('occurred_at', prev.start)
       .lt('occurred_at', prev.end),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
 
+  type FlowRow = {
+    amount_cents: number;
+    direction: Direction;
+    category: string;
+    flow_kind: 'expense' | 'income' | 'transfer';
+    excluded_from_spend: boolean;
+  };
+
   const byCat = new Map<string, { direction: Direction; cents: number; count: number }>();
   let spend = 0;
   let income = 0;
-  for (const r of (curRows ?? []) as { amount_cents: number; direction: Direction; category: string }[]) {
-    if (r.direction === 'debit') spend += r.amount_cents;
-    else income += r.amount_cents;
+  let transfers = 0;
+  let transfersCount = 0;
+  let entryCount = 0;
+  for (const r of (curRows ?? []) as FlowRow[]) {
+    if (r.flow_kind === 'expense') spend += r.amount_cents;
+    else if (r.flow_kind === 'income') income += r.amount_cents;
+
+    if (r.excluded_from_spend) {
+      transfers += r.amount_cents;
+      transfersCount += 1;
+      continue; // transfers get their own block, not a category card
+    }
+    entryCount += 1;
     const key = `${r.direction}:${r.category}`;
     const e = byCat.get(key) ?? { direction: r.direction, cents: 0, count: 0 };
     e.cents += r.amount_cents;
@@ -556,16 +578,18 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
     byCat.set(key, e);
   }
   let prevSpend = 0;
-  for (const r of (prevRows ?? []) as { amount_cents: number; direction: Direction }[]) {
-    if (r.direction === 'debit') prevSpend += r.amount_cents;
+  for (const r of (prevRows ?? []) as { amount_cents: number; flow_kind: string }[]) {
+    if (r.flow_kind === 'expense') prevSpend += r.amount_cents;
   }
 
   return {
     month,
     spendCents: spend,
     incomeCents: income,
+    transfersCents: transfers,
+    transfersCount,
     prevSpendCents: prevSpend,
-    count: curRows?.length ?? 0,
+    count: entryCount,
     byCategory: [...byCat.entries()]
       .map(([key, v]) => ({
         category: key.slice(key.indexOf(':') + 1),
@@ -639,7 +663,7 @@ export async function applyCategoryToMatching(input: {
 export async function listCategories(): Promise<RawCategoryRow[]> {
   const { data, error } = await supabase
     .from('categories')
-    .select('slug,label,direction,color,sort,is_system,user_id')
+    .select('slug,label,direction,color,sort,is_system,user_id,kind')
     .order('sort');
   if (error) throw error;
   return data as RawCategoryRow[];

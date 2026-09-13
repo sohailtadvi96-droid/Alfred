@@ -23,12 +23,13 @@ export function MonthDashboard({
   const navigate = useNavigate();
   const { hidden } = usePrivacy();
   const [editCat, setEditCat] = useState<Category | null>(null);
+  const [showEmpty, setShowEmpty] = useState(false);
 
   if (isLoading || !data) {
     return <div className="bento-skeleton" aria-busy="true" />;
   }
 
-  const { spendCents, incomeCents, prevSpendCents, count } = data;
+  const { spendCents, incomeCents, transfersCents, transfersCount, prevSpendCents, count } = data;
   const delta =
     prevSpendCents > 0 ? Math.round(((spendCents - prevSpendCents) / prevSpendCents) * 100) : null;
   const creditCount = data.byCategory
@@ -49,13 +50,18 @@ export function MonthDashboard({
     }
   }
 
+  // transfer-kind categories (cash withdrawal, self-transfer, credit card
+  // payment) get their own block below, not a card in this grid
   const cards = cats.all
-    .filter((c) => !flow || c.direction === flow)
+    .filter((c) => (!flow || c.direction === flow) && c.kind !== 'transfer')
     .map((cat) => {
       const t = totals.get(`${cat.direction}:${cat.slug}`);
       return { cat, cents: t?.cents ?? 0, count: t?.count ?? 0 };
     })
     .sort((a, b) => b.cents - a.cents || a.cat.sort - b.cat.sort);
+
+  const activeCards = cards.filter((c) => c.count > 0);
+  const emptyCards = cards.filter((c) => c.count === 0);
 
   function openCategory(cat: Category) {
     const p = new URLSearchParams();
@@ -88,7 +94,7 @@ export function MonthDashboard({
         </div>
 
         <SeatedEnter className="catgrid">
-          {cards.map(({ cat, cents, count: n }, i) => {
+          {activeCards.map(({ cat, cents, count: n }, i) => {
             const d = denom(cat.direction);
             return (
               <CategoryCard
@@ -105,6 +111,38 @@ export function MonthDashboard({
               />
             );
           })}
+
+          {emptyCards.length > 0 && !showEmpty && (
+            <button
+              type="button"
+              className="catgrid-collapsed"
+              onClick={() => setShowEmpty(true)}
+            >
+              <span>
+                {emptyCards.length} categor{emptyCards.length === 1 ? 'y' : 'ies'} with no activity
+              </span>
+              <span aria-hidden="true">＋</span>
+            </button>
+          )}
+
+          {showEmpty &&
+            emptyCards.map(({ cat, cents, count: n }, i) => {
+              const d = denom(cat.direction);
+              return (
+                <CategoryCard
+                  key={`${cat.direction}:${cat.slug}`}
+                  style={{ ['--i' as string]: activeCards.length + i } as React.CSSProperties}
+                  cat={cat}
+                  month={month}
+                  spentCents={cents}
+                  count={n}
+                  sharePct={d > 0 ? Math.round((cents / d) * 100) : 0}
+                  recent={recentByKey.get(`${cat.direction}:${cat.slug}`) ?? []}
+                  onOpen={() => openCategory(cat)}
+                  onEdit={() => setEditCat(cat)}
+                />
+              );
+            })}
         </SeatedEnter>
       </div>
 
@@ -119,6 +157,20 @@ export function MonthDashboard({
             {creditCount === 1 ? '' : 's'}
           </span>
         </div>
+
+        {transfersCount > 0 && (
+          <div className="sumcard sumcard-transfers">
+            <span className="sumcard-l">Transfers · this month</span>
+            <span className="sumcard-v">
+              <AnimatedNumber value={transfersCents} format={(c) => money(c, true)} />
+            </span>
+            <span className="sumcard-s">
+              <AnimatedNumber value={transfersCount} format={String} />{' '}
+              {transfersCount === 1 ? 'entry' : 'entries'} · cash withdrawals, self-transfers &amp;
+              card payments — not counted as spend
+            </span>
+          </div>
+        )}
 
         <AccountsWallet />
       </div>

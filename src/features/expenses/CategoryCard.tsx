@@ -85,7 +85,9 @@ export function CategoryCard({
       {/* front panel: brown band (back) | receipt (middle) | green body (front) */}
       <div className="catcard-front">
         <div className="catcard-band" style={bandStyle}>
-          <span className="catcard-share">{empty ? '—' : `${sharePct}% of month`}</span>
+          <span className="catcard-share">
+            {empty ? '—' : `${sharePct}% of ${cat.direction === 'credit' ? 'income' : 'spend'}`}
+          </span>
         </div>
 
         {printKey > 0 && recent.length > 0 && (

@@ -117,6 +117,8 @@ export interface MonthSummary {
   month: string;
   spendCents: number;
   incomeCents: number;
+  transfersCents: number;
+  transfersCount: number;
   prevSpendCents: number;
   byCategory: CategoryTotal[];
   count: number;
