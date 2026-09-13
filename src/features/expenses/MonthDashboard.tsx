@@ -35,24 +35,13 @@ export function MonthDashboard({
   const [editCat, setEditCat] = useState<Category | null>(null);
   const [showEmpty, setShowEmpty] = useState(false);
 
-  // day-of-month of the LAST transaction IN THIS MONTH — not today's date.
-  // For the current/latest month this naturally lands on the ledger's
-  // actual cutoff (e.g. 5 for a ledger that runs to 5 Sept); for a fully
-  // populated past month it lands on that month's real last day.
-  const lastTxnDay = useMemo(() => {
-    if (!monthTxns || monthTxns.length === 0) return null;
-    let max = 0;
-    for (const t of monthTxns) {
-      const d = new Date(t.occurred_at).getDate();
-      if (d > max) max = d;
-    }
-    return max;
-  }, [monthTxns]);
-
   const currentBurn = useMemo(() => buildBurnSeries(monthTxns), [monthTxns]);
   const priorBurn = useMemo(() => buildBurnSeries(prevMonthTxns), [prevMonthTxns]);
 
-  const { data: comparison } = usePeriodComparison(month, lastTxnDay);
+  // day-of-month of the last transaction IN THIS MONTH (not today's date) —
+  // computed once, server-side, in getMonthSummary and shared with Home's
+  // Board tile via the same MonthSummary shape. See src/lib/periodComparison.ts.
+  const { data: comparison } = usePeriodComparison(month, data?.lastTxnDay ?? null);
   const { data: ledgerLastTxnDate } = useLedgerStaleness();
   const daysStale =
     ledgerLastTxnDate != null
@@ -64,10 +53,6 @@ export function MonthDashboard({
   }
 
   const { spendCents, incomeCents, transfersCents, transfersCount, count } = data;
-  const cmpPct =
-    comparison && comparison.priorExpenseCents ? Math.round(
-      ((comparison.currentExpenseCents - comparison.priorExpenseCents) / comparison.priorExpenseCents) * 100,
-    ) : null;
   const creditCount = data.byCategory
     .filter((c) => c.direction === 'credit')
     .reduce((s, c) => s + c.count, 0);
@@ -125,9 +110,9 @@ export function MonthDashboard({
                       : undefined
                   }
                 >
-                  {comparison.priorExpenseCents > 0 && (
+                  {comparison.pct != null && (
                     <>
-                      {cmpPct! >= 0 ? '▲' : '▼'} <AnimatedNumber value={Math.abs(cmpPct!)} format={String} />%{' '}
+                      {comparison.pct >= 0 ? '▲' : '▼'} <AnimatedNumber value={Math.abs(comparison.pct)} format={String} />%{' '}
                     </>
                   )}
                   vs same days last month ({money(comparison.currentExpenseCents, true)} vs{' '}

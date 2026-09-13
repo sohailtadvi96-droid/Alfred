@@ -125,6 +125,10 @@ export interface MonthSummary {
   transfersCents: number;
   transfersCount: number;
   prevSpendCents: number;
+  /** day-of-month of the last transaction IN THIS MONTH (not today's date);
+   *  null when the month has no transactions at all. Feeds day-matched
+   *  period comparisons — see src/lib/periodComparison.ts. */
+  lastTxnDay: number | null;
   byCategory: CategoryTotal[];
   count: number;
 }

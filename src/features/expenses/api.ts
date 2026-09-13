@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { addMonths, monthRange } from '@/lib/format';
+import { dayMatchedWindow, lastDayOfMonthFrom, summarizeComparison } from '@/lib/periodComparison';
 import type { Direction, RawCategoryRow } from './categories';
 import type { Lists } from './categorize';
 import { recategoriseStored, type RecategoriseUpdate, type StoredTxn } from './engineImport';
@@ -535,7 +536,7 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
   const [{ data: curRows, error: e1 }, { data: prevRows, error: e2 }] = await Promise.all([
     supabase
       .from('transaction_flows')
-      .select('amount_cents, direction, category, flow_kind, excluded_from_spend')
+      .select('amount_cents, direction, category, flow_kind, excluded_from_spend, occurred_at')
       .gte('occurred_at', cur.start)
       .lt('occurred_at', cur.end),
     supabase
@@ -553,6 +554,7 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
     category: string;
     flow_kind: 'expense' | 'income' | 'transfer';
     excluded_from_spend: boolean;
+    occurred_at: string;
   };
 
   const byCat = new Map<string, { direction: Direction; cents: number; count: number }>();
@@ -561,6 +563,7 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
   let transfers = 0;
   let transfersCount = 0;
   let entryCount = 0;
+  const lastTxnDay = lastDayOfMonthFrom(((curRows ?? []) as FlowRow[]).map((r) => r.occurred_at));
   for (const r of (curRows ?? []) as FlowRow[]) {
     if (r.flow_kind === 'expense') spend += r.amount_cents;
     else if (r.flow_kind === 'income') income += r.amount_cents;
@@ -589,6 +592,7 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
     transfersCents: transfers,
     transfersCount,
     prevSpendCents: prevSpend,
+    lastTxnDay,
     count: entryCount,
     byCategory: [...byCat.entries()]
       .map(([key, v]) => ({
@@ -621,44 +625,39 @@ export interface PeriodComparison {
   currentExpenseCents: number;
   /** null = no prior-month data at all (any flow_kind) — show nothing */
   priorExpenseCents: number | null;
+  /** null when priorExpenseCents is null OR exactly zero — show the
+   *  absolute current figure instead of dividing */
+  pct: number | null;
   /** the prior window was clamped because that month is shorter than lastTxnDay */
   clamped: boolean;
   priorToDay: number;
 }
 
 /** Day-matched comparison: days 1..lastTxnDay of `month` vs the same day
- *  span in the prior month. `lastTxnDay` must come from the caller (the
- *  day-of-month of the last transaction IN THIS MONTH, not today's date —
- *  see MonthDashboard, which derives it from the already-fetched month's
- *  transaction list). Expense only; transfers are never folded into this. */
+ *  span in the prior month. `lastTxnDay` must come from the caller — the
+ *  day-of-month of the last transaction IN THIS MONTH, not today's date
+ *  (see MonthSummary.lastTxnDay, computed server-side in getMonthSummary,
+ *  and reused as-is by Home's Board tile — this is the single
+ *  implementation both screens share; see src/lib/periodComparison.ts).
+ *  Expense only; transfers are never folded into this. */
 export async function getPeriodComparison(month: string, lastTxnDay: number): Promise<PeriodComparison> {
-  const [y, m] = month.split('-').map(Number);
-  const pad = (n: number) => String(n).padStart(2, '0');
-
-  const currentFrom = `${month}-01`;
-  const currentTo = `${month}-${pad(lastTxnDay)}`;
-
-  const priorFirst = new Date(y, m - 2, 1); // m is 1-based; -1 more for "prior month"
-  const priorYear = priorFirst.getFullYear();
-  const priorMonthNum = priorFirst.getMonth() + 1;
-  const priorDaysInMonth = new Date(priorYear, priorMonthNum, 0).getDate();
-  const priorToDay = Math.min(lastTxnDay, priorDaysInMonth);
-  const priorFrom = `${priorYear}-${pad(priorMonthNum)}-01`;
-  const priorTo = `${priorYear}-${pad(priorMonthNum)}-${pad(priorToDay)}`;
+  const w = dayMatchedWindow(month, lastTxnDay);
 
   const [curRows, priorRows] = await Promise.all([
-    periodSummary(currentFrom, currentTo),
-    periodSummary(priorFrom, priorTo),
+    periodSummary(w.currentFrom, w.currentTo),
+    periodSummary(w.priorFrom, w.priorTo),
   ]);
 
   const expenseOf = (rows: PeriodFlowTotal[]) => rows.find((r) => r.flow_kind === 'expense')?.total_cents ?? 0;
+  const cmp = summarizeComparison(expenseOf(curRows), priorRows.length > 0 ? expenseOf(priorRows) : null);
 
   return {
     lastTxnDay,
-    currentExpenseCents: expenseOf(curRows),
-    priorExpenseCents: priorRows.length > 0 ? expenseOf(priorRows) : null,
-    clamped: lastTxnDay > priorDaysInMonth,
-    priorToDay,
+    currentExpenseCents: cmp.currentCents,
+    priorExpenseCents: cmp.priorCents,
+    pct: cmp.pct,
+    clamped: w.clamped,
+    priorToDay: w.priorToDay,
   };
 }
 
