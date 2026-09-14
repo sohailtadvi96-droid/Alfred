@@ -4317,7 +4317,8 @@ textarea.office-journal {
   background: var(--base);
   border-color: var(--base);
 }
-.tag-filter-clear {
+.tag-filter-clear,
+.tag-filter-toggle {
   background: none;
   border: none;
   font-family: var(--mono);
@@ -4327,7 +4328,8 @@ textarea.office-journal {
   color: var(--text-faint);
   cursor: pointer;
 }
-.tag-filter-clear:hover {
+.tag-filter-clear:hover,
+.tag-filter-toggle:hover {
   color: var(--text);
 }
 
