@@ -57,7 +57,7 @@ components, not business logic.
 | **Goals** | `GoalsPage` | 0016 | Shipped, Phase 1 (manual goals only — no auto-progress from other modules yet) |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped |
 
-## Database schema (as of migration 0025)
+## Database schema (as of migration 0028)
 
 All tables live in `public`, have RLS enabled, and (unless noted) use the same
 per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`.
@@ -132,6 +132,16 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 - `merchant_rules` — learned exact-match category pins (vpa/counterparty), distinct
   from the regex `category_rules` (0013). Orthogonal to identity — unaffected by the
   `entities` migration.
+- `recurring_series` (0026–0028) — detected recurring charges: `entity_id` (preferred)
+  or `match_key` (merchant-name fallback), `category`, `median_cents`/`interval_days`
+  (robust stats over a single-linkage amount-chain cluster, not a naive average),
+  `occurrence_count`, `first_seen`/`last_seen`/`next_expected`, `status`
+  (active/lapsed/cancelled). Populated by `detect_recurring_series()` — **not
+  auto-invoked**, run manually. Upserts (never duplicates on re-run) and preserves
+  `status = 'cancelled'` across re-runs (a user dismissal must not be resurrected).
+  0027/0028 fixed two Postgres type errors in the original 0026 function body
+  (`max(uuid)` has no default aggregate; `date - numeric` isn't a valid operator) —
+  0028 is the live, correct version.
 - `gmail_sync_state` — one row per user, Gmail history-id checkpoint.
 - Key RPCs: `categorize(merchant, direction)` (SQL fallback categoriser),
   `ingest_transactions(source_type, rows jsonb)` (dedupe + insert + categorise),
@@ -144,7 +154,10 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   and `ambiguous` keys already claimed but flagged `needs_review`, with a per-name
   `name_breakdown`), `counterparty_queue_stats(p_min_txns default 2)` (resolved/
   ambiguous/unresolved/singleton counts for the queue's progress line — ambiguous is
-  never folded into resolved).
+  never folded into resolved), `detect_recurring_series()` (0026–0028, `security
+  definer`, returns match count — single-linkage amount-chain clustering in
+  sorted-amount order with a 25% per-step tolerance, plus a gap-consistency filter;
+  see `recurring_series` above).
 - **Taxonomy history:** 0007 shipped a small hand-picked category set; 0013 replaced it
   with a 25-category engine taxonomy (`kind` added); 0014/0015 migrated existing rows
   off the four retired slugs (`dineout`, `person`, `refund`, `misc`) onto the new ones
