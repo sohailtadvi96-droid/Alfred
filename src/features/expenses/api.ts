@@ -100,15 +100,27 @@ export async function recategorizeAll(): Promise<number> {
 export async function loadEngineLists(): Promise<Lists> {
   const empty: Lists = { familyVpas: new Set(), ferrariShops: new Set(), overrides: new Map() };
   try {
-    const [people, ferrari, rules] = await Promise.all([
-      supabase.from('people').select('vpa').eq('is_family', true),
-      supabase.from('ferrari_shops').select('vpa'),
+    // Sourced from entities/entity_keys (0023), not people/ferrari_shops
+    // directly — those tables are left in place but unread. Only
+    // key_type = 'vpa_prefix' keys are meaningful here since these sets
+    // are checked against a transaction's own vpa in classify().
+    const [familyKeys, ferrariKeys, rules] = await Promise.all([
+      supabase
+        .from('entity_keys')
+        .select('key_value, entities!inner(is_family)')
+        .eq('key_type', 'vpa_prefix')
+        .eq('entities.is_family', true),
+      supabase
+        .from('entity_keys')
+        .select('key_value, entities!inner(is_ferrari)')
+        .eq('key_type', 'vpa_prefix')
+        .eq('entities.is_ferrari', true),
       supabase.from('merchant_rules').select('match_type,match_value,category,merchant'),
     ]);
-    if (people.error || ferrari.error || rules.error) return empty;
+    if (familyKeys.error || ferrariKeys.error || rules.error) return empty;
     return {
-      familyVpas: new Set((people.data ?? []).map((r) => r.vpa as string)),
-      ferrariShops: new Set((ferrari.data ?? []).map((r) => r.vpa as string)),
+      familyVpas: new Set((familyKeys.data ?? []).map((r) => r.key_value as string)),
+      ferrariShops: new Set((ferrariKeys.data ?? []).map((r) => r.key_value as string)),
       overrides: new Map(
         (rules.data ?? []).map((r) => [
           r.match_type === 'counterparty'
