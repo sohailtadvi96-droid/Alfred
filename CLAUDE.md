@@ -57,7 +57,7 @@ components, not business logic.
 | **Goals** | `GoalsPage` | 0016 | Shipped, Phase 1 (manual goals only — no auto-progress from other modules yet) |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped |
 
-## Database schema (as of migration 0023)
+## Database schema (as of migration 0025)
 
 All tables live in `public`, have RLS enabled, and (unless noted) use the same
 per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`.
@@ -122,7 +122,13 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   duplicate rows for the same person/shop under different vpas), plus identities found
   in `merchant_rules` with a category pin but no `people`/`ferrari_shops` row at all.
   Deliberately does not yet cover the lending/receivable ledger (planned separately,
-  not before this queue has been used for a while).
+  not before this queue has been used for a while). `entity_keys.ambiguity_state`
+  (0024: `unknown`/`same_entity`/`separated`/`needs_review`) is a stored decision, not
+  a recomputed inference — a key stays `needs_review` (surfaced in the resolution
+  queue's AMBIGUOUS section) until explicitly resolved, even if its entity is
+  otherwise pinned; `separated` nulls `entity_id` permanently (tombstoned, never
+  reattached) once the distinct payees under a colliding prefix are split into their
+  own entities via `merchant_name`-keyed keys.
 - `merchant_rules` — learned exact-match category pins (vpa/counterparty), distinct
   from the regex `category_rules` (0013). Orthogonal to identity — unaffected by the
   `entities` migration.
@@ -132,7 +138,13 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   `recategorize_all()`, `upsert_category` (accepts `bucket` since 0021) /
   `delete_category`, `period_summary(from, to)` (0020, reads `transaction_flows`,
   returns expense/income/transfer rows separately — caller decides what to exclude),
-  `pair_internal_transfers()` (0018, manual-only, see above).
+  `pair_internal_transfers()` (0018, manual-only, see above),
+  `unresolved_counterparties(p_min_txns default 2)` (0024/0025 — two-section
+  counterparty resolution queue: `unresolved` vpa_prefix keys with no entity_keys row,
+  and `ambiguous` keys already claimed but flagged `needs_review`, with a per-name
+  `name_breakdown`), `counterparty_queue_stats(p_min_txns default 2)` (resolved/
+  ambiguous/unresolved/singleton counts for the queue's progress line — ambiguous is
+  never folded into resolved).
 - **Taxonomy history:** 0007 shipped a small hand-picked category set; 0013 replaced it
   with a 25-category engine taxonomy (`kind` added); 0014/0015 migrated existing rows
   off the four retired slugs (`dineout`, `person`, `refund`, `misc`) onto the new ones
