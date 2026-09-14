@@ -130,5 +130,10 @@ export interface MonthSummary {
    *  period comparisons — see src/lib/periodComparison.ts. */
   lastTxnDay: number | null;
   byCategory: CategoryTotal[];
+  /** per-category breakdown of excluded_from_spend rows (cash withdrawal,
+   *  self-transfer, credit card payment...) — byCategory excludes these
+   *  entirely, so a chart wanting to show transfers as their own muted
+   *  bars (not folded into one aggregate) needs this separately. */
+  transfersByCategory: CategoryTotal[];
   count: number;
 }

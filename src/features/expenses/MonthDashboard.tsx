@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addMonths, casualDayMonth, money, monthKey, monthLabel } from '@/lib/format';
+import { addMonths, money, monthKey, monthLabel } from '@/lib/format';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SeatedEnter } from '@/components/SeatedEnter';
 import { BucketBar } from './BucketBar';
@@ -10,13 +10,8 @@ import { buildBurnSeries } from './burnSeries';
 import { CategoryCard, type RecentEntry } from './CategoryCard';
 import { EditCategoryDialog } from './EditCategoryDialog';
 import { AccountsWallet } from './AccountsWallet';
-import {
-  useCategories,
-  useLedgerStaleness,
-  useMonthSummary,
-  usePeriodComparison,
-  useTransactions,
-} from './hooks';
+import { LedgerStalenessNote } from './LedgerStalenessNote';
+import { useCategories, useMonthSummary, usePeriodComparison, useTransactions } from './hooks';
 import { usePrivacy, MASK } from './privacy';
 import type { Category, Direction } from './categories';
 
@@ -45,11 +40,6 @@ export function MonthDashboard({
   // computed once, server-side, in getMonthSummary and shared with Home's
   // Board tile via the same MonthSummary shape. See src/lib/periodComparison.ts.
   const { data: comparison } = usePeriodComparison(month, data?.lastTxnDay ?? null);
-  const { data: ledgerLastTxnDate } = useLedgerStaleness();
-  const daysStale =
-    ledgerLastTxnDate != null
-      ? Math.floor((Date.now() - new Date(ledgerLastTxnDate).getTime()) / 86_400_000)
-      : null;
 
   if (isLoading || !data) {
     return <div className="bento-skeleton" aria-busy="true" />;
@@ -126,12 +116,7 @@ export function MonthDashboard({
             )}
             <AnimatedNumber value={count} format={String} /> {count === 1 ? 'entry' : 'entries'}
           </span>
-          {daysStale !== null && daysStale > 0 && ledgerLastTxnDate && (
-            <span className={`sumcard-s sumcard-stale${daysStale > 3 ? ' amber' : ''}`}>
-              Ledger current to {casualDayMonth(ledgerLastTxnDate)} · {daysStale} day{daysStale === 1 ? '' : 's'}{' '}
-              unimported
-            </span>
-          )}
+          <LedgerStalenessNote />
         </div>
 
         <BurnCurve

@@ -758,6 +758,7 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
   };
 
   const byCat = new Map<string, { direction: Direction; cents: number; count: number }>();
+  const transferByCat = new Map<string, { direction: Direction; cents: number; count: number }>();
   let spend = 0;
   let income = 0;
   let transfers = 0;
@@ -771,6 +772,11 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
     if (r.excluded_from_spend) {
       transfers += r.amount_cents;
       transfersCount += 1;
+      const tKey = `${r.direction}:${r.category}`;
+      const te = transferByCat.get(tKey) ?? { direction: r.direction, cents: 0, count: 0 };
+      te.cents += r.amount_cents;
+      te.count += 1;
+      transferByCat.set(tKey, te);
       continue; // transfers get their own block, not a category card
     }
     entryCount += 1;
@@ -795,6 +801,14 @@ export async function getMonthSummary(month: string): Promise<MonthSummary> {
     lastTxnDay,
     count: entryCount,
     byCategory: [...byCat.entries()]
+      .map(([key, v]) => ({
+        category: key.slice(key.indexOf(':') + 1),
+        direction: v.direction,
+        cents: v.cents,
+        count: v.count,
+      }))
+      .sort((a, b) => b.cents - a.cents),
+    transfersByCategory: [...transferByCat.entries()]
       .map(([key, v]) => ({
         category: key.slice(key.indexOf(':') + 1),
         direction: v.direction,
