@@ -94,12 +94,22 @@ call_capture() {
 
 # rows_for_image_url <image_url> — design_items joined to design_boards,
 # scoped by RLS to this user, matched on the unique image_url each test uses.
+# Prints the raw PostgREST response: a JSON array on success, or a
+# {"code":...,"message":...} error object if the query itself failed.
 rows_for_image_url() {
   $CURL -G "$REST_URL/design_items" \
     -H "apikey: $ANON_KEY" \
     -H "Authorization: Bearer $JWT" \
     --data-urlencode "select=id,medium,enrich_status,board_id,image_url,design_boards(id,name,is_inbox)" \
     --data-urlencode "image_url=eq.$1"
+}
+
+# query_error <postgrest response> — true (exit 0) when the response is a
+# PostgREST error object rather than a result array. `jq length` on an error
+# object like {"code":"42703","message":"..."} returns its key count (e.g. 4),
+# which reads exactly like "4 rows came back" unless this is checked first.
+query_error() {
+  ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$1"
 }
 
 # --------------------------------------------------------------- tests ----
@@ -110,12 +120,16 @@ call_capture "$(jq -n --arg p "https://example.com/verify/$NONCE-1" --arg i "$T1
   '{page_url:$p, image_url:$i}')"
 if [[ "$CAPTURE_STATUS" == "201" ]]; then
   ROW="$(rows_for_image_url "$T1_IMG")"
-  N="$(jq 'length' <<<"$ROW" 2>/dev/null || echo 0)"
-  IS_INBOX="$(jq -r '.[0].design_boards.is_inbox // empty' <<<"$ROW")"
-  if [[ "$N" == "1" && "$IS_INBOX" == "true" ]]; then
-    pass "Test 1 (no medium): 201, row in Inbox board"
+  if query_error "$ROW"; then
+    fail "Test 1 (no medium): got 201 but the verification query itself errored" "$ROW"
   else
-    fail "Test 1 (no medium): got 201 but DB check failed" "rows=$N is_inbox=$IS_INBOX row=$ROW"
+    N="$(jq 'length' <<<"$ROW")"
+    IS_INBOX="$(jq -r '.[0].design_boards.is_inbox // empty' <<<"$ROW")"
+    if [[ "$N" == "1" && "$IS_INBOX" == "true" ]]; then
+      pass "Test 1 (no medium): 201, row in Inbox board"
+    else
+      fail "Test 1 (no medium): got 201 but DB check failed" "rows=$N is_inbox=$IS_INBOX row=$ROW"
+    fi
   fi
 else
   fail "Test 1 (no medium): expected 201, got $CAPTURE_STATUS" "$CAPTURE_BODY"
@@ -127,12 +141,16 @@ call_capture "$(jq -n --arg p "https://example.com/verify/$NONCE-2" --arg i "$T2
   '{page_url:$p, image_url:$i, medium:"editorial"}')"
 if [[ "$CAPTURE_STATUS" == "201" ]]; then
   ROW="$(rows_for_image_url "$T2_IMG")"
-  N="$(jq 'length' <<<"$ROW" 2>/dev/null || echo 0)"
-  MEDIUM="$(jq -r '.[0].medium // empty' <<<"$ROW")"
-  if [[ "$N" == "1" && "$MEDIUM" == "editorial" ]]; then
-    pass "Test 2 (medium=editorial): 201, medium set on row"
+  if query_error "$ROW"; then
+    fail "Test 2 (medium=editorial): got 201 but the verification query itself errored" "$ROW"
   else
-    fail "Test 2 (medium=editorial): got 201 but DB check failed" "rows=$N medium=$MEDIUM row=$ROW"
+    N="$(jq 'length' <<<"$ROW")"
+    MEDIUM="$(jq -r '.[0].medium // empty' <<<"$ROW")"
+    if [[ "$N" == "1" && "$MEDIUM" == "editorial" ]]; then
+      pass "Test 2 (medium=editorial): 201, medium set on row"
+    else
+      fail "Test 2 (medium=editorial): got 201 but DB check failed" "rows=$N medium=$MEDIUM row=$ROW"
+    fi
   fi
 else
   fail "Test 2 (medium=editorial): expected 201, got $CAPTURE_STATUS" "$CAPTURE_BODY"
@@ -144,11 +162,15 @@ call_capture "$(jq -n --arg p "https://example.com/verify/$NONCE-3" --arg i "$T3
   '{page_url:$p, image_url:$i, medium:"typography"}')"
 if [[ "$CAPTURE_STATUS" == "400" ]]; then
   ROW="$(rows_for_image_url "$T3_IMG")"
-  N="$(jq 'length' <<<"$ROW" 2>/dev/null || echo 0)"
-  if [[ "$N" == "0" ]]; then
-    pass "Test 3 (medium=typography, invalid): 400, nothing inserted"
+  if query_error "$ROW"; then
+    fail "Test 3 (medium=typography, invalid): got 400 but the verification query itself errored — cannot confirm nothing was inserted" "$ROW"
   else
-    fail "Test 3 (medium=typography, invalid): got 400 but a row was inserted" "row=$ROW"
+    N="$(jq 'length' <<<"$ROW")"
+    if [[ "$N" == "0" ]]; then
+      pass "Test 3 (medium=typography, invalid): 400, nothing inserted"
+    else
+      fail "Test 3 (medium=typography, invalid): got 400 but a row was inserted" "row=$ROW"
+    fi
   fi
 else
   fail "Test 3 (medium=typography, invalid): expected 400, got $CAPTURE_STATUS" "$CAPTURE_BODY"
@@ -160,11 +182,15 @@ call_capture "$(jq -n --arg p "https://example.com/verify/$NONCE-4" --arg i "$T4
   '{page_url:$p, image_url:$i}')" noauth
 if [[ "$CAPTURE_STATUS" == "401" ]]; then
   ROW="$(rows_for_image_url "$T4_IMG")"
-  N="$(jq 'length' <<<"$ROW" 2>/dev/null || echo 0)"
-  if [[ "$N" == "0" ]]; then
-    pass "Test 4 (no Authorization header): 401, nothing inserted"
+  if query_error "$ROW"; then
+    fail "Test 4 (no Authorization header): got 401 but the verification query itself errored — cannot confirm nothing was inserted" "$ROW"
   else
-    fail "Test 4 (no Authorization header): got 401 but a row was inserted anyway" "row=$ROW"
+    N="$(jq 'length' <<<"$ROW")"
+    if [[ "$N" == "0" ]]; then
+      pass "Test 4 (no Authorization header): 401, nothing inserted"
+    else
+      fail "Test 4 (no Authorization header): got 401 but a row was inserted anyway" "row=$ROW"
+    fi
   fi
 else
   fail "Test 4 (no Authorization header): expected 401, got $CAPTURE_STATUS" "$CAPTURE_BODY"

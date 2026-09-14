@@ -1,0 +1,90 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Alfred Clipper</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    max-width: 30rem; margin: 2.5rem auto; padding: 0 1.25rem;
+  }
+  h1 { font-size: 1.1rem; letter-spacing: -0.01em; margin: 0 0 0.25rem; }
+  p.sub { margin: 0 0 1.75rem; opacity: 0.6; }
+  fieldset { border: 0; padding: 0; margin: 0 0 1.75rem; }
+  legend { font-weight: 600; padding: 0; margin-bottom: 0.6rem; }
+  label { display: block; margin-bottom: 0.75rem; }
+  label span { display: block; margin-bottom: 0.2rem; opacity: 0.7; font-size: 0.85em; }
+  input, select {
+    width: 100%; padding: 0.5rem 0.6rem; border-radius: 0.4rem;
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    background: transparent; color: inherit; font: inherit;
+  }
+  button {
+    padding: 0.5rem 0.9rem; border-radius: 0.4rem; font: inherit; cursor: pointer;
+    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    background: color-mix(in srgb, currentColor 8%, transparent); color: inherit;
+  }
+  #status { margin-top: 1rem; min-height: 1.5em; opacity: 0.75; }
+  #last {
+    margin-top: 0.9rem; padding: 0.75rem 0.85rem; border-radius: 0.45rem;
+    white-space: pre-wrap; word-break: break-word; font-size: 0.85em;
+    border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+    background: color-mix(in srgb, currentColor 5%, transparent);
+  }
+  #last:empty { display: none; }
+  #last.ok { border-color: #2f7d4f; }
+  #last.bad { border-color: #b3261e; }
+  hr { border: 0; border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); margin: 1.75rem 0; }
+</style>
+
+<h1>Alfred Clipper</h1>
+<p class="sub">Right-click any image or page to save it to your Design library.</p>
+
+<fieldset>
+  <legend>Connection</legend>
+  <label>
+    <span>Supabase URL</span>
+    <input id="url" type="url" placeholder="https://xxxx.supabase.co" />
+  </label>
+  <label>
+    <span>Anon key</span>
+    <input id="anonKey" type="text" placeholder="eyJhbGci…" />
+  </label>
+</fieldset>
+
+<fieldset>
+  <legend>Sign in</legend>
+  <label>
+    <span>Email</span>
+    <input id="email" type="email" autocomplete="username" />
+  </label>
+  <label>
+    <span>Password</span>
+    <input id="password" type="password" autocomplete="current-password" />
+  </label>
+  <button id="signin">Sign in</button>
+  <button id="signout" hidden>Sign out</button>
+</fieldset>
+
+<hr />
+
+<fieldset>
+  <legend>Default board</legend>
+  <label>
+    <span>New saves land here unless you pick a medium</span>
+    <select id="board"><option value="">— none (inbox) —</option></select>
+  </label>
+  <button id="save">Save settings</button>
+</fieldset>
+
+
+<hr />
+
+<fieldset>
+  <legend>Diagnostics</legend>
+  <button id="test">Run a test save</button>
+  <div id="last"></div>
+</fieldset>
+
+<div id="status" role="status"></div>
+
+<script src="options.js"></script>

@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Alfred Clipper",
+  "version": "0.1.0",
+  "description": "Save design reference to Alfred from anywhere on the web.",
+  "permissions": ["contextMenus", "storage", "notifications", "scripting"],
+  "host_permissions": ["https://*.supabase.co/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "Alfred Clipper — right-click an image to save"
+  }
+}
