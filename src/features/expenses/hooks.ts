@@ -173,6 +173,46 @@ export function useCommitVpaTag() {
   });
 }
 
+export function useResolutionQueue() {
+  return useQuery({
+    queryKey: ['expenses', 'resolutionQueue'] as const,
+    queryFn: () => api.listResolutionQueue(),
+  });
+}
+
+export function useQueueStats() {
+  return useQuery({
+    queryKey: ['expenses', 'queueStats'] as const,
+    queryFn: () => api.getQueueStats(),
+  });
+}
+
+export function useResolveCounterparty() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { keyValue: string; input: api.ResolveEntityInput }) =>
+      api.resolveCounterparty(args.keyValue, args.input),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useResolveAmbiguousSameEntity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (keyValue: string) => api.resolveAmbiguousSameEntity(keyValue),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useResolveAmbiguousSeparated() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { keyValue: string; perName: (api.ResolveEntityInput & { name: string })[] }) =>
+      api.resolveAmbiguousSeparated(args.keyValue, args.perName),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
 export function useReviewQueue() {
   return useQuery({
     queryKey: ['expenses', 'reviewQueue'] as const,

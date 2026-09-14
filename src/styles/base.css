@@ -1005,6 +1005,50 @@ button {
   color: var(--text);
 }
 
+/* ============ counterparty resolution queue ============ */
+.queue-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: var(--surface);
+}
+.queue-card.ambiguous {
+  border-color: var(--c-ochre);
+  background: color-mix(in srgb, var(--c-ochre) 8%, var(--surface));
+}
+.queue-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+.queue-card-row + .queue-card-row {
+  margin-top: 4px;
+}
+.queue-card-title {
+  font-weight: 700;
+}
+.queue-card-sub {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.queue-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.queue-name-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 3px 0;
+}
+
 /* ============ bucket bar (needs/wants) ============ */
 .bucketbar {
   border: 1px solid var(--line);

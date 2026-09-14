@@ -1,8 +1,14 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
 import { ReviewQueue } from '@/features/expenses/ReviewQueue';
+import { CounterpartyQueue } from '@/features/expenses/CounterpartyQueue';
+
+type Tab = 'confidence' | 'counterparties';
 
 export function ReviewPage() {
+  const [tab, setTab] = useState<Tab>('confidence');
+
   return (
     <>
       <TopBar
@@ -16,7 +22,15 @@ export function ReviewPage() {
         }
       />
       <div className="wrap expenses">
-        <ReviewQueue />
+        <div className="txn-filters" style={{ marginBottom: 16 }}>
+          <button className={`chip${tab === 'confidence' ? ' on' : ''}`} onClick={() => setTab('confidence')}>
+            Low confidence
+          </button>
+          <button className={`chip${tab === 'counterparties' ? ' on' : ''}`} onClick={() => setTab('counterparties')}>
+            Counterparties
+          </button>
+        </div>
+        {tab === 'confidence' ? <ReviewQueue /> : <CounterpartyQueue />}
       </div>
     </>
   );

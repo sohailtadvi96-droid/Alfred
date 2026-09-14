@@ -323,6 +323,194 @@ export async function commitVpaTag(
   return recategoriseMatching({ vpa }, lists, false);
 }
 
+// ---------- counterparty resolution queue (Phase 3a) ----------
+
+export interface QueueNameBreakdown {
+  name: string;
+  txn_count: number;
+  total_cents: number;
+}
+
+export interface QueueRow {
+  queueSection: 'unresolved' | 'ambiguous';
+  keyValue: string;
+  keyLength: number;
+  sampleNames: string[];
+  txnCount: number;
+  totalCents: number;
+  firstSeen: string;
+  lastSeen: string;
+  currentCategory: string | null;
+  isAmbiguous: boolean;
+  ambiguityState: string | null;
+  entityId: string | null;
+  entityDisplayName: string | null;
+  nameBreakdown: QueueNameBreakdown[] | null;
+}
+
+export interface QueueStats {
+  totalRepeatingKeys: number;
+  resolvedCount: number;
+  ambiguousCount: number;
+  unresolvedCount: number;
+  singletonKeys: number;
+}
+
+export async function listResolutionQueue(minTxns = 2): Promise<QueueRow[]> {
+  const { data, error } = await supabase.rpc('unresolved_counterparties', { p_min_txns: minTxns });
+  if (error) throw error;
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    queueSection: r.queue_section as 'unresolved' | 'ambiguous',
+    keyValue: r.key_value as string,
+    keyLength: r.key_length as number,
+    sampleNames: (r.sample_names as string[] | null) ?? [],
+    txnCount: r.txn_count as number,
+    totalCents: r.total_cents as number,
+    firstSeen: r.first_seen as string,
+    lastSeen: r.last_seen as string,
+    currentCategory: r.current_category as string | null,
+    isAmbiguous: r.is_ambiguous as boolean,
+    ambiguityState: r.ambiguity_state as string | null,
+    entityId: r.entity_id as string | null,
+    entityDisplayName: r.entity_display_name as string | null,
+    nameBreakdown: r.name_breakdown as QueueNameBreakdown[] | null,
+  }));
+}
+
+export async function getQueueStats(minTxns = 2): Promise<QueueStats> {
+  const { data, error } = await supabase
+    .rpc('counterparty_queue_stats', { p_min_txns: minTxns })
+    .single();
+  if (error) throw error;
+  const r = data as Record<string, number>;
+  return {
+    totalRepeatingKeys: r.total_repeating_keys,
+    resolvedCount: r.resolved_count,
+    ambiguousCount: r.ambiguous_count,
+    unresolvedCount: r.unresolved_count,
+    singletonKeys: r.singleton_keys,
+  };
+}
+
+export interface ResolveEntityInput {
+  entityType: 'person' | 'merchant' | 'self';
+  displayName: string;
+  /** category slug — required for a Shop, defaulted to 'self_transfer' for
+   *  Me, left unset for a plain Person (no forced category). */
+  categorySlug?: string;
+}
+
+/** Resolve an UNRESOLVED vpa_prefix key: create the entity, attach the key,
+ *  optionally pin a category, then re-run the engine over its transactions. */
+export async function resolveCounterparty(
+  keyValue: string,
+  input: ResolveEntityInput,
+): Promise<{ moved: number }> {
+  const categorySlug = input.categorySlug ?? (input.entityType === 'self' ? 'self_transfer' : undefined);
+
+  const { data: entity, error: e1 } = await supabase
+    .from('entities')
+    .insert({
+      display_name: input.displayName,
+      entity_type: input.entityType,
+      default_category: categorySlug ?? null,
+      resolved_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+  if (e1) throw e1;
+
+  const { error: e2 } = await supabase.from('entity_keys').insert({
+    entity_id: entity.id as string,
+    key_type: 'vpa_prefix',
+    key_value: keyValue,
+    confidence: keyValue.length === 14 ? 'prefix' : 'exact',
+  });
+  if (e2) throw e2;
+
+  if (categorySlug) {
+    const { error: e3 } = await supabase.from('merchant_rules').upsert(
+      { match_type: 'vpa', match_value: keyValue, category: categorySlug, merchant: input.displayName, source: 'manual' },
+      { onConflict: 'user_id,match_type,match_value' },
+    );
+    if (e3) throw e3;
+  }
+
+  const lists = await loadEngineLists();
+  const res = await recategoriseMatching({ vpa: keyValue }, lists, false);
+  return { moved: res.moved };
+}
+
+/** Ambiguous card, "Same entity, name varies" — the key stays attached;
+ *  nothing about categorisation changes, only the ambiguity flag clears. */
+export async function resolveAmbiguousSameEntity(keyValue: string): Promise<void> {
+  const { error } = await supabase
+    .from('entity_keys')
+    .update({ ambiguity_state: 'same_entity' })
+    .eq('key_type', 'vpa_prefix')
+    .eq('key_value', keyValue);
+  if (error) throw error;
+}
+
+/** Ambiguous card, "Different entities" — detaches the prefix permanently
+ *  (tombstoned: ambiguity_state = 'separated', entity_id nulled, never
+ *  reattached or re-suggested) and resolves each distinct name under it
+ *  individually via its own counterparty key, so future transactions for
+ *  that name route correctly regardless of which vpa they arrive under. */
+export async function resolveAmbiguousSeparated(
+  keyValue: string,
+  perName: (ResolveEntityInput & { name: string })[],
+): Promise<{ moved: number }> {
+  const { error: e1 } = await supabase
+    .from('entity_keys')
+    .update({ ambiguity_state: 'separated', entity_id: null })
+    .eq('key_type', 'vpa_prefix')
+    .eq('key_value', keyValue);
+  if (e1) throw e1;
+
+  for (const p of perName) {
+    const categorySlug = p.categorySlug ?? (p.entityType === 'self' ? 'self_transfer' : undefined);
+
+    const { data: entity, error: e2 } = await supabase
+      .from('entities')
+      .insert({
+        display_name: p.displayName,
+        entity_type: p.entityType,
+        default_category: categorySlug ?? null,
+        resolved_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+    if (e2) throw e2;
+
+    const { error: e3 } = await supabase.from('entity_keys').insert({
+      entity_id: entity.id as string,
+      key_type: 'merchant_name',
+      key_value: p.name,
+      confidence: 'exact',
+    });
+    if (e3) throw e3;
+
+    if (categorySlug) {
+      const { error: e4 } = await supabase.from('merchant_rules').upsert(
+        {
+          match_type: 'counterparty',
+          match_value: p.name.toUpperCase(),
+          category: categorySlug,
+          merchant: p.displayName,
+          source: 'manual',
+        },
+        { onConflict: 'user_id,match_type,match_value' },
+      );
+      if (e4) throw e4;
+    }
+  }
+
+  const lists = await loadEngineLists();
+  const moved = await recategorizeAllClient(lists);
+  return { moved };
+}
+
 // ---------- review queue ----------
 
 const CONFIDENCE_RANK: Record<string, number> = { low: 0, medium: 1, high: 2 };
