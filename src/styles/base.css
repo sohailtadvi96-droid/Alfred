@@ -4145,16 +4145,18 @@ textarea.office-journal {
   font-size: 13px;
   background: var(--surface);
 }
-.design-all-link {
+.design-boards-section {
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.design-boards-heading {
   font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-dim);
-  align-self: flex-start;
-}
-.design-all-link:hover {
-  color: var(--base);
+  color: var(--text-faint);
+  margin: 0 0 12px;
 }
 
 /* ---- board grid ---- */
@@ -4303,8 +4305,35 @@ textarea.office-journal {
 /* ---- tag filter ---- */
 .tag-filter {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* MediumFilter reuses .tag-filter for its base look (tag pills, meta
+   buttons) but has no category groups — one flat row, not TagFilter's
+   stacked sections. */
+.tag-filter.medium-filter {
+  flex-direction: row;
   flex-wrap: wrap;
   gap: 7px;
+  align-items: center;
+}
+.tag-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: baseline;
+}
+.tag-filter-group-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  min-width: 58px;
+}
+.tag-filter-meta {
+  display: flex;
+  gap: 12px;
   align-items: center;
 }
 .tag .tag-n {
@@ -4345,6 +4374,12 @@ textarea.office-journal {
   border-radius: 13px;
   background: var(--surface);
   overflow: hidden;
+  position: relative;
+  transform-origin: center;
+  /* Snaps back to scale(1) on mouse-leave — the keyframe animation below
+     only runs while :hover matches; once it's removed this is what takes
+     over and eases the card back down instead of it just vanishing. */
+  transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
 }
 .item-card-frame {
   position: relative;
@@ -4354,6 +4389,36 @@ textarea.office-journal {
 .item-card-frame img {
   width: 100%;
   display: block;
+  cursor: zoom-in;
+}
+/* The whole card (image, caption, tags) pops together on hover-in, then
+   keeps growing the longer the hover holds — overflow: hidden above only
+   clips the image to the card's own rounded corners, it doesn't clip this,
+   since the transform is on the card itself, not a child. z-index + shadow
+   lift it above whatever it now visually overlaps in the masonry grid.
+   Kept small on purpose: the grid image is only ever fetched at ~2x the
+   column's nominal width (GRID_THUMB_PX in hooks.ts) — column-width is a
+   hint, not a hard cap, so a wide viewport can render it wider than that
+   already; scaling much past this starts upscaling the raster past its own
+   resolution and it visibly blurs. */
+@keyframes item-card-hover-grow {
+  0% {
+    transform: scale(1);
+  }
+  12% {
+    transform: scale(1.015);
+  }
+  28% {
+    transform: scale(1.006);
+  }
+  100% {
+    transform: scale(1.03);
+  }
+}
+.item-card:hover {
+  animation: item-card-hover-grow 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  box-shadow: var(--sh);
+  z-index: 5;
 }
 .item-card-state {
   display: flex;
@@ -4454,6 +4519,69 @@ textarea.office-journal {
   letter-spacing: 0.03em;
   color: var(--text-faint);
   margin-right: 2px;
+}
+
+/* ---- lightbox: click a card's image for the original ---- */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 5, 0.85);
+  z-index: 100;
+}
+.lightbox-content {
+  position: fixed;
+  inset: 0;
+  z-index: 101;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  cursor: zoom-out;
+}
+.lightbox-content img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: var(--sh);
+  cursor: default;
+}
+.lightbox-loading {
+  color: var(--surface);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.lightbox-close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--surface) 30%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
+  color: var(--surface);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.lightbox-close:hover {
+  background: color-mix(in srgb, var(--surface-2) 65%, transparent);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---- add/edit reference: image preview ---- */

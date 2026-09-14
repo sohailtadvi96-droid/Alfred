@@ -59,6 +59,17 @@ export function useThumbUrls(items: DesignItem[] | undefined, gridWidthPx: numbe
   });
 }
 
+/** Untransformed original for the lightbox — fetched only once the lightbox
+ *  is actually open, not batched upfront with every card's grid thumbnail. */
+export function useOriginalUrl(thumbPath: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['design', 'original-url', thumbPath],
+    queryFn: () => api.getOriginalUrl(thumbPath as string),
+    enabled: enabled && !!thumbPath,
+    staleTime: 55 * 60_000,
+  });
+}
+
 export function useRetryIngest() {
   const qc = useQueryClient();
   return useMutation({

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { errMessage } from '@/lib/errors';
 import { BoardFormDialog } from './BoardFormDialog';
 import { BoardGrid } from './BoardGrid';
 import { ItemFormDialog } from './ItemFormDialog';
-import { useBoards } from './hooks';
-import { ALL_BOARD, type BoardWithCover } from './types';
+import { ReferenceGrid } from './ReferenceGrid';
+import { useBoards, useDeleteItem, useItems } from './hooks';
+import { ALL_BOARD, type BoardWithCover, type DesignItem } from './types';
 
 export function DesignView({
   newBoardOpen,
@@ -18,9 +19,25 @@ export function DesignView({
   onAddRefOpenChange: (v: boolean) => void;
 }) {
   const { data: boards, isLoading, error } = useBoards();
+  // Landing on Design shows every reference, newest first, mixed across
+  // boards — the board grid below is for organizing/navigating into one,
+  // not the default view. useItems(ALL_BOARD) already sorts created_at desc.
+  const { data: items, isLoading: itemsLoading, error: itemsError } = useItems(ALL_BOARD);
+  const deleteItem = useDeleteItem();
   const [editBoard, setEditBoard] = useState<BoardWithCover | undefined>();
+  const [editItem, setEditItem] = useState<DesignItem | undefined>();
+  const [banner, setBanner] = useState<string | null>(null);
 
-  const totalRefs = (boards ?? []).reduce((n, b) => n + b.itemCount, 0);
+  const hasBoards = (boards?.length ?? 0) > 0;
+
+  async function onDeleteItem(it: DesignItem) {
+    if (!confirm('Remove this reference?')) return;
+    try {
+      await deleteItem.mutateAsync(it.id);
+    } catch (err) {
+      setBanner(errMessage(err, 'Could not remove the reference.'));
+    }
+  }
 
   return (
     <div className="design">
@@ -29,22 +46,31 @@ export function DesignView({
         can find it again.
       </p>
 
+      {banner && <div className="err">{banner}</div>}
+
       {error ? (
         <div className="design-empty">Couldn’t load your boards.</div>
       ) : isLoading ? (
         <div className="design-empty">Loading…</div>
-      ) : (boards?.length ?? 0) === 0 ? (
+      ) : !hasBoards ? (
         <div className="design-empty">
           No boards yet. Create one to start collecting references.
         </div>
       ) : (
         <>
-          {totalRefs > 0 && (
-            <Link to={`/design/${ALL_BOARD}`} className="design-all-link">
-              View all {totalRefs} references across boards ›
-            </Link>
-          )}
-          <BoardGrid boards={boards ?? []} onEdit={setEditBoard} />
+          <ReferenceGrid
+            items={items}
+            isLoading={itemsLoading}
+            error={itemsError}
+            emptyMessage="Nothing saved yet. Add your first reference."
+            onEdit={setEditItem}
+            onDelete={onDeleteItem}
+          />
+
+          <section className="design-boards-section">
+            <h3 className="design-boards-heading">Boards</h3>
+            <BoardGrid boards={boards ?? []} onEdit={setEditBoard} />
+          </section>
         </>
       )}
 
@@ -55,6 +81,12 @@ export function DesignView({
         edit={editBoard}
       />
       <ItemFormDialog open={addRefOpen} onOpenChange={onAddRefOpenChange} boards={boards ?? []} />
+      <ItemFormDialog
+        open={!!editItem}
+        onOpenChange={(v) => !v && setEditItem(undefined)}
+        boards={boards ?? []}
+        edit={editItem}
+      />
     </div>
   );
 }

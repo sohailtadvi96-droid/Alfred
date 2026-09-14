@@ -152,3 +152,13 @@ export async function getThumbUrls(
   ]);
   return { ...transformed, ...plain };
 }
+
+/** Untransformed signed URL for one cached original — the lightbox's "click
+ *  for full size," never batched with the grid's transformed request. */
+export async function getOriginalUrl(thumbPath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(MEDIA_BUCKET)
+    .createSignedUrl(thumbPath, SIGNED_URL_TTL);
+  if (error) throw error;
+  return data.signedUrl;
+}

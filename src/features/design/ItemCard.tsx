@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { useOriginalUrl } from './hooks';
+import { Lightbox } from './Lightbox';
 import { hostOf } from './tags';
 import type { DesignItem } from './types';
 
@@ -23,6 +25,7 @@ export function ItemCard({
   retrying: boolean;
 }) {
   const [broken, setBroken] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const href = item.link_url ?? item.image_url ?? undefined;
   const source = item.source ?? hostOf(item.link_url ?? item.image_url ?? '');
 
@@ -32,6 +35,17 @@ export function ItemCard({
   // video, image_url for everything else — while the batch is still loading
   // or for a pre-pipeline / manually-added row that never gets a thumb_path.
   const displaySrc = thumbUrl ?? item.image_url ?? item.poster_url ?? null;
+
+  // The lightbox's "original size" — thumb_path's cache holds the real
+  // original (unresized, see docs/DESIGN.md), so this is a fresh
+  // untransformed signed URL, never the grid's resized thumbUrl. No
+  // thumb_path (a manual save, or a row still pending) just means the only
+  // "original" that ever existed is the external image_url/poster_url.
+  const { data: originalUrl, isFetching: originalLoading } = useOriginalUrl(
+    item.thumb_path,
+    lightboxOpen,
+  );
+  const lightboxSrc = item.thumb_path ? originalUrl : (item.image_url ?? item.poster_url ?? undefined);
 
   return (
     <figure className="item-card">
@@ -57,7 +71,13 @@ export function ItemCard({
             <span>No image</span>
           </div>
         ) : (
-          <img src={displaySrc} alt={item.title ?? ''} loading="lazy" onError={() => setBroken(true)} />
+          <img
+            src={displaySrc}
+            alt={item.title ?? ''}
+            loading="lazy"
+            onError={() => setBroken(true)}
+            onClick={() => setLightboxOpen(true)}
+          />
         )}
         <div className="item-card-actions">
           <a
@@ -110,6 +130,14 @@ export function ItemCard({
           </div>
         </figcaption>
       )}
+
+      <Lightbox
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        src={lightboxSrc}
+        alt={item.title ?? ''}
+        loading={originalLoading && !originalUrl}
+      />
     </figure>
   );
 }
