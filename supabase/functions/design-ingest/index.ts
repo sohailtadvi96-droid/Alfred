@@ -10,18 +10,27 @@
 // frontend (Step 5) and for the vision call below, not something this
 // function computes and stores itself. (This wasn't the original plan — see
 // docs/DESIGN.md gotchas for why: no image codec, WASM or native-canvas,
-// survives this edge runtime.) Gif still fails explicitly: the bucket's mime
-// allowlist has no room for one, and there's nothing here to re-encode it
-// into one that does.
+// survives this edge runtime.) A gif gets the same treatment — stored as-is
+// (0032 added image/gif to the bucket's mime allowlist), not thumbnailed —
+// with the transform endpoint tried first for a static frame at read time.
+// Confirmed by testing: it doesn't actually work on a real animated gif (the
+// download call throws), so both the vision call below and the grid (Step
+// 5) fall back to the original animated file — the vision call sends it as
+// the image directly, the grid just renders the gif.
 //
 //   supabase functions deploy design-ingest
 //   supabase secrets set OPENAI_API_KEY=...
 //
 // Called via POST /functions/v1/design-ingest { item_id }. Invoked by
-// design-capture through EdgeRuntime.waitUntil — never awaited by the caller,
-// so nothing here can assume a client is still listening for the response.
-// Runs under the service role: RLS does not apply, so every read/write below
-// is scoped by the row's own id / user_id, never by an auth context.
+// design-capture and design-retry, both through EdgeRuntime.waitUntil —
+// never awaited by the caller, so nothing here can assume a client is still
+// listening for the response. verify_jwt is off (this is machine-to-machine,
+// there's no user session), so the handler itself checks the Authorization
+// header against the service-role key and rejects anything else — nothing
+// holding only a user JWT can reach this directly, only design-capture and
+// design-retry, which hold the real secret. Runs under the service role:
+// RLS does not apply, so every read/write below is scoped by the row's own
+// id / user_id, never by an auth context.
 //
 // Media resolution and AI enrichment are two separate writes, deliberately —
 // a vision/embedding failure must not discard a thumbnail that's already
@@ -40,6 +49,30 @@ const EMBEDDING_MODEL = 'text-embedding-3-small'; // 1536 dims — baked into th
 const RENDITION_WIDTH = 800;
 const ALLOWED_MEDIUMS = [
   'identity', 'packaging', 'editorial', 'motion', 'type', 'web', 'illustration', 'other',
+] as const;
+
+// Fixed vocabulary the vision model picks from — no invented tags. Without
+// this the tag cloud fills with one-off single-use terms that never work as
+// filters (free-text search covers anything this list misses). 12 per
+// category, deliberately excluding generic aesthetic adjectives (modern,
+// clean, minimal, sleek, elegant, professional, bold, beautiful) — those
+// describe nothing distinguishing. See docs/DESIGN.md for the full writeup.
+const ALLOWED_TAGS = [
+  // style
+  'brutalist', 'swiss style', 'art deco', 'art nouveau', 'bauhaus', 'memphis', 'y2k', 'grunge',
+  'psychedelic', 'flat design', 'skeuomorphic', 'maximalist',
+  // colour family
+  'monochrome', 'black and white', 'pastel', 'neon', 'earth tones', 'jewel tones', 'muted palette',
+  'high contrast', 'warm tones', 'cool tones', 'duotone', 'metallic',
+  // mood
+  'playful', 'nostalgic', 'moody', 'serene', 'energetic', 'whimsical', 'somber', 'dreamy', 'edgy',
+  'cozy', 'futuristic', 'raw',
+  // technique
+  'hand drawn', 'collage', 'photography', '3d render', 'gradient', 'texture', 'grid layout',
+  'asymmetric layout', 'line art', 'halftone', 'glitch effect', 'paper cutout',
+  // subject
+  'portrait', 'product shot', 'landscape', 'architecture', 'interior space', 'fashion', 'food',
+  'abstract shapes', 'figure illustration', 'nature', 'cityscape', 'still life',
 ] as const;
 
 // A default Deno fetch gets 403'd by a good number of sites.
@@ -96,7 +129,7 @@ async function callVisionModel(
 ): Promise<VisionResult> {
   const prompt = `You are labeling an image for a personal design-inspiration library. Respond with strict JSON only — no markdown fences, no commentary: {"caption": string, "tags": string[], "medium": string, "colors": [{"hex": string, "pct": number}]}.
 - caption: one sentence describing subject, style and mood.
-- tags: 5-10 lowercase single-or-two-word terms.
+- tags: choose exactly 5-8 terms from this fixed list only — do not invent terms, do not use anything outside it: ${ALLOWED_TAGS.join(', ')}.
 - medium: exactly one of: ${ALLOWED_MEDIUMS.join(', ')}.
 - colors: the 5 dominant colors as hex codes with approximate share (0-1), sorted by pct descending.`;
 
@@ -148,7 +181,11 @@ async function callVisionModel(
 
   return {
     caption: p.caption,
-    tags: p.tags.filter((t): t is string => typeof t === 'string'),
+    // Defensive, same as medium below — the prompt says "this list only"
+    // but nothing stops a model from ignoring it.
+    tags: p.tags.filter(
+      (t): t is string => typeof t === 'string' && (ALLOWED_TAGS as readonly string[]).includes(t),
+    ),
     medium,
     colors: p.colors.filter(
       (c): c is { hex: string; pct: number } =>
@@ -238,6 +275,17 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
 
+  // verify_jwt is off (see file header — this is invoked machine-to-machine,
+  // there's no user session in play), so the platform gate lets any request
+  // through regardless of who's asking. This is the actual gate: only a
+  // caller holding the service-role key gets past it. design-capture and
+  // design-retry are the only things that should ever call this directly —
+  // a browser holding just a user JWT cannot reach this function.
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!serviceRoleKey || req.headers.get('Authorization') !== `Bearer ${serviceRoleKey}`) {
+    return json({ error: 'Forbidden.' }, 403);
+  }
+
   let payload: { item_id?: unknown };
   try {
     payload = await req.json();
@@ -259,9 +307,9 @@ Deno.serve(async (req) => {
   await supabase.from('design_items').update({ enrich_status: 'running' }).eq('id', item_id);
 
   // Hoisted above the try so the catch block can still see how far we got —
-  // e.g. a gif that resolved a still via unfurl but can't be cached (no
-  // codec) should still record where it came from on the failed row, not
-  // just on a row that reaches 'done'.
+  // e.g. a still resolved via unfurl but never reached (the media fetch
+  // itself 403s) should still record where it came from on the failed row,
+  // not just on a row that reaches 'done'.
   let mediaType: MediaType = 'image';
   let posterUrl: string | null = null;
   // The URL of the single still frame we'll actually download and cache.
@@ -304,12 +352,6 @@ Deno.serve(async (req) => {
 
     if (mediaType !== 'video' && stillUrl && isGifUrl(stillUrl)) mediaType = 'gif';
 
-    if (mediaType === 'gif') {
-      // See the file-header note: no codec survives this runtime to
-      // re-encode a gif into one of the bucket's allowed mime types.
-      throw new Error('GIF thumbnailing is unavailable: no working image codec in this runtime.');
-    }
-
     let thumbPath: string | null = null;
 
     if (stillUrl) {
@@ -326,11 +368,29 @@ Deno.serve(async (req) => {
       if (!mediaRes.ok) throw new Error(`Fetching media ${stillUrl} failed: ${mediaRes.status}`);
       const bytes = new Uint8Array(await mediaRes.arrayBuffer());
 
-      // No resize/re-encode (see file header) — cache the original bytes.
+      // No resize/re-encode (see file header) — cache the original bytes as
+      // uploaded. A gif is stored as-is too, not thumbnailed: no codec in
+      // this runtime can decode/re-encode one, so there's nothing to
+      // attempt — 0032 added image/gif to the bucket's mime allowlist for
+      // exactly this. The vision model and the grid each get a static
+      // frame via Storage's transform endpoint at read time instead.
       const declaredType = mediaRes.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
       const uploadContentType =
-        declaredType === 'image/png' ? 'image/png' : declaredType === 'image/webp' ? 'image/webp' : 'image/jpeg';
-      const ext = uploadContentType === 'image/png' ? 'png' : uploadContentType === 'image/webp' ? 'webp' : 'jpg';
+        mediaType === 'gif'
+          ? 'image/gif'
+          : declaredType === 'image/png'
+            ? 'image/png'
+            : declaredType === 'image/webp'
+              ? 'image/webp'
+              : 'image/jpeg';
+      const ext =
+        uploadContentType === 'image/gif'
+          ? 'gif'
+          : uploadContentType === 'image/png'
+            ? 'png'
+            : uploadContentType === 'image/webp'
+              ? 'webp'
+              : 'jpg';
       thumbPath = `${item.user_id}/${item_id}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
@@ -376,14 +436,39 @@ Deno.serve(async (req) => {
       const openaiKey = Deno.env.get('OPENAI_API_KEY');
       if (!openaiKey) throw new Error('OPENAI_API_KEY is not set.');
 
-      const { data: renditionBlob, error: renditionError } = await supabase.storage
-        .from(BUCKET)
-        .download(thumbPath, { transform: { width: RENDITION_WIDTH, quality: 80 } });
-      if (renditionError || !renditionBlob) {
-        throw new Error(`Transform fetch failed: ${renditionError?.message ?? 'no data returned'}`);
+      let renditionBytes: Uint8Array;
+      let renditionType: string;
+      let usedTransformFallback = false;
+      try {
+        const { data: transformedBlob, error: transformError } = await supabase.storage
+          .from(BUCKET)
+          .download(thumbPath, { transform: { width: RENDITION_WIDTH, quality: 80 } });
+        if (transformError || !transformedBlob) {
+          throw new Error(transformError?.message ?? 'no data returned');
+        }
+        renditionBytes = new Uint8Array(await transformedBlob.arrayBuffer());
+        renditionType = transformedBlob.type || 'image/webp';
+      } catch (transformErr) {
+        usedTransformFallback = true;
+        // gif is documented as a supported transform input, but confirmed
+        // by testing: it throws on a real animated gif. Only gif gets a
+        // fallback here — send the original animated file straight to the
+        // vision model rather than failing enrichment outright. Any other
+        // media type failing here is a real problem, not a format gap.
+        if (mediaType !== 'gif') {
+          throw new Error(
+            `Transform fetch failed: ${transformErr instanceof Error ? transformErr.message : String(transformErr)}`,
+          );
+        }
+        const { data: originalBlob, error: originalError } = await supabase.storage
+          .from(BUCKET)
+          .download(thumbPath);
+        if (originalError || !originalBlob) {
+          throw new Error(`Original gif fetch failed: ${originalError?.message ?? 'no data returned'}`);
+        }
+        renditionBytes = new Uint8Array(await originalBlob.arrayBuffer());
+        renditionType = 'image/gif';
       }
-      const renditionBytes = new Uint8Array(await renditionBlob.arrayBuffer());
-      const renditionType = renditionBlob.type || 'image/webp';
 
       const vision = await callVisionModel(renditionBytes, renditionType, openaiKey);
 
@@ -410,7 +495,20 @@ Deno.serve(async (req) => {
         .eq('id', item_id);
       if (enrichUpdateError) throw new Error(enrichUpdateError.message);
 
-      return json({ ok: true, item_id, media_type: mediaType, thumb_path: thumbPath, enriched: true });
+      return json({
+        ok: true,
+        item_id,
+        media_type: mediaType,
+        thumb_path: thumbPath,
+        enriched: true,
+        // Which input the vision call actually saw, and whether it came
+        // from Storage's transform or the animated-original fallback — see
+        // the catch just above. Cheap to keep; the only way to tell from
+        // the response which path a gif actually took.
+        vision_input_type: renditionType,
+        vision_used_transform_fallback: usedTransformFallback,
+        vision_input_bytes: renditionBytes.length,
+      });
     } catch (enrichErr) {
       const enrichMessage = enrichErr instanceof Error ? enrichErr.message : String(enrichErr);
       console.error(`design-ingest enrichment failed for ${item_id}:`, enrichMessage);
@@ -428,7 +526,7 @@ Deno.serve(async (req) => {
       .update({
         // Same provenance write-back as the success path — most valuable
         // exactly when something failed after a still was already resolved
-        // (e.g. a gif found via unfurl that can't be cached — no codec).
+        // but before it could be fetched/cached (e.g. a 403 on the media URL).
         ...(mediaType !== 'video' && stillUrl ? { image_url: stillUrl } : {}),
         enrich_status: 'failed',
         enrich_error: message,

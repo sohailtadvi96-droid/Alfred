@@ -101,8 +101,9 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // design-ingest authenticates with the service role itself; this
-        // just gets the call past the platform's JWT gate.
+        // The one credential design-ingest actually accepts — its
+        // verify_jwt is off, but it checks this header itself against the
+        // service-role key and rejects anything else. See its file header.
         Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
       },
       body: JSON.stringify({ item_id }),

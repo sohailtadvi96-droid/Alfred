@@ -102,9 +102,19 @@ verify_jwt = true
 verify_jwt = true
 
 # Design module — media ingest (Step 3 of docs/DESIGN.md). Invoked
-# machine-to-machine by design-capture, never by a browser client. It does
-# its own service-role auth internally, so the platform JWT gate must be off
-# — with it on, the invoke 401s before any of this function's code runs,
-# and the row is left stuck at whatever status design-capture wrote.
+# machine-to-machine by design-capture and design-retry, never directly by a
+# browser client. It does its own service-role auth internally (checks the
+# Authorization header against the service-role key itself), so the
+# platform JWT gate must be off — with it on, the invoke 401s before any of
+# this function's code runs, and the row is left stuck at whatever status
+# the caller wrote.
 [functions.design-ingest]
 verify_jwt = false
+
+# Design module — retry (Step 5 of docs/DESIGN.md). Runs under the caller's
+# own JWT so RLS confirms the item is theirs, then hands off to
+# design-ingest (service role) the same way design-capture does. Exists so
+# the frontend's retry button never holds — and never needs — the
+# service-role key design-ingest actually requires.
+[functions.design-retry]
+verify_jwt = true
