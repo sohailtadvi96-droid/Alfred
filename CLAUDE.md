@@ -57,7 +57,7 @@ components, not business logic.
 | **Goals** | `GoalsPage` | 0016 | Shipped, Phase 1 (manual goals only — no auto-progress from other modules yet) |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped |
 
-## Database schema (as of migration 0017)
+## Database schema (as of migration 0023)
 
 All tables live in `public`, have RLS enabled, and (unless noted) use the same
 per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`.
@@ -83,19 +83,56 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   parser bug) — treat it as a prefix, not a resolvable full VPA; `people.vpa` /
   `ferrari_shops.vpa` / `merchant_rules.match_value` still hold the same truncated
   values under the old, unrenamed name.
+  `transfer_group_id` + `is_internal` (0018) pair the two legs of an internal transfer
+  detected by `pair_internal_transfers()` — defined but not auto-invoked; run manually
+  and check the result before trusting it (the same-amount/48h heuristic is prone to
+  false positives on coincidental same-amount transactions).
 - `category_rules` — regex/contains/equals rules; `user_id is null` = system default,
   otherwise a per-user override, ranked by priority.
 - `categories` — user-editable label/color/sort on top of the slug system; `user_id is
   null` = system row, a user row of the same `(slug, direction)` shadows it. `kind`
-  (expense/income/transfer) added in 0013.
-- `people` — VPA → display name mapping, `is_family` flag (0013).
-- `ferrari_shops` — pinned merchant QRs, "My Ferrari" tier (0013).
+  (expense/income/transfer) added in 0013. `bucket` (0021: need/want/obligation/invest,
+  nullable) applies to expense-kind categories only — null means "not applicable"
+  (income/transfer) or "not yet resolved" (a low-confidence catch-all, or
+  `person_transactions` pending Phase 3 identity resolution), never "forgot to set".
+- `transaction_flows` (view, 0018) — the only place spend/income/transfer totals may be
+  computed from; joins `categories` (user row shadows system row) to derive `flow_kind`
+  (expense/income/transfer, falling back to direction when uncategorized) and
+  `excluded_from_spend` (`is_internal` or `kind = 'transfer'`, wrapped in `is true` per
+  0019 so a null-kind category can't leak a SQL-null through). `security_invoker = on`
+  like `account_balances` — no RLS bypass. No query outside this view should read
+  `transactions.direction` for a total.
+- `people` — VPA → display name mapping, `is_family` flag (0013). **Superseded by
+  `entities`/`entity_keys` (0023) for identity resolution** — left in place and
+  populated, no longer read by the client. `people.vpa` still holds the old truncated
+  (and unrenamed) prefix.
+- `ferrari_shops` — pinned merchant QRs, "My Ferrari" tier (0013). Same status as
+  `people`: superseded by `entities` (`is_ferrari` flag), left in place, unread.
+- `entities` / `entity_keys` (0023) — counterparty identity, replacing the one-row-
+  per-vpa model above (the data is many-to-many: a truncated `vpa_prefix` can cover
+  more than one real payee, and one payee can appear under more than one prefix).
+  `entities`: `display_name`, `entity_type` (person/merchant/self), `default_category`,
+  `is_family`, `is_ferrari`, `notes`, `resolved_at`. `entity_keys`: `entity_id`,
+  `key_type` (vpa_prefix/merchant_name/counterparty), `key_value`, `confidence`
+  (exact/prefix) — unique on `(user_id, key_type, key_value)`, so a key is claimed by at
+  most one entity. `confidence = 'exact'` means "not a truncated prefix, cannot silently
+  collide" — it does **not** mean the key uniquely identifies the entity; one entity can
+  legitimately hold several exact keys. Migrated from `people`/`ferrari_shops` by
+  grouping on `display_name` (not row-per-row — the source tables already contained
+  duplicate rows for the same person/shop under different vpas), plus identities found
+  in `merchant_rules` with a category pin but no `people`/`ferrari_shops` row at all.
+  Deliberately does not yet cover the lending/receivable ledger (planned separately,
+  not before this queue has been used for a while).
 - `merchant_rules` — learned exact-match category pins (vpa/counterparty), distinct
-  from the regex `category_rules` (0013).
+  from the regex `category_rules` (0013). Orthogonal to identity — unaffected by the
+  `entities` migration.
 - `gmail_sync_state` — one row per user, Gmail history-id checkpoint.
 - Key RPCs: `categorize(merchant, direction)` (SQL fallback categoriser),
   `ingest_transactions(source_type, rows jsonb)` (dedupe + insert + categorise),
-  `recategorize_all()`, `upsert_category` / `delete_category`.
+  `recategorize_all()`, `upsert_category` (accepts `bucket` since 0021) /
+  `delete_category`, `period_summary(from, to)` (0020, reads `transaction_flows`,
+  returns expense/income/transfer rows separately — caller decides what to exclude),
+  `pair_internal_transfers()` (0018, manual-only, see above).
 - **Taxonomy history:** 0007 shipped a small hand-picked category set; 0013 replaced it
   with a 25-category engine taxonomy (`kind` added); 0014/0015 migrated existing rows
   off the four retired slugs (`dineout`, `person`, `refund`, `misc`) onto the new ones
