@@ -178,11 +178,15 @@ what actually shipped):
 `createImageBitmap`/`OffscreenCanvas`) survives this edge runtime — see Gotchas. Resize
 was moved to read time instead: `design-ingest` downloads the resolved still and uploads
 it **unresized** to `{user_id}/{item_id}.{ext}` (`ext` from the response's declared
-content-type — jpeg/png/webp only), and callers request a sized rendition from Supabase
-Storage's image-transform endpoint
+content-type — jpeg/png/webp, or gif since 0032/Step 5's GIF fix), and callers request a
+sized rendition from Supabase Storage's image-transform endpoint
 (`/storage/v1/render/image/authenticated/design-media/{path}?width=&quality=`) rather
-than reading `thumb_path` directly. Gif still fails outright (no bucket mime allowlist
-slot, no codec to re-encode into one that has one) — unchanged, not revisited yet.
+than reading `thumb_path` directly. A gif is stored as-is too — no thumbnailing attempt
+on ingest. The transform endpoint is tried first for a static frame at read time (grid,
+vision model); confirmed by testing that it doesn't actually work on a real animated
+gif (`.download()` with `transform` throws), so both fall back to the original animated
+file — the grid renders it directly, the vision model gets it raw (worked fine in
+testing on a 6MB file, tags/caption came back sensible).
 
 **Acceptance** — save one item from each and confirm `thumb_path` is populated and the
 object exists in the bucket:
@@ -230,7 +234,23 @@ Only once step 3's acceptance list is green.
 
 ### Step 5 — Frontend states
 
-**Prompt for Claude Code:**
+**Shipped.** Beyond the original prompt below, also folded in four display-side issues
+deferred from Step 3: cards with no image at all (not just a failed load) now get the
+same graceful placeholder as a broken `<img>`; a video item's still (poster_url, or the
+cached thumb once it exists) renders with no playback attempt (Step 8's job); every card
+shows its source domain, computed client-side from `link_url`/`image_url` rather than
+trusting the stored `source` column (extension-captured rows never had it set); gif
+thumb_paths are excluded from the transformed batch entirely and get a plain signed URL
+instead, since 0032's testing already showed the transform endpoint doesn't work on a
+real animated gif — the grid renders the gif directly, same fallback the vision call
+uses. Also fixed a bug this step's own polling would have surfaced immediately: manual
+saves via "Add reference" never go through design-ingest, so they now insert with
+`enrich_status='skipped'` (0029's own convention for pre-pipeline rows) instead of
+inheriting the column's `'pending'` default and sitting in the new shimmer state forever.
+The retry button does **not** call `design-ingest` directly — it goes through a new
+`design-retry` function instead; see the Gotchas entry below for why and how.
+
+**Prompt for Claude Code** (original scope — see above for what was added):
 
 > Update `src/features/design/` and `DesignBoardPage`: items with
 > `enrich_status='pending'` or `'running'` render a shimmer placeholder; `'failed'`
@@ -246,6 +266,12 @@ Only once step 3's acceptance list is green.
   on its own.
 - A failed item is visibly failed and retryable.
 - No broken image icons anywhere.
+
+**Verification note:** type-checked clean (`tsc --noEmit`) and every changed/new file
+transforms cleanly through Vite's own dev pipeline (checked directly — not just that the
+dev server boots). Could not visually verify in an authenticated browser session — this
+app requires a real login and I don't have (and shouldn't ask for) the credentials. If
+something looks off once you're in the UI, that's the gap to check first.
 
 ---
 
@@ -329,8 +355,8 @@ storage objects, delete the rows. Weekly is plenty.
   (`typeof OffscreenCanvas === 'function'` is `false`), so there's no way to draw a
   decoded bitmap anywhere or re-encode it — confirmed by a probe deploy. Given both dead
   ends, the decision is: `design-ingest` stores the fetched bytes **unresized**
-  (jpeg/png/webp only — gif still fails outright, no bucket mime allowlist slot and no
-  codec to re-encode into one that has one), and every read requests a sized rendition
+  (jpeg/png/webp/gif — 0032 added gif to the bucket's mime allowlist once it was clear
+  no codec would ever re-encode one anyway), and every read requests a sized rendition
   from Storage's image-transform endpoint
   (`/storage/v1/render/image/authenticated/design-media/{path}?width=&quality=`) instead
   — confirmed available on this project's plan (an authenticated request against a real
@@ -350,6 +376,22 @@ storage objects, delete the rows. Weekly is plenty.
   this function does. Noted only, not fixed. Worth remembering for Step 4: adding a
   vision-model call per item is more outbound volume per save, and if that pushes
   through the same egress path it's more exposure to this, not less.
+- **Fixed: `design-ingest` was reachable by anyone with the URL, for any `item_id`, no
+  auth at all.** `verify_jwt = false` has to stay (it's machine-to-machine, no user
+  session in play), but the platform gate being off isn't the same as no gate — the
+  handler now checks its own `Authorization` header against `SUPABASE_SERVICE_ROLE_KEY`
+  and returns 403 on anything else (confirmed: both a missing header and a wrong bearer
+  value get rejected). The exposure had gotten more reachable than when it was first
+  flagged in Step 3 — Step 5's retry button called this function straight from the
+  browser — which is what made fixing it now, not later. Frontend retry no longer talks
+  to `design-ingest` at all: it calls a new **`design-retry`** function
+  (`verify_jwt = true`), which runs under the caller's own JWT, does an RLS-scoped
+  `update(...).eq('id', item_id).select().single()` (ownership check and the
+  `enrich_status='running'` transition in one round trip — zero rows back means it
+  isn't the caller's item, 404, not a distinguishable-from-nonexistent leak), and only
+  then hands off to `design-ingest` server-side with the service-role key, same pattern
+  as design-capture's original handoff. A browser holding only a user JWT now has no
+  path to `design-ingest` at all.
 
 ---
 
