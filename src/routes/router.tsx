@@ -7,6 +7,7 @@ import { ExpensesPage } from './ExpensesPage';
 import { TransactionsPage } from './TransactionsPage';
 import { PeoplePage } from './PeoplePage';
 import { ReviewPage } from './ReviewPage';
+import { InsightsPage } from './InsightsPage';
 import { SecretsPage } from './SecretsPage';
 import { WorkPage } from './WorkPage';
 import { DesignPage } from './DesignPage';
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
       { path: 'expenses/transactions', element: <TransactionsPage /> },
       { path: 'expenses/people', element: <PeoplePage /> },
       { path: 'expenses/review', element: <ReviewPage /> },
+      { path: 'expenses/insights', element: <InsightsPage /> },
       { path: 'secrets', element: <SecretsPage /> },
       { path: 'design', element: <DesignPage /> },
       { path: 'design/discover', element: <DesignDiscoverPage /> },

@@ -111,6 +111,12 @@ export function ExpensesPage() {
             >
               Review queue
             </Link>
+            <Link
+              className="btn sec sm"
+              to={{ pathname: '/expenses/insights', search: window.location.search }}
+            >
+              Insights
+            </Link>
           </div>
         </div>
 

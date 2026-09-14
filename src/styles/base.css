@@ -1114,6 +1114,129 @@ button {
   font-style: normal;
 }
 
+/* ============ insights ============ */
+.insight-panel {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 18px 20px;
+}
+.insight-section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 10px;
+}
+.insight-section-label.muted {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+.insight-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.insight-bar-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.insight-bar-row-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.insight-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.insight-bar-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.insight-bar-track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+.insight-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--base);
+  transition: width 0.3s ease;
+}
+.insight-bar-fill.transfer {
+  background: var(--text-faint);
+}
+.insight-bar-fill.unresolved {
+  background: var(--c-ochre);
+}
+.insight-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.insight-tag.unresolved {
+  color: var(--c-ochre);
+  border: 1px solid var(--c-ochre);
+}
+
+.freqticket-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.freqticket-axis-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: var(--text-faint);
+}
+.freqticket-bubble {
+  fill: color-mix(in srgb, var(--base) 55%, transparent);
+  stroke: var(--base);
+  stroke-width: 1.5;
+  transition: fill 0.15s ease, stroke-width 0.15s ease;
+}
+.freqticket-bubble.unresolved {
+  fill: color-mix(in srgb, var(--c-ochre) 45%, transparent);
+  stroke: var(--c-ochre);
+}
+.freqticket-bubble.hover {
+  stroke-width: 2.5;
+}
+.freqticket-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: var(--text-dim);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.freqticket-label.dim {
+  fill: var(--text-faint);
+}
+
 /* ============ burn curve ============ */
 .burncurve {
   border: 1px solid var(--line);
