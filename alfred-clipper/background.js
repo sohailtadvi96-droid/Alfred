@@ -70,8 +70,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "alfred-test") {
     capture({
-      page_url: "https://example.com/alfred-clipper-test",
-      image_url: "https://example.com/alfred-clipper-test.jpg",
+      // A real, stable, publicly-hosted image — not example.com, which
+      // 404s and only proves design-capture's insert works, not the
+      // design-ingest fetch/thumbnail/upload path behind it.
+      page_url: "https://picsum.photos/id/1015",
+      image_url: "https://picsum.photos/id/1015/800",
       title: "Alfred Clipper test",
       medium: null,
     }).then((result) => sendResponse(result));

@@ -106,11 +106,19 @@ Deno.serve(async (req) => {
         Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
       },
       body: JSON.stringify({ item_id }),
-    }).catch((e) => {
-      // design-ingest doesn't exist yet (Step 3) — a failed invoke here is
-      // expected for now and must never fail the capture request.
-      console.error('design-ingest invoke failed', e);
-    }),
+    })
+      .then(async (res) => {
+        // fetch only rejects on a network-level failure — a non-2xx response
+        // (e.g. a 401 from the platform JWT gate) resolves normally and would
+        // otherwise be silently discarded here, never reaching .catch().
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          console.error(`design-ingest invoke returned ${res.status} for ${item_id}: ${body.slice(0, 300)}`);
+        }
+      })
+      .catch((e) => {
+        console.error(`design-ingest invoke failed (network error) for ${item_id}`, e);
+      }),
   );
 
   return json({ id: item_id }, 201);

@@ -33,13 +33,14 @@ Everything below exists to fix those three, in that order.
         │
         └── waitUntil ──▶ design-ingest
                               ├─ unfurl page_url → og:image / og:video / og:video:poster
-                              ├─ download media, resize, write design-media/{user}/{item}.jpg
+                              ├─ download media as-is, write design-media/{user}/{item}.{ext}
                               ├─ vision call → caption, tags, palette
                               ├─ embedding call → vector(1536)
                               └─ update row, enrich_status = 'done'
 ```
 
-Two functions, not one, so the extension never waits on a vision call.
+Two functions, not one, so the extension never waits on a vision call. No resize step —
+resizing is a read-time concern (§1 Data model note on `thumb_path`, Step 5).
 
 ### Data model (after 0029)
 
@@ -47,7 +48,7 @@ Two functions, not one, so the extension never waits on a vision call.
 |---|---|
 | `media_type` | `image` / `video` / `gif` — drives grid playback |
 | `poster_url` | still frame for video/gif |
-| `thumb_path` | path inside the private `design-media` bucket |
+| `thumb_path` | path inside the private `design-media` bucket — the **original**, unresized bytes (no codec survives the edge runtime to resize on ingest; see Gotchas). Despite the name, this is not a thumbnail — request a rendition via Storage's image-transform endpoint at read time instead of serving this path directly. |
 | `medium` | hard facet: identity / packaging / editorial / motion / type / web / illustration / other |
 | `colors` | `[{"hex":"#2b1d18","pct":0.41}, …]` |
 | `caption` | vision-generated description; also the embedded text |
@@ -156,7 +157,8 @@ that when enrichment misbehaves you know the media path is sound.
   `media_type='video'` and a null `poster_url` and let the UI show a placeholder.
 - **Send a real User-Agent.** A default Deno fetch gets 403'd by a good number of sites.
 
-**Prompt for Claude Code:**
+**Prompt for Claude Code** (superseded — kept for history; see the note below it for
+what actually shipped):
 
 > Create `supabase/functions/design-ingest/index.ts`. It accepts `{ item_id }` and uses
 > the **service role** client. Steps: load the row; set `enrich_status='running'`; if
@@ -171,6 +173,16 @@ that when enrichment misbehaves you know the media path is sound.
 > and set `enrich_status='done'`, `enriched_at=now()`. Wrap everything so any thrown
 > error sets `enrich_status='failed'` and stores the message — the row must never be
 > left in `running`. Add a 20-second timeout on every outbound fetch.
+
+**What actually shipped, and why it differs:** no codec (WASM `imagescript`, native
+`createImageBitmap`/`OffscreenCanvas`) survives this edge runtime — see Gotchas. Resize
+was moved to read time instead: `design-ingest` downloads the resolved still and uploads
+it **unresized** to `{user_id}/{item_id}.{ext}` (`ext` from the response's declared
+content-type — jpeg/png/webp only), and callers request a sized rendition from Supabase
+Storage's image-transform endpoint
+(`/storage/v1/render/image/authenticated/design-media/{path}?width=&quality=`) rather
+than reading `thumb_path` directly. Gif still fails outright (no bucket mime allowlist
+slot, no codec to re-encode into one that has one) — unchanged, not revisited yet.
 
 **Acceptance** — save one item from each and confirm `thumb_path` is populated and the
 object exists in the bucket:
@@ -193,8 +205,11 @@ Only once step 3's acceptance list is green.
 
 **Prompt for Claude Code:**
 
-> Extend `design-ingest`: after the thumbnail is written, send the resized image to a
-> vision model and ask for strict JSON — `{ caption, tags, medium, colors }` where
+> Extend `design-ingest`: after `thumb_path` is written, request a transformed
+> rendition from Storage's image-transform endpoint
+> (`/storage/v1/render/image/authenticated/design-media/{thumb_path}?width=800`) —
+> **not** the stored original, which is unresized and can be several MB — and send that
+> to a vision model. Ask for strict JSON — `{ caption, tags, medium, colors }` where
 > caption is one sentence describing subject, style and mood; tags is 5–10 lowercase
 > single-or-two-word terms; medium is one of the eight allowed slugs; colors is the 5
 > dominant colours as `[{hex, pct}]` sorted by pct descending. Parse defensively —
@@ -220,9 +235,11 @@ Only once step 3's acceptance list is green.
 > Update `src/features/design/` and `DesignBoardPage`: items with
 > `enrich_status='pending'` or `'running'` render a shimmer placeholder; `'failed'`
 > renders with a retry button that re-invokes `design-ingest`. Load thumbnails from
-> `thumb_path` via `createSignedUrls` in a single batched call per page of results,
-> falling back to `image_url` when `thumb_path` is null. Add a medium filter row.
-> Poll or subscribe so a pending item resolves without a manual refresh.
+> `thumb_path` via `createSignedUrls` in a single batched call per page of results —
+> `thumb_path` holds the original, unresized upload (Step 3), so request a **transformed**
+> rendition at grid size (`{ transform: { width: <grid tile px>, quality: 70 } }`), not
+> the original — falling back to `image_url` when `thumb_path` is null. Add a medium
+> filter row. Poll or subscribe so a pending item resolves without a manual refresh.
 
 **Acceptance**
 - Saving from the extension makes an item appear within a couple of seconds and resolve
@@ -292,8 +309,47 @@ storage objects, delete the rows. Weekly is plenty.
 - **Instagram will not unfurl.** It's login-walled. Accept it or save the image directly
   via right-click.
 - **Signed URLs expire.** Batch them per page and set a sane TTL — an hour is fine.
-- **Don't cache source video.** Thumbnails and posters only; the 10MB bucket cap in 0030
-  enforces this.
+- **Don't cache source video.** Thumbnails and posters only; the bucket's 25MB
+  per-object cap (0031, raised from 0030's original 10MB once ingest started storing
+  full unresized originals — see below) still isn't sized for source video.
+- **`design-ingest` needs `verify_jwt = false`** in `supabase/config.toml` — it's invoked
+  machine-to-machine by `design-capture` with the service-role key purely to pass the
+  platform gate, and does its own auth internally. Left at the CLI's default (`true`,
+  since an unlisted function gets no explicit block), every invoke 401s before any of
+  its code runs — and since `fetch()` only rejects on network errors, not HTTP error
+  statuses, a bare `.catch()` on the invoke call never even logs it. Rows land in
+  `design_items` at `enrich_status='pending'` and stay there forever with no error
+  recorded. Check `supabase functions list` for `"verify_jwt"` on every new function.
+- **No image codec survives this edge runtime — resize moved to read time,
+  permanently, by decision.** `imagescript` (both `deno.land/x` and `npm:` forms)
+  crashes the function on invoke (`BOOT_ERROR` / `WORKER_ERROR`) even with a bare
+  `import` and no usage — confirmed by bisecting an import-only build against a
+  no-imagescript baseline. The WASM-free alternative doesn't pan out either:
+  `createImageBitmap` exists as a global here, but `OffscreenCanvas` does not
+  (`typeof OffscreenCanvas === 'function'` is `false`), so there's no way to draw a
+  decoded bitmap anywhere or re-encode it — confirmed by a probe deploy. Given both dead
+  ends, the decision is: `design-ingest` stores the fetched bytes **unresized**
+  (jpeg/png/webp only — gif still fails outright, no bucket mime allowlist slot and no
+  codec to re-encode into one that has one), and every read requests a sized rendition
+  from Storage's image-transform endpoint
+  (`/storage/v1/render/image/authenticated/design-media/{path}?width=&quality=`) instead
+  — confirmed available on this project's plan (an authenticated request against a real
+  path reached actual object-resolution logic — a plan-gated project errors before that
+  point). 0031 raised the bucket's per-object cap from 10MB to 25MB accordingly. Despite
+  its name, `thumb_path` now holds the original, not a thumbnail — see §1 Data model.
+- **Behance 403s the ingest fetch even with a full browser header set** (`User-Agent`,
+  `Accept`, `Accept-Language`, `Referer` all set) — confirmed candidate for the
+  headless-browser fallback mentioned in Step 3's acceptance notes, not just a missing
+  header. Untested whether it's TLS fingerprinting, a Cloudflare/Akamai challenge, or a
+  cookie/JS requirement; whichever it is, no amount of static header tuning fixed it.
+- **YouTube 429-rate-limits Supabase's egress IP on repeated fetches.** A plain curl
+  from an ordinary residential/dev connection gets clean 200s on the same URL, every
+  time; the same URL fetched from `design-ingest` got 429 on every attempt in a row —
+  Supabase's shared edge egress IPs look to be under enough load from other tenants'
+  functions hitting YouTube that it's actively throttling them, independent of anything
+  this function does. Noted only, not fixed. Worth remembering for Step 4: adding a
+  vision-model call per item is more outbound volume per save, and if that pushes
+  through the same egress path it's more exposure to this, not less.
 
 ---
 

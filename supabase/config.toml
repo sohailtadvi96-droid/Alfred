@@ -100,3 +100,11 @@ verify_jwt = true
 # caller's own JWT; hands off to design-ingest (service role) without waiting.
 [functions.design-capture]
 verify_jwt = true
+
+# Design module — media ingest (Step 3 of docs/DESIGN.md). Invoked
+# machine-to-machine by design-capture, never by a browser client. It does
+# its own service-role auth internally, so the platform JWT gate must be off
+# — with it on, the invoke 401s before any of this function's code runs,
+# and the row is left stuck at whatever status design-capture wrote.
+[functions.design-ingest]
+verify_jwt = false
