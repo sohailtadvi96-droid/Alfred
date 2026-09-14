@@ -1200,41 +1200,119 @@ button {
   border: 1px solid var(--c-ochre);
 }
 
-.freqticket-svg {
+.freqstrip-rows {
+  display: flex;
+  flex-direction: column;
+}
+.freqstrip-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.6fr) minmax(56px, auto) minmax(90px, 1fr) minmax(110px, 1.2fr);
+  align-items: center;
+  gap: 14px;
   width: 100%;
-  height: auto;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line-soft);
+  padding: 8px 6px;
+  margin: 0 -6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.freqstrip-row:last-child {
+  border-bottom: none;
+}
+.freqstrip-row:hover {
+  background: var(--surface-2);
+}
+.freqstrip-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  min-width: 0;
+}
+.freqstrip-name-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.freqstrip-name .insight-tag {
+  flex: none;
+  white-space: nowrap;
+}
+.freqstrip-avg {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+}
+.freqstrip-freq {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+.freqstrip-dots {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.freqstrip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--base);
+  opacity: 0.55;
+  flex: none;
+}
+.freqstrip-dot.unresolved {
+  background: var(--c-ochre);
+  opacity: 0.8;
+}
+.freqstrip-count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text-dim);
+  flex: none;
+}
+.freqstrip-total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.freqstrip-total-bar {
+  width: 48px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-soft);
+  overflow: hidden;
+  flex: none;
+}
+.freqstrip-total-fill {
   display: block;
-  overflow: visible;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--base);
 }
-.freqticket-axis-title {
+.freqstrip-total-fill.unresolved {
+  background: var(--c-ochre);
+}
+.freqstrip-total-amount {
   font-family: var(--mono);
-  font-size: 10px;
-  fill: var(--text-faint);
-}
-.freqticket-bubble {
-  fill: color-mix(in srgb, var(--base) 55%, transparent);
-  stroke: var(--base);
-  stroke-width: 1.5;
-  transition: fill 0.15s ease, stroke-width 0.15s ease;
-}
-.freqticket-bubble.unresolved {
-  fill: color-mix(in srgb, var(--c-ochre) 45%, transparent);
-  stroke: var(--c-ochre);
-}
-.freqticket-bubble.hover {
-  stroke-width: 2.5;
-}
-.freqticket-label {
-  font-family: var(--mono);
-  font-size: 10px;
-  fill: var(--text-dim);
-  paint-order: stroke;
-  stroke: var(--surface);
-  stroke-width: 3px;
-  stroke-linejoin: round;
-}
-.freqticket-label.dim {
-  fill: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+  min-width: 68px;
 }
 
 .insight-tier {
