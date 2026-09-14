@@ -4355,12 +4355,48 @@ textarea.office-journal {
   width: 100%;
   display: block;
 }
-.item-card-broken {
+.item-card-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   padding: 40px 12px;
   text-align: center;
   font-size: 11px;
   color: var(--text-faint);
   line-height: 1.4;
+}
+.item-card-broken svg {
+  opacity: 0.4;
+}
+.item-card-failed {
+  color: var(--neg);
+}
+.item-card-state-detail {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--text-faint);
+}
+.item-card-shimmer {
+  height: 180px;
+  background: linear-gradient(
+    100deg,
+    var(--surface-2) 35%,
+    color-mix(in srgb, var(--surface-2) 50%, var(--surface)) 50%,
+    var(--surface-2) 65%
+  );
+  background-size: 200% 100%;
+  animation: item-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes item-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 .item-card-actions {
   position: absolute;
