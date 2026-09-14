@@ -1237,6 +1237,44 @@ button {
   fill: var(--text-faint);
 }
 
+.insight-tier {
+  margin-bottom: 18px;
+}
+.insight-tier-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin: 0 0 8px;
+}
+.insight-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  background: var(--surface-2);
+}
+.insight-card-evidence {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.insight-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.insight-card-row + .insight-card-row {
+  margin-top: 4px;
+}
+.insight-card-annual {
+  font-weight: 700;
+  color: var(--text);
+}
+
 /* ============ burn curve ============ */
 .burncurve {
   border: 1px solid var(--line);
