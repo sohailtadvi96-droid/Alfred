@@ -95,3 +95,8 @@ verify_jwt = true
 # classify. `supabase secrets set ANTHROPIC_API_KEY=...`
 [functions.categorise-ai]
 verify_jwt = true
+
+# Design module — capture flow (Step 2 of docs/DESIGN.md). Runs under the
+# caller's own JWT; hands off to design-ingest (service role) without waiting.
+[functions.design-capture]
+verify_jwt = true
