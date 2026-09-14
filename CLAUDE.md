@@ -49,7 +49,7 @@ components, not business logic.
 
 | Module | Route(s) | Migration(s) | Status |
 |---|---|---|---|
-| **Expenses** | `ExpensesPage`, `TransactionsPage`, `ReviewPage`, `PeoplePage` | 0002, 0006, 0007, 0012–0015 | Shipped, actively evolving |
+| **Expenses** | `ExpensesPage`, `TransactionsPage`, `ReviewPage`, `PeoplePage`, `InsightsPage` | 0002, 0006, 0007, 0012–0015 | Shipped, actively evolving |
 | **Secrets** (password/vault) | `SecretsPage` | 0003 | Shipped |
 | **Work** (freelance: clients/projects/invoices) | `WorkPage`, `ProjectDetailPage`, `InvoicesPage`, `InvoiceViewPage` | 0004, 0008 | Shipped |
 | **Office** (tasks/calendar/journal) | `OfficeDayPage` | 0009, 0010 | Shipped |
