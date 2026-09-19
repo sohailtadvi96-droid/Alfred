@@ -5,15 +5,89 @@ import type { ModuleId } from '@/features/home/types';
 import { useGoals, useSaveGoal } from './hooks';
 import type { GoalDirection, GoalType } from './types';
 
-const TYPE_LABEL: Record<GoalType, string> = {
-  count: 'Count — reach N of something',
-  value: 'Value — reach an amount',
-  milestone: 'Milestone — an ordered checklist',
-  streak: 'Streak — do X on N days',
+/** Per-type field behaviour and copy. The tab label is display-only — the
+ *  stored `type` enum stays count/value/milestone/streak either way (this
+ *  is the "DEFAULT = relabel" option from the investigation: Value shows
+ *  as "Amount", Milestone as "Checklist", the enum is untouched). */
+const TYPE_CONFIG: Record<
+  GoalType,
+  {
+    tabLabel: string;
+    tagline: string;
+    titlePlaceholder: string;
+    targetLabel: string;
+    targetPlaceholder: string;
+    unitLabel: string;
+    unitPlaceholder: string;
+    showUnit: boolean;
+    showDirection: boolean;
+    showTargetDate: boolean;
+    showSteps: boolean;
+  }
+> = {
+  count: {
+    tabLabel: 'Count',
+    tagline: 'Count how many times you do something.',
+    titlePlaceholder: 'e.g. Read 12 books',
+    targetLabel: 'How many?',
+    targetPlaceholder: '12',
+    unitLabel: 'What are you counting?',
+    unitPlaceholder: 'books, tasks, workouts',
+    showUnit: true,
+    showDirection: true,
+    showTargetDate: true,
+    showSteps: false,
+  },
+  value: {
+    tabLabel: 'Amount',
+    tagline: 'Reach a total — usually money.',
+    titlePlaceholder: 'e.g. Save ₹60,000 buffer',
+    targetLabel: 'Target amount',
+    targetPlaceholder: '60000',
+    unitLabel: 'In what?',
+    unitPlaceholder: '₹, kg, hrs',
+    showUnit: true,
+    showDirection: true,
+    showTargetDate: true,
+    showSteps: false,
+  },
+  milestone: {
+    tabLabel: 'Checklist',
+    tagline: 'Tick off steps until the whole thing is done.',
+    titlePlaceholder: 'e.g. Launch my portfolio site',
+    targetLabel: '',
+    targetPlaceholder: '',
+    unitLabel: '',
+    unitPlaceholder: '',
+    showUnit: false,
+    showDirection: false,
+    showTargetDate: true,
+    showSteps: true,
+  },
+  streak: {
+    tabLabel: 'Streak',
+    tagline: 'Do it on a run of days. Miss one and the streak resets.',
+    titlePlaceholder: 'e.g. Journal every day',
+    // goal_pace treats a streak's target as a per-week frequency (a daily
+    // streak is just target=4-7) -- "optional" only means the field can be
+    // left blank; the Number(target) || 1 fallback below still always
+    // sends a positive number, since goals.target is NOT NULL and
+    // check (target > 0).
+    targetLabel: 'Aim for how many days a week? (optional)',
+    targetPlaceholder: 'e.g. 4 — leave blank to just keep it going',
+    unitLabel: '',
+    unitPlaceholder: '',
+    showUnit: false,
+    showDirection: false,
+    showTargetDate: false,
+    showSteps: false,
+  },
 };
 
+// The real 7-id ModuleId union, matching goals.module_id's DB check
+// constraint exactly -- not the reference's invented 'office' area.
 const MODULE_OPTIONS: { id: ModuleId; label: string }[] = [
-  { id: 'expenses', label: 'Expenses' },
+  { id: 'expenses', label: 'Money' },
   { id: 'work', label: 'Work' },
   { id: 'design', label: 'Design' },
   { id: 'invest', label: 'Invest' },
@@ -43,7 +117,15 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const [milestoneLabels, setMilestoneLabels] = useState(['', '']);
   const [error, setError] = useState<string | null>(null);
 
+  const cfg = TYPE_CONFIG[type];
   const atCap = activeCount >= 7;
+  const isValid =
+    title.trim().length > 0 &&
+    (cfg.showSteps
+      ? milestoneLabels.some((l) => l.trim())
+      : type === 'streak'
+        ? true // optional to type -- Number(target) || 1 below always sends a valid positive number
+        : Number(target) > 0);
 
   function reset() {
     setType('count');
@@ -62,8 +144,8 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     e.preventDefault();
     setError(null);
     if (!title.trim()) return;
-    if (type === 'milestone' && milestoneLabels.filter((l) => l.trim()).length === 0) {
-      setError('Add at least one milestone.');
+    if (cfg.showSteps && milestoneLabels.filter((l) => l.trim()).length === 0) {
+      setError('Add at least one step.');
       return;
     }
     try {
@@ -72,14 +154,13 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         type,
         target: Number(target) || 1,
         unit: unit || null,
-        direction: type === 'value' ? direction : 'up',
+        direction: cfg.showDirection ? direction : 'up',
         start_date: startDate,
-        target_date: targetDate || null,
+        target_date: cfg.showTargetDate ? targetDate || null : null,
         module_id: moduleId || null,
-        milestones:
-          type === 'milestone'
-            ? milestoneLabels.filter((l) => l.trim()).map((label, i) => ({ label: label.trim(), order: i }))
-            : undefined,
+        milestones: cfg.showSteps
+          ? milestoneLabels.filter((l) => l.trim()).map((label, i) => ({ label: label.trim(), order: i }))
+          : undefined,
       });
       reset();
       onOpenChange(false);
@@ -102,7 +183,7 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           <button className="btn ghost sm" type="button" onClick={() => onOpenChange(false)}>
             Cancel
           </button>
-          <button className="btn primary sm" type="submit" form="new-goal-form" disabled={save.isPending || !title.trim() || atCap}>
+          <button className="btn primary sm" type="submit" form="new-goal-form" disabled={save.isPending || !isValid || atCap}>
             {save.isPending ? 'Adding…' : 'Add goal'}
           </button>
         </>
@@ -112,31 +193,31 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         <div className="field">
           <label>Type</label>
           <div className="seg goal-type-seg">
-            {(Object.keys(TYPE_LABEL) as GoalType[]).map((t) => (
+            {(Object.keys(TYPE_CONFIG) as GoalType[]).map((t) => (
               <button key={t} type="button" className={type === t ? 'on' : ''} onClick={() => setType(t)}>
-                {t}
+                {TYPE_CONFIG[t].tabLabel}
               </button>
             ))}
           </div>
-          <span className="hint">{TYPE_LABEL[type]}</span>
+          <span className="hint">{cfg.tagline}</span>
         </div>
 
         <div className={`field${error ? ' bad' : ''}`}>
-          <label htmlFor="goal-title">Title</label>
+          <label htmlFor="goal-title">What's the goal?</label>
           <input
             id="goal-title"
             className="input"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Read 12 books"
+            placeholder={cfg.titlePlaceholder}
             autoFocus
           />
           {error && <span className="err">{error}</span>}
         </div>
 
-        {type === 'milestone' ? (
+        {cfg.showSteps ? (
           <div className="field">
-            <label>Milestones, in order</label>
+            <label>Steps, in order</label>
             {milestoneLabels.map((label, i) => (
               <div key={i} className="goal-milestone-input">
                 <input
@@ -145,14 +226,14 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                   onChange={(e) =>
                     setMilestoneLabels((arr) => arr.map((v, idx) => (idx === i ? e.target.value : v)))
                   }
-                  placeholder={`e.g. ${['A1', 'A2', 'B1', 'B2'][i] ?? `Step ${i + 1}`}`}
+                  placeholder={`Step ${i + 1}`}
                 />
                 {milestoneLabels.length > 1 && (
                   <button
                     type="button"
                     className="btn ghost sm"
                     onClick={() => setMilestoneLabels((arr) => arr.filter((_, idx) => idx !== i))}
-                    aria-label="Remove milestone"
+                    aria-label="Remove step"
                   >
                     ×
                   </button>
@@ -164,9 +245,9 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             </button>
           </div>
         ) : (
-          <div className="field-row">
+          <div className={cfg.showUnit ? 'field-row' : 'field'}>
             <div className="field">
-              <label htmlFor="goal-target">Target</label>
+              <label htmlFor="goal-target">{cfg.targetLabel}</label>
               <input
                 id="goal-target"
                 className="input"
@@ -175,24 +256,27 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 step="any"
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
+                placeholder={cfg.targetPlaceholder}
               />
             </div>
-            <div className="field">
-              <label htmlFor="goal-unit">Unit</label>
-              <input
-                id="goal-unit"
-                className="input"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                placeholder="books, ₹, days…"
-              />
-            </div>
+            {cfg.showUnit && (
+              <div className="field">
+                <label htmlFor="goal-unit">{cfg.unitLabel}</label>
+                <input
+                  id="goal-unit"
+                  className="input"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  placeholder={cfg.unitPlaceholder}
+                />
+              </div>
+            )}
           </div>
         )}
 
-        {type === 'value' && (
+        {cfg.showDirection && (
           <div className="field">
-            <label>Direction</label>
+            <label>Which way?</label>
             <div className="seg">
               <button type="button" className={direction === 'up' ? 'on' : ''} onClick={() => setDirection('up')}>
                 Reach at least
@@ -209,28 +293,37 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             <label htmlFor="goal-start">Start date</label>
             <input id="goal-start" className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
-          <div className="field">
-            <label htmlFor="goal-due">Target date</label>
-            <input id="goal-due" className="input" type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
-            <span className="hint">Blank = open-ended, no pace tracked</span>
-          </div>
+          {cfg.showTargetDate && (
+            <div className="field">
+              <label htmlFor="goal-due">Deadline</label>
+              <input id="goal-due" className="input" type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+              <span className="hint">Leave blank if there's no rush — we just won't track pace against a date.</span>
+            </div>
+          )}
         </div>
 
         <div className="field">
-          <label htmlFor="goal-module">Colour / linked module</label>
-          <select
-            id="goal-module"
-            className="input"
-            value={moduleId}
-            onChange={(e) => setModuleId(e.target.value as ModuleId | '')}
-          >
-            <option value="">None</option>
-            {MODULE_OPTIONS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
+          <label htmlFor="goal-module">Area</label>
+          <div className="goal-area-row">
+            <select
+              id="goal-module"
+              className="input"
+              value={moduleId}
+              onChange={(e) => setModuleId(e.target.value as ModuleId | '')}
+            >
+              <option value="">None</option>
+              {MODULE_OPTIONS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <span
+              className="goal-area-swatch"
+              style={{ background: moduleId ? `var(--m-${moduleId})` : 'transparent' }}
+              aria-hidden="true"
+            />
+          </div>
         </div>
       </form>
     </Dialog>

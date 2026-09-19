@@ -5684,6 +5684,22 @@ textarea.office-journal {
   font-size: 13px;
 }
 
+.goal-area-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.goal-area-row .input {
+  flex: 1;
+}
+.goal-area-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
 .goal-log {
   display: flex;
   gap: 8px;
