@@ -12,15 +12,12 @@ export interface Milestone {
   order: number;
 }
 
-export interface SourceQuery {
-  metric: string;
-  filter?: Record<string, unknown>;
-}
-
-export type GoalSource =
-  | { kind: 'manual' }
-  | { kind: 'module'; moduleId: ModuleId; query: SourceQuery }
-  | { kind: 'hybrid'; moduleId: ModuleId; query: SourceQuery; allowManualAdjust: true };
+/** Whitelisted at the DB (0033's goals_source_kind_check) -- goal_current_value
+ *  and goal_pace both dispatch on this. 'manual' is the only kind the UI
+ *  ever writes (saveGoal) -- journal_streak/tasks_completed goals are
+ *  populated by other modules, never created through NewGoalDialog. */
+export type GoalSourceKind = 'manual' | 'journal_streak' | 'tasks_completed';
+export type GoalSource = { kind: GoalSourceKind };
 
 export interface Goal {
   id: string;
@@ -41,7 +38,9 @@ export interface Goal {
 }
 
 /** One manual progress entry. Count/value goals: an increment, summed to get
- *  `actual`. Streak goals: one row per completed day (value is unused). */
+ *  `actual`. Streak goals: one row per completed day. Only meaningful for
+ *  source.kind === 'manual' -- journal_streak/tasks_completed goals never
+ *  write here, their ledger lives in office_journal/office_tasks instead. */
 export interface GoalProgress {
   id: string;
   goal_id: string;
@@ -64,26 +63,16 @@ export interface NewGoal {
   milestones?: Omit<Milestone, 'id' | 'done' | 'done_at'>[];
 }
 
-export type PaceStatus = 'ahead' | 'on-track' | 'behind' | 'at-risk';
+export type PaceStatus = 'ahead' | 'on-track' | 'behind' | 'at-risk' | 'no-deadline';
 
-export interface Pace {
-  status: PaceStatus | 'no-deadline';
-  paceRatio: number | null;
+/** goal_pace's return shape -- the single pace engine, computed in SQL
+ *  (0035). Covers manual linear, recurring, and streak goals alike.
+ *  Milestone goals never call it (goal_pace rejects them outright); they
+ *  read their checklist fraction off `milestones` directly and carry
+ *  pace: null wherever this appears. */
+export interface GoalPace {
+  expectedByToday: number | null;
   actual: number;
-  expected: number | null;
-  requiredRate: number | null;
-  requiredRateLabel: string | null;
-  stale: boolean;
+  projectedEnd: string | null;
+  status: PaceStatus;
 }
-
-export interface StreakPace {
-  status: 'streak';
-  currentStreak: number;
-  bestStreak: number;
-  completionRate4wk: number;
-  stale: boolean;
-}
-
-export type GoalProgressInput =
-  | { kind: 'value'; actual: number; lastUpdatedAt: string | null }
-  | { kind: 'streak'; completions: string[]; lastUpdatedAt: string | null };

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Goal, GoalProgress, GoalStatus, Milestone, NewGoal } from './types';
+import type { Goal, GoalPace, GoalProgress, GoalStatus, Milestone, NewGoal } from './types';
 
 export async function listGoals(): Promise<Goal[]> {
   const { data, error } = await supabase.from('goals').select('*').order('created_at', { ascending: false });
@@ -27,8 +27,16 @@ export async function saveGoal(input: NewGoal): Promise<void> {
     start_date: input.start_date,
     target_date: input.target_date,
     module_id: input.module_id,
-    source: { kind: 'manual' },
   };
+
+  // source is set only at creation -- this is the only path that ever
+  // creates a goal today, and it's always manual. On edit, `source` is
+  // deliberately left out of `row` so a journal_streak/tasks_completed
+  // goal (created elsewhere) never gets silently reset back to manual by
+  // GoalRow's "Save changes".
+  if (!input.id) {
+    row.source = { kind: 'manual' };
+  }
 
   // Milestone checklists are owned by setMilestones (toggle/add/remove),
   // which keeps `target` in sync with the list length. Only set
@@ -118,4 +126,29 @@ export async function toggleStreakDay(goalId: string, occurredOn: string): Promi
       .insert({ goal_id: goalId, occurred_on: occurredOn, value: 1 });
     if (insErr) throw insErr;
   }
+}
+
+// ---------- computed-progress RPCs (0034/0035) ----------
+
+/** A goal's current value over an explicit [from, to] range -- dispatches
+ *  server-side on source.kind. Pure: no "today" of its own. */
+export async function fetchGoalCurrentValue(goalId: string, from: string, to: string): Promise<number> {
+  const { data, error } = await supabase.rpc('goal_current_value', { p_goal_id: goalId, p_from: from, p_to: to });
+  if (error) throw error;
+  return (data as number | null) ?? 0;
+}
+
+/** The single pace engine (0035) -- returns null for a milestone goal
+ *  (goal_pace rejects those server-side) or a goal you don't own. */
+export async function fetchGoalPace(goalId: string): Promise<GoalPace | null> {
+  const { data, error } = await supabase.rpc('goal_pace', { p_goal_id: goalId });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    expectedByToday: row.expected_by_today,
+    actual: row.actual,
+    projectedEnd: row.projected_end,
+    status: row.status,
+  };
 }

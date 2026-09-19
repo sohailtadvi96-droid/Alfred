@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useGoalProgress, useGoalsWithPace } from './hooks';
 import { GoalRow } from './GoalRow';
-import type { Goal, Pace, StreakPace } from './types';
+import type { Goal, GoalPace } from './types';
 
-function needsAttention(pace: Pace | StreakPace): boolean {
-  return pace.status === 'behind' || pace.status === 'at-risk';
+/** Milestone goals carry pace: null and never need pace-based attention —
+ *  their own checklist UI is the only signal they need. */
+function needsAttention(pace: GoalPace | null): boolean {
+  return pace != null && (pace.status === 'behind' || pace.status === 'at-risk');
 }
 
 function byTargetDateAsc(a: Goal, b: Goal): number {

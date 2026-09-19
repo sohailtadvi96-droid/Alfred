@@ -1,4 +1,4 @@
-import type { Pace, StreakPace } from './types';
+import type { PaceStatus } from './types';
 
 export function ProgressBar({
   actual,
@@ -7,7 +7,7 @@ export function ProgressBar({
 }: {
   actual: number;
   target: number;
-  status: Pace['status'] | StreakPace['status'];
+  status: PaceStatus;
 }) {
   const pct = target > 0 ? Math.min(100, Math.max(0, (actual / target) * 100)) : 0;
   return (

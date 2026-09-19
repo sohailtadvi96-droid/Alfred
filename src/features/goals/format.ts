@@ -1,4 +1,4 @@
-import type { Goal } from './types';
+import type { Goal, PaceStatus } from './types';
 
 const CURRENCY_UNITS = new Set(['₹', 'rs', 'rs.', 'inr', 'rupee', 'rupees']);
 
@@ -31,4 +31,18 @@ export function fractionLabel(goal: Goal, actual: number): string {
     return `${formatAmount(actual, goal.unit)} / ${formatAmount(target, goal.unit)}`;
   }
   return `${formatAmount(actual, null)} / ${formatAmount(target, goal.unit)}`;
+}
+
+const PACE_STATUS_LABEL: Record<PaceStatus, string> = {
+  ahead: 'Ahead',
+  'on-track': 'On track',
+  behind: 'Behind',
+  'at-risk': 'At risk',
+  'no-deadline': 'No deadline',
+};
+
+/** Shared between GoalRow (module page) and goalsToSnapshot (Home rollup)
+ *  so the two surfaces never drift on wording. */
+export function paceStatusLabel(status: PaceStatus): string {
+  return PACE_STATUS_LABEL[status];
 }

@@ -1,9 +1,9 @@
 import { FormEvent, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { errMessage } from '@/lib/errors';
-import { dateKey } from './pace';
-import { fractionLabel } from './format';
-import { sparklineSeries } from './progress';
+import { shortDate } from '@/lib/format';
+import { dateKey, sparklineSeries } from './progress';
+import { fractionLabel, formatAmount, paceStatusLabel } from './format';
 import { PaceDot } from './PaceDot';
 import { ProgressBar } from './ProgressBar';
 import { Sparkline } from './Sparkline';
@@ -17,24 +17,13 @@ import {
   useToggleMilestone,
   useToggleStreakDay,
 } from './hooks';
-import type { Goal, GoalProgress, Pace, StreakPace } from './types';
+import type { Goal, GoalPace, GoalProgress, GoalSourceKind } from './types';
 
-function paceLabel(pace: Pace | StreakPace): string {
-  switch (pace.status) {
-    case 'ahead':
-      return 'Ahead';
-    case 'on-track':
-      return 'On track';
-    case 'behind':
-      return 'Behind';
-    case 'at-risk':
-      return 'At risk';
-    case 'streak':
-      return `${pace.currentStreak}-day streak`;
-    case 'no-deadline':
-      return 'No deadline';
-  }
-}
+const SOURCE_LABEL: Record<GoalSourceKind, string> = {
+  manual: 'Manual',
+  journal_streak: 'Journal streak',
+  tasks_completed: 'Tasks completed',
+};
 
 export function GoalRow({
   goal,
@@ -42,7 +31,7 @@ export function GoalRow({
   progress,
 }: {
   goal: Goal;
-  pace: Pace | StreakPace;
+  pace: GoalPace | null;
   progress: GoalProgress[];
 }) {
   const [open, setOpen] = useState(false);
@@ -67,10 +56,12 @@ export function GoalRow({
   const [unit, setUnit] = useState(goal.unit ?? '');
   const [targetDate, setTargetDate] = useState(goal.target_date ?? '');
 
-  const isStreak = pace.status === 'streak';
-  const doneCount = goal.type === 'milestone' ? (goal.milestones ?? []).filter((m) => m.done).length : 0;
-  const actual = isStreak ? doneCount : (pace as Pace).actual;
-  const target_ = goal.type === 'milestone' ? (goal.milestones?.length ?? goal.target) : goal.target;
+  const isMilestone = goal.type === 'milestone';
+  const isStreak = goal.type === 'streak';
+  const isManualSource = goal.source.kind === 'manual';
+  const doneCount = isMilestone ? (goal.milestones ?? []).filter((m) => m.done).length : 0;
+  const actual = isMilestone ? doneCount : (pace?.actual ?? 0);
+  const target_ = isMilestone ? (goal.milestones?.length ?? goal.target) : goal.target;
   const doneToday = progress.some((r) => r.goal_id === goal.id && r.occurred_on === todayKey);
   const streakDateDone = progress.some((r) => r.goal_id === goal.id && r.occurred_on === streakDate);
 
@@ -129,17 +120,17 @@ export function GoalRow({
   return (
     <div className="goal-row" data-status={goal.status}>
       <button type="button" className="goal-row-head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <PaceDot pace={pace} />
+        {pace && <PaceDot status={pace.status} />}
         <span className="goal-row-title">{goal.title}</span>
         <span className="goal-row-mid">
-          {!isStreak && <ProgressBar actual={actual} target={target_} status={pace.status} />}
+          {!isStreak && <ProgressBar actual={actual} target={target_} status={pace?.status ?? 'no-deadline'} />}
           <span className="goal-row-fraction">
-            {isStreak
-              ? `${(pace as StreakPace).currentStreak}-day streak · best ${(pace as StreakPace).bestStreak}`
+            {isStreak && pace
+              ? `${Math.round(pace.actual)} / ${Math.round(pace.expectedByToday ?? 0)} in the last 4 weeks`
               : fractionLabel(goal, actual)}
           </span>
         </span>
-        <span className="goal-row-pacelabel">{paceLabel(pace)}</span>
+        <span className="goal-row-pacelabel">{pace ? paceStatusLabel(pace.status) : 'Checklist'}</span>
         <Icon name="chevron" size={13} className={open ? 'goal-row-chevron open' : 'goal-row-chevron'} />
       </button>
 
@@ -149,15 +140,17 @@ export function GoalRow({
             <Sparkline series={sparklineSeries(goal, progress)} />
           </div>
 
-          {!isStreak && (pace as Pace).requiredRateLabel && (
-            <p className="goal-row-required">{(pace as Pace).requiredRateLabel}</p>
-          )}
-          {isStreak && (
+          {pace && (
             <p className="goal-row-required">
-              Trailing 4 weeks: {Math.round((pace as StreakPace).completionRate4wk * 100)}% of target
+              Expected by today: {pace.expectedByToday != null ? formatAmount(pace.expectedByToday, goal.unit) : '—'}
+              {' · '}Actual: {formatAmount(pace.actual, goal.unit)}
+              {pace.projectedEnd && <> · Projected: {shortDate(`${pace.projectedEnd}T00:00:00`)}</>}
             </p>
           )}
-          <p className="goal-row-source">Source: Manual</p>
+          {!isManualSource && !isMilestone && goal.status === 'active' && (
+            <p className="goal-row-required">Tracked automatically — no manual logging needed.</p>
+          )}
+          <p className="goal-row-source">Source: {SOURCE_LABEL[goal.source.kind]}</p>
 
           {goal.type === 'milestone' && (
             <>
@@ -205,7 +198,7 @@ export function GoalRow({
             </>
           )}
 
-          {(goal.type === 'count' || goal.type === 'value') && goal.status === 'active' && (
+          {(goal.type === 'count' || goal.type === 'value') && goal.status === 'active' && isManualSource && (
             <form className="goal-log" onSubmit={logProgress}>
               <input
                 className="input goal-log-input"
@@ -229,7 +222,7 @@ export function GoalRow({
             </form>
           )}
 
-          {goal.type === 'streak' && goal.status === 'active' && (
+          {goal.type === 'streak' && goal.status === 'active' && isManualSource && (
             <div className="goal-log">
               <button
                 type="button"

@@ -8,8 +8,8 @@ import { money, monthLabel, shortDate } from '@/lib/format';
 import type { MonthSummary } from '@/features/expenses/types';
 import type { PeriodComparison } from '@/features/expenses/api';
 import type { BoardWithCover } from '@/features/design/types';
-import { fractionLabel } from '@/features/goals/format';
-import type { Goal, Pace, StreakPace } from '@/features/goals/types';
+import { fractionLabel, paceStatusLabel } from '@/features/goals/format';
+import type { Goal, GoalPace } from '@/features/goals/types';
 
 function dueAt(dateOnly: string): string {
   return new Date(`${dateOnly}T23:59:00`).toISOString();
@@ -216,22 +216,36 @@ function comparisonStat(comparison: PeriodComparison | undefined): SnapshotStat 
   return { label: 'vs same days last month', value };
 }
 
-function isGoalOnTrack(pace: Pace | StreakPace): boolean {
-  if (pace.status === 'streak') return pace.completionRate4wk >= 0.85;
-  return pace.status === 'ahead' || pace.status === 'on-track';
+function isGoalOnTrack(pace: GoalPace | null): boolean {
+  return pace != null && (pace.status === 'ahead' || pace.status === 'on-track');
 }
 
-export function goalsToSnapshot(goalsWithPace: { goal: Goal; pace: Pace | StreakPace }[] | undefined): Snapshot {
+/** Milestone goals carry pace: null (goal_pace rejects them) — their
+ *  "actual" is their own checklist doneCount, read straight off the goal,
+ *  not from the RPC. */
+function spotlightActualFor(entry: { goal: Goal; pace: GoalPace | null }): number | undefined {
+  if (entry.goal.type === 'milestone') {
+    return (entry.goal.milestones ?? []).filter((m) => m.done).length;
+  }
+  return entry.pace?.actual;
+}
+
+export function goalsToSnapshot(goalsWithPace: { goal: Goal; pace: GoalPace | null }[] | undefined): Snapshot {
   const active = (goalsWithPace ?? []).filter((g) => g.goal.status === 'active');
-  const onTrack = active.filter((g) => isGoalOnTrack(g.pace)).length;
+  // Milestone goals have no pace concept at all (see spotlightActualFor) —
+  // folding them into this ratio would either always count against them or
+  // require reintroducing a client-side pace guess, so the "on track"
+  // stat is scoped to goals goal_pace can actually speak to.
+  const paced = active.filter((g) => g.goal.type !== 'milestone');
+  const onTrack = paced.filter((g) => isGoalOnTrack(g.pace)).length;
 
   const nearest = active
     .filter((g) => g.goal.target_date)
     .sort((a, b) => (a.goal.target_date as string).localeCompare(b.goal.target_date as string))[0];
 
   const spotlight = active[0];
-  const spotlightActual =
-    spotlight && spotlight.pace.status !== 'streak' ? (spotlight.pace as Pace).actual : undefined;
+  const spotlightActual = spotlight ? spotlightActualFor(spotlight) : undefined;
+  const spotlightPaceLabel = spotlight?.pace ? paceStatusLabel(spotlight.pace.status) : null;
 
   return {
     module: 'goals',
@@ -239,10 +253,13 @@ export function goalsToSnapshot(goalsWithPace: { goal: Goal; pace: Pace | Streak
     icon: 'goals',
     live: true,
     href: '/goals',
-    stats: [{ label: 'On track', value: `${onTrack} / ${active.length}` }],
+    stats: [{ label: 'On track', value: `${onTrack} / ${paced.length}` }],
     moreStats:
       spotlight && spotlightActual !== undefined
-        ? [{ label: spotlight.goal.title, value: fractionLabel(spotlight.goal, spotlightActual) }]
+        ? [
+            { label: spotlight.goal.title, value: fractionLabel(spotlight.goal, spotlightActual) },
+            ...(spotlightPaceLabel ? [{ label: 'Pace', value: spotlightPaceLabel }] : []),
+          ]
         : [],
     detail: nearest
       ? `Nearest: ${nearest.goal.title} · ${shortDate(`${nearest.goal.target_date}T00:00:00`)}`
@@ -257,7 +274,7 @@ export function buildBoardSnapshots(input: {
   projects: ProjectWithClient[] | undefined;
   upcomingDeliverables: (Deliverable & { project: Pick<Project, 'id' | 'name'> })[] | undefined;
   boards: BoardWithCover[] | undefined;
-  goalsWithPace: { goal: Goal; pace: Pace | StreakPace }[] | undefined;
+  goalsWithPace: { goal: Goal; pace: GoalPace | null }[] | undefined;
 }): Snapshot[] {
   const { monthSummary, periodComparison, projects, upcomingDeliverables, boards, goalsWithPace } = input;
 
