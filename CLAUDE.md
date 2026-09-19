@@ -16,8 +16,14 @@ concept of teams/orgs/sharing.
   always add a new `NNNN_name.sql`. Filenames are zero-padded sequence numbers, applied
   in order.
 - **Edge Functions** (`supabase/functions/`): `categorise-ai` (LLM-assisted expense
-  categorisation), `design-search` (image search proxy for the Design module — API keys
-  live server-side as Supabase secrets, never in the client `.env`).
+  categorisation); for the Design module, `design-search` (image search proxy),
+  `design-capture` (creates a `design_items` row and hands off to `design-ingest`),
+  `design-ingest` (resolves/caches media, parses dimensions, runs AI enrichment —
+  service-role only, invoked via `EdgeRuntime.waitUntil`, never awaited by the caller),
+  `design-retry` (re-invokes `design-ingest` for one item under the caller's own JWT),
+  `design-backfill-dimensions` (manual-only sweep, caller's own JWT throughout — see
+  Design schema section). API keys live server-side as Supabase secrets, never in the
+  client `.env`.
 - **Env vars:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, optional
   `VITE_GOOGLE_CLIENT_ID` (Google Calendar read-only sync in Work/Office). App still
   boots without `.env` and shows a "not configured" login screen.
@@ -53,7 +59,7 @@ components, not business logic.
 | **Secrets** (password/vault) | `SecretsPage` | 0003 | Shipped |
 | **Work** (freelance: clients/projects/invoices) | `WorkPage`, `ProjectDetailPage`, `InvoicesPage`, `InvoiceViewPage` | 0004, 0008 | Shipped |
 | **Office** (tasks/calendar/journal) | `OfficeDayPage` | 0009, 0010 | Shipped |
-| **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011 | Shipped |
+| **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011, 0029–0032, 0036 | Shipped |
 | **Goals** | `GoalsPage` | 0016 | Shipped, Phase 1 (manual goals only — no auto-progress from other modules yet) |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped |
 
@@ -184,8 +190,32 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   entry per calendar day, unique per user+date).
 
 **Design**
-- `design_boards`, `design_items` (image_url + optional link_url, tags via `text[]` +
-  GIN index). URL-only — no file uploads.
+- `design_boards` — name/description; `is_inbox` (0029) flags each user's one
+  catch-all board (`design_inbox_board()` RPC gets-or-creates it), so an item saved
+  without an explicit board is never unfiled-and-invisible.
+- `design_items` — `image_url` (nullable, 0029 — null until `design-ingest` unfurls a
+  page-only save) + optional `link_url`, `tags` via `text[]` + GIN index,
+  `media_type` (image/video/gif), `poster_url` (video's poster frame from the source
+  page), `thumb_path` (path in the private `design-media` storage bucket — despite the
+  name this is the cached *original*, unresized, not a thumbnail; grid/vision renditions
+  come from Storage's image-transform endpoint at read time), `medium` (identity/
+  packaging/editorial/motion/type/web/illustration/other), `colors`/`caption`/
+  `embedding` (`vector(1536)`, HNSW-indexed) and `enrich_status`/`enrich_error` — all
+  written by `design-ingest`. `width`/`height` (0036, both int, nullable together) hold
+  the media's natural pixel size, parsed by `design-ingest` straight from the
+  downloaded bytes' file header (PNG IHDR / JPEG SOF / WebP VP8-VP8L-VP8X — no image
+  codec survives the edge runtime, so no library; parsers live in
+  `_shared/imageDimensions.ts`) — the grid uses these to size masonry cards from real
+  aspect ratio, floored at 1:2.1 (Pinterest-style — only the tall side is capped,
+  excess height cropped off top-anchored; a landscape/square image is never cropped).
+  `design-backfill-dimensions` (manual-only, like `pair_internal_transfers()` — not
+  wired to any UI, re-run while `has_more` is true) re-parses the cached `thumb_path`
+  bytes of any row with a null width, without re-hitting the source URL or re-running
+  vision/embedding. Null for anything not yet backfilled or that never went through
+  ingest (gif, or a manual page-only save); the grid falls back to natural CSS layout
+  sizing in that case. URL-only — no file uploads.
+- `design_media_orphans` (0030) — logs `thumb_path` on delete for a manual sweep;
+  Storage has no FK to `design_items`, so the row's own delete can't cascade the object.
 
 **Goals**
 - `goals` — type (`count`/`value`/`milestone`/`streak`), target, unit, direction

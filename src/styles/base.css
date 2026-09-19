@@ -4391,6 +4391,22 @@ textarea.office-journal {
   display: block;
   cursor: zoom-in;
 }
+/* Applied only once design-ingest has parsed real dimensions (item.width/
+   height); a pre-migration or never-ingested row has no --item-ratio and
+   keeps the plain rule above — natural layout height, exactly as before.
+   --item-ratio is width/height already floored at 1:2.1 in ItemCard.tsx
+   (Pinterest-style — only the tall side is capped), so this never needs
+   its own min here: a landscape/square/mildly-portrait image's ratio
+   passes through unchanged and renders uncropped (the box matches the
+   image's own ratio); only an image taller than 1:2.1 gets its ratio
+   floored, and object-fit crops the excess height, top-anchored so a
+   long screenshot keeps its head in frame. */
+.item-card-img-sized {
+  aspect-ratio: var(--item-ratio);
+  height: auto;
+  object-fit: cover;
+  object-position: top;
+}
 /* The whole card (image, caption, tags) pops together on hover-in, then
    keeps growing the longer the hover holds — overflow: hidden above only
    clips the image to the card's own rounded corners, it doesn't clip this,
@@ -4535,15 +4551,23 @@ textarea.office-journal {
   display: grid;
   place-items: center;
   padding: 32px;
+  overflow-y: auto;
   cursor: zoom-out;
 }
-.lightbox-content img {
+.lightbox-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   max-width: 100%;
-  max-height: 100%;
+  cursor: default;
+}
+.lightbox-body img {
+  max-width: 100%;
+  max-height: calc(100vh - 220px);
   object-fit: contain;
   border-radius: 6px;
   box-shadow: var(--sh);
-  cursor: default;
 }
 .lightbox-loading {
   color: var(--surface);
@@ -4551,6 +4575,64 @@ textarea.office-journal {
   font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+.lightbox-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  max-width: 560px;
+  text-align: center;
+  color: var(--surface);
+}
+.lightbox-title {
+  font-weight: 700;
+  font-size: 13px;
+}
+.lightbox-caption {
+  font-size: 12px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--surface) 82%, transparent);
+}
+.lightbox-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+}
+.lightbox-src {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, var(--surface) 65%, transparent);
+  margin-right: 2px;
+}
+.lightbox-tag {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 100px;
+  border: 1px solid color-mix(in srgb, var(--surface) 30%, transparent);
+  color: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+.lightbox-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--surface);
+  border-bottom: 1px solid color-mix(in srgb, var(--surface) 40%, transparent);
+  padding-bottom: 1px;
+}
+.lightbox-link:hover {
+  border-color: var(--surface);
 }
 .lightbox-close {
   position: fixed;

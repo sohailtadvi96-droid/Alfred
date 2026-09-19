@@ -40,6 +40,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import { corsHeaders } from '../_shared/cors.ts';
+import { type Dimensions, parseImageDimensions } from '../_shared/imageDimensions.ts';
 
 const FETCH_TIMEOUT_MS = 20_000;
 const AI_TIMEOUT_MS = 30_000;
@@ -353,6 +354,9 @@ Deno.serve(async (req) => {
     if (mediaType !== 'video' && stillUrl && isGifUrl(stillUrl)) mediaType = 'gif';
 
     let thumbPath: string | null = null;
+    // Null for gif (not parsed — see parseImageDimensions) or when the
+    // header didn't match any parser, e.g. a truncated download.
+    let dimensions: Dimensions | null = null;
 
     if (stillUrl) {
       const mediaHeaders: Record<string, string> = {
@@ -367,6 +371,7 @@ Deno.serve(async (req) => {
       const mediaRes = await fetchWithTimeout(stillUrl, { headers: mediaHeaders });
       if (!mediaRes.ok) throw new Error(`Fetching media ${stillUrl} failed: ${mediaRes.status}`);
       const bytes = new Uint8Array(await mediaRes.arrayBuffer());
+      if (mediaType !== 'gif') dimensions = parseImageDimensions(bytes);
 
       // No resize/re-encode (see file header) — cache the original bytes as
       // uploaded. A gif is stored as-is too, not thumbnailed: no codec in
@@ -424,6 +429,8 @@ Deno.serve(async (req) => {
         media_type: mediaType,
         poster_url: posterUrl,
         thumb_path: thumbPath,
+        width: dimensions?.width ?? null,
+        height: dimensions?.height ?? null,
       })
       .eq('id', item_id);
     if (mediaUpdateError) throw new Error(mediaUpdateError.message);

@@ -33,6 +33,11 @@ export interface DesignItem {
   colors: { hex: string; pct: number }[] | null;
   enrich_status: EnrichStatus;
   enrich_error: string | null;
+  /** Natural pixel size of the cached media, parsed from the file header by
+   *  design-ingest — null for a pre-migration row or one that never went
+   *  through ingest (gif, or a manual page-only save). */
+  width: number | null;
+  height: number | null;
 }
 
 /** A board plus the numbers the overview card needs: how many references it

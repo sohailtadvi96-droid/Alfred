@@ -118,3 +118,11 @@ verify_jwt = false
 # service-role key design-ingest actually requires.
 [functions.design-retry]
 verify_jwt = true
+
+# Design module — one-off dimensions backfill (0036). Runs entirely under
+# the caller's own JWT (no service role, no handoff) — re-parses each of
+# the caller's own already-cached thumb_path bytes for width/height. Not
+# wired to any UI; invoke manually and re-run while has_more is true, same
+# spirit as pair_internal_transfers()/detect_recurring_series().
+[functions.design-backfill-dimensions]
+verify_jwt = true
