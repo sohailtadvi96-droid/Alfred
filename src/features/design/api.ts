@@ -113,29 +113,33 @@ export async function retryIngest(itemId: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Batched signed URLs for a set of design-media paths, one call per
- *  distinct transform option (Storage's createSignedUrls applies transform
- *  uniformly to the whole batch, so gif paths — no working transform, see
- *  docs/DESIGN.md — must be a separate untransformed batch, not mixed in). */
+/** One signed URL per path, not Storage's batched createSignedUrls: the
+ *  installed storage-js's batch method never forwards a `transform` option
+ *  to the server at all (confirmed by reading its request body — only the
+ *  singular createSignedUrl sends `transform`), so a batched call here
+ *  would silently serve full-size originals instead of grid-sized
+ *  renditions. Paths are still split by transform option one level up
+ *  (getThumbUrls), so gifs never get a transform request. */
 async function signedUrlsFor(
   paths: string[],
   transform?: { width: number; quality?: number },
 ): Promise<Record<string, string>> {
   if (paths.length === 0) return {};
-  const { data, error } = await supabase.storage
-    .from(MEDIA_BUCKET)
-    .createSignedUrls(paths, SIGNED_URL_TTL, transform ? { transform } : undefined);
-  if (error) throw error;
-  const out: Record<string, string> = {};
-  for (const d of data ?? []) {
-    if (d.path && d.signedUrl) out[d.path] = d.signedUrl;
-  }
-  return out;
+  const entries = await Promise.all(
+    paths.map(async (path) => {
+      const { data, error } = await supabase.storage
+        .from(MEDIA_BUCKET)
+        .createSignedUrl(path, SIGNED_URL_TTL, transform ? { transform } : undefined);
+      if (error) throw error;
+      return [path, data.signedUrl] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
 }
 
-/** One batched fetch per page of results (per DESIGN.md Step 5): every
- *  non-gif thumb_path gets a grid-sized transformed rendition, every gif
- *  path gets its original signed URL so the grid renders it directly. */
+/** Per page of results (see signedUrlsFor): every non-gif thumb_path gets
+ *  a grid-sized transformed rendition, every gif path gets its original
+ *  signed URL so the grid renders it directly. */
 export async function getThumbUrls(
   items: Pick<DesignItem, 'thumb_path' | 'media_type'>[],
   gridWidthPx: number,

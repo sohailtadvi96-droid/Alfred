@@ -243,7 +243,13 @@ trusting the stored `source` column (extension-captured rows never had it set); 
 thumb_paths are excluded from the transformed batch entirely and get a plain signed URL
 instead, since 0032's testing already showed the transform endpoint doesn't work on a
 real animated gif — the grid renders the gif directly, same fallback the vision call
-uses. Also fixed a bug this step's own polling would have surfaced immediately: manual
+uses. **Correction (post-launch):** the original prompt below asks for one batched
+`createSignedUrls` call per page — the installed `@supabase/storage-js` never forwards a
+`transform` option on that batched method at all (only the singular `createSignedUrl`
+does), so a batched call here silently served full-size originals instead of grid-sized
+renditions. `signedUrlsFor` now calls `createSignedUrl` once per path instead — still
+split by transform option (transformable vs. gif), just no longer one network call per
+page. Also fixed a bug this step's own polling would have surfaced immediately: manual
 saves via "Add reference" never go through design-ingest, so they now insert with
 `enrich_status='skipped'` (0029's own convention for pre-pipeline rows) instead of
 inheriting the column's `'pending'` default and sitting in the new shimmer state forever.
@@ -272,6 +278,11 @@ transforms cleanly through Vite's own dev pipeline (checked directly — not jus
 dev server boots). Could not visually verify in an authenticated browser session — this
 app requires a real login and I don't have (and shouldn't ask for) the credentials. If
 something looks off once you're in the UI, that's the gap to check first.
+
+**This didn't hold up:** `tsc -b` was later found broken on `main` against the installed
+`@supabase/storage-js@2.112.4` — its batched `createSignedUrls` doesn't type (or run) with
+a `transform` option — so this step's build was never actually green against the
+dependency versions checked into `package-lock.json`. See the correction above.
 
 ---
 
