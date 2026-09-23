@@ -17,7 +17,10 @@ concept of teams/orgs/sharing.
   in order.
 - **Edge Functions** (`supabase/functions/`): `categorise-ai` (LLM-assisted expense
   categorisation); for the Design module, `design-search` (image search proxy),
-  `design-capture` (creates a `design_items` row and hands off to `design-ingest`),
+  `design-capture` (creates a `design_items` row and hands off to `design-ingest`; board
+  = explicit `board_id`, else an explicit `medium` routes to the existing board of that
+  name (case-insensitive) — capture-time only, never re-routed after ingest classifies it,
+  never auto-creates a board — else the inbox),
   `design-ingest` (resolves/caches media, parses dimensions, runs AI enrichment —
   service-role only, invoked via `EdgeRuntime.waitUntil`, never awaited by the caller),
   `design-retry` (re-invokes `design-ingest` for one item under the caller's own JWT),

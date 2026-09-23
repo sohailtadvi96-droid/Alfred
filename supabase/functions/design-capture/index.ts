@@ -7,6 +7,8 @@
 //
 // Called via POST /functions/v1/design-capture
 //   { page_url, image_url?, link_url?, title?, medium?, board_id? }
+// Board: an explicit board_id wins; else an explicit medium routes to the
+// board whose name matches it (case-insensitive), if one exists; else the inbox.
 // JWT-verified: only a signed-in ALFRED session can reach it.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
@@ -66,6 +68,28 @@ Deno.serve(async (req) => {
   );
 
   let board_id = typeof payload.board_id === 'string' ? payload.board_id : null;
+
+  // Medium-based routing: ONLY when the caller explicitly sent a medium (the
+  // extension's "Save to Alfred as…" choice — a deliberate signal, not an AI
+  // guess) and no board_id, which always wins. It happens here, at capture
+  // time, and nowhere else: design-ingest's vision call may assign a medium
+  // later, but that never moves an item out of the inbox after the fact. The
+  // medium slugs are the board labels lower-cased (Identity, Packaging, …),
+  // matched case-insensitively against existing board names — oldest board
+  // wins a tie. Never creates a board; no match (or a failed lookup — a
+  // capture must not be lost over routing) falls through to the inbox below.
+  if (!board_id && medium) {
+    const { data: boards, error: boardsError } = await supabase
+      .from('design_boards')
+      .select('id, name')
+      .order('created_at', { ascending: true });
+    if (boardsError) {
+      console.error('design-capture: board lookup for medium routing failed', boardsError.message);
+    } else {
+      board_id = boards?.find((b) => b.name.trim().toLowerCase() === medium)?.id ?? null;
+    }
+  }
+
   if (!board_id) {
     // design_items.board_id is not-null — an unfiled capture resolves to the
     // caller's inbox board rather than being rejected or stored boardless.
