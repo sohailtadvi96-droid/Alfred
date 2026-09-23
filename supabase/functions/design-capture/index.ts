@@ -7,8 +7,10 @@
 //
 // Called via POST /functions/v1/design-capture
 //   { page_url, image_url?, link_url?, title?, medium?, board_id? }
-// Board: an explicit board_id wins; else an explicit medium routes to the
-// board whose name matches it (case-insensitive), if one exists; else the inbox.
+// Board: an explicit board_id wins; else the item is homed in the inbox. An
+// explicit medium (with no board_id) additionally CROSS-LISTS the item into the
+// board whose name matches it (case-insensitive), if one exists — via a
+// design_item_boards row; the item never leaves the inbox.
 // JWT-verified: only a signed-in ALFRED session can reach it.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
@@ -69,24 +71,28 @@ Deno.serve(async (req) => {
 
   let board_id = typeof payload.board_id === 'string' ? payload.board_id : null;
 
-  // Medium-based routing: ONLY when the caller explicitly sent a medium (the
-  // extension's "Save to Alfred as…" choice — a deliberate signal, not an AI
-  // guess) and no board_id, which always wins. It happens here, at capture
+  // Medium-based cross-listing: ONLY when the caller explicitly sent a medium
+  // (the extension's "Save to Alfred as…" choice — a deliberate signal, not an
+  // AI guess) and no board_id, which always wins. It happens here, at capture
   // time, and nowhere else: design-ingest's vision call may assign a medium
-  // later, but that never moves an item out of the inbox after the fact. The
-  // medium slugs are the board labels lower-cased (Identity, Packaging, …),
-  // matched case-insensitively against existing board names — oldest board
-  // wins a tie. Never creates a board; no match (or a failed lookup — a
-  // capture must not be lost over routing) falls through to the inbox below.
+  // later, but that never adds or moves anything after the fact. This only
+  // FINDS the board; board_id stays the inbox (below) and the item is linked
+  // into the matched board once it exists. The medium slugs are the board
+  // labels lower-cased (Identity, Packaging, …), matched case-insensitively
+  // against existing board names — oldest board wins a tie, the inbox is never
+  // a target, and no board is ever created. No match (or a failed lookup — a
+  // capture must not be lost over routing) simply means no cross-listing.
+  let alsoBoardId: string | null = null;
   if (!board_id && medium) {
     const { data: boards, error: boardsError } = await supabase
       .from('design_boards')
       .select('id, name')
+      .eq('is_inbox', false)
       .order('created_at', { ascending: true });
     if (boardsError) {
       console.error('design-capture: board lookup for medium routing failed', boardsError.message);
     } else {
-      board_id = boards?.find((b) => b.name.trim().toLowerCase() === medium)?.id ?? null;
+      alsoBoardId = boards?.find((b) => b.name.trim().toLowerCase() === medium)?.id ?? null;
     }
   }
 
@@ -114,6 +120,23 @@ Deno.serve(async (req) => {
   if (error) return json({ error: error.message }, 400);
 
   const item_id = data.id as string;
+
+  // The cross-listing goes in after the item exists. If it fails the save
+  // still succeeds — the item is safely in the inbox — and the failure is
+  // logged (with the ids needed to add it by hand) rather than surfaced.
+  let alsoIn: string | null = null;
+  if (alsoBoardId) {
+    const { error: linkError } = await supabase
+      .from('design_item_boards')
+      .insert({ item_id, board_id: alsoBoardId });
+    if (linkError) {
+      console.error(
+        `design-capture: cross-listing item ${item_id} into board ${alsoBoardId} failed: ${linkError.message}`,
+      );
+    } else {
+      alsoIn = alsoBoardId;
+    }
+  }
 
   // Fire-and-forget. Do NOT await — design-ingest does unfurl + vision +
   // embedding work and this request must return in well under a second.
@@ -146,5 +169,5 @@ Deno.serve(async (req) => {
       }),
   );
 
-  return json({ id: item_id }, 201);
+  return json({ id: item_id, also_in: alsoIn }, 201);
 });

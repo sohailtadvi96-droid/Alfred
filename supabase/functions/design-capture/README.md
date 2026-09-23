@@ -22,8 +22,8 @@ No secrets of its own; `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
 // POST body
 { "page_url": "https://dribbble.com/shots/...", "image_url": "https://...", "medium": "editorial", "board_id": "..." }
 
-// 201
-{ "id": "..." }
+// 201 — also_in is the board the item was cross-listed into, or null
+{ "id": "...", "also_in": null }
 
 // 400 — both page_url and image_url missing, or medium not one of the
 // eight allowed slugs (identity/packaging/editorial/motion/type/web/
@@ -33,6 +33,13 @@ No secrets of its own; `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
 // 401 — no Authorization header
 { "error": "Missing Authorization header." }
 ```
+
+Boards: `board_id` is the item's home — the caller's explicit `board_id`, else the
+inbox. With an explicit `medium` and no `board_id`, the item is *additionally*
+cross-listed (a `design_item_boards` row, 0037) into the existing board whose name
+matches the medium case-insensitively; no match means no cross-listing, no board is
+ever created, and a failed cross-listing is logged, not surfaced. Capture-time only —
+`design-ingest` classifying a medium later never adds or moves anything.
 
 Inserts one `design_items` row with `enrich_status='pending'`, then invokes
 `design-ingest` with `{ item_id }` via `EdgeRuntime.waitUntil` — fire and
