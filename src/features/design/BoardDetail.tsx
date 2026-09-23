@@ -27,7 +27,11 @@ export function BoardDetail({ boardId }: { boardId: string }) {
 
   async function onDeleteBoard() {
     if (!board) return;
-    if (!confirm(`Delete "${board.name}"? Its ${board.itemCount} reference(s) go with it.`)) return;
+    // Only items homed here are deleted with the board; items merely
+    // cross-listed into it stay, in the boards they live in.
+    const staying = board.itemCount - board.homeCount;
+    const note = staying > 0 ? ` ${staying} cross-listed here from other boards will stay.` : '';
+    if (!confirm(`Delete "${board.name}"? Its ${board.homeCount} reference(s) go with it.${note}`)) return;
     try {
       await deleteBoard.mutateAsync(board.id);
       navigate('/design');

@@ -24,6 +24,11 @@ export function useBoards() {
   return useQuery({ queryKey: keys.boards, queryFn: api.listBoards });
 }
 
+/** Cross-listing rows (design_item_boards) — for the Sort Inbox dry run. */
+export function useItemBoardLinks() {
+  return useQuery({ queryKey: ['design', 'item-board-links'], queryFn: api.listItemBoardLinks });
+}
+
 /** Items for one board, or every item when boardId is the ALL_BOARD id.
  *  Polls while anything is still pending/running so a card resolves on its
  *  own — Step 5's acceptance bar is no manual refresh needed. */

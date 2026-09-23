@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogClose } from '@/components/Dialog';
-import { useThumbUrls } from './hooks';
+import { useItemBoardLinks, useThumbUrls } from './hooks';
 import { planInboxSort } from './inboxSort';
 import type { BoardWithCover, DesignItem } from './types';
 
 const THUMB_PX = 160;
 
-/** Preview-first sweep of the Inbox: which items would move where, grouped by
- *  target board. This is a dry run — it renders what a move WOULD do and
- *  writes nothing. The confirm button is deliberately not wired yet. */
+/** Preview-first sweep of the Inbox: which items would ALSO be listed in which
+ *  board, grouped by target board. Items never leave the Inbox — this only
+ *  ever adds cross-listings (design_item_boards). A dry run: it renders what
+ *  would be added and writes nothing. The confirm button is deliberately not
+ *  wired yet. */
 export function SortInboxDialog({
   open,
   onOpenChange,
@@ -20,7 +22,8 @@ export function SortInboxDialog({
   inboxItems: DesignItem[];
   boards: BoardWithCover[];
 }) {
-  const groups = useMemo(() => planInboxSort(inboxItems, boards), [inboxItems, boards]);
+  const { data: links } = useItemBoardLinks();
+  const groups = useMemo(() => planInboxSort(inboxItems, boards, links ?? []), [inboxItems, boards, links]);
   const matched = groups.filter((g) => g.board);
   const allItems = groups.flatMap((g) => g.items);
   const { data: thumbUrls } = useThumbUrls(allItems, THUMB_PX);
@@ -63,24 +66,24 @@ export function SortInboxDialog({
       onOpenChange={onOpenChange}
       wide
       title="Sort Inbox"
-      description="Preview only — this shows where items would go, based on their medium and a board of the same name. Nothing moves until you confirm."
+      description="Preview only — items with a medium would also be listed in the board of the same name. They stay in the Inbox either way, and nothing changes until you confirm."
       footer={
         <>
-          <span className="sort-note">Preview only — moving isn’t wired up yet.</span>
+          <span className="sort-note">Preview only — adding isn’t wired up yet.</span>
           <DialogClose asChild>
             <button type="button" className="btn ghost">
               Close
             </button>
           </DialogClose>
           <button type="button" className="btn primary" disabled>
-            Move {count} {count === 1 ? 'item' : 'items'}
+            Add {count} {count === 1 ? 'item' : 'items'}
           </button>
         </>
       }
     >
       {groups.length === 0 ? (
         <div className="design-empty">
-          Nothing to sort — no Inbox item has a medium set. Items without a medium are left alone.
+          Nothing new to add — no Inbox item has a medium that isn’t already cross-listed. Items without a medium are left alone.
         </div>
       ) : (
         <div className="sort-groups">
@@ -109,7 +112,7 @@ export function SortInboxDialog({
                       <span className="sort-group-count">({g.items.length})</span>
                     </div>
                   )}
-                  {!g.board && <span className="sort-group-hint">Won’t move — no board with that name</span>}
+                  {!g.board && <span className="sort-group-hint">Won’t be added — no board with that name</span>}
                 </header>
                 <div className="sort-items">
                   {g.items.map((it) => (

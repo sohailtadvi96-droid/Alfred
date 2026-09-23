@@ -45,8 +45,21 @@ export interface DesignItem {
 /** A board plus the numbers the overview card needs: how many references it
  *  holds and up to four recent image URLs for the mosaic cover. */
 export interface BoardWithCover extends DesignBoard {
+  /** every item in the board: homed here (design_items.board_id) plus
+   *  cross-listed into it (design_item_boards) — tiles overlap by design, so
+   *  these do NOT sum to the library size */
   itemCount: number;
+  /** only the items homed here. Each item has exactly one home, so this is
+   *  what sums to the library size, and it is what deleting the board deletes
+   *  (design_items.board_id cascades; cross-listing rows just go away) */
+  homeCount: number;
   covers: string[];
+}
+
+/** one extra board an item also appears in (design_item_boards, 0037) */
+export interface ItemBoardLink {
+  item_id: string;
+  board_id: string;
 }
 
 export interface NewBoard {

@@ -318,7 +318,10 @@ export function buildBoardSnapshots(input: {
   };
 
   const sortedBoards = [...(boards ?? [])].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  const totalRefs = (boards ?? []).reduce((s, b) => s + b.itemCount, 0);
+  // homeCount, not itemCount: an item cross-listed into several boards is in
+  // each board's itemCount but has exactly one home, so only homeCount sums to
+  // the number of references.
+  const totalRefs = (boards ?? []).reduce((s, b) => s + b.homeCount, 0);
   const design: Snapshot = {
     module: 'design',
     title: 'Design',

@@ -1,37 +1,65 @@
 import { supabase } from '@/lib/supabase';
 import { hostOf } from './tags';
-import type { BoardWithCover, DesignBoard, DesignItem, NewBoard, NewItem } from './types';
+import type { BoardWithCover, DesignBoard, DesignItem, ItemBoardLink, NewBoard, NewItem } from './types';
 
 const MEDIA_BUCKET = 'design-media';
 const SIGNED_URL_TTL = 60 * 60; // an hour — DESIGN.md gotchas: batch and set a sane TTL
 
 // ---------- boards ----------
 export async function listBoards(): Promise<BoardWithCover[]> {
-  const [boardsRes, itemsRes] = await Promise.all([
+  const [boardsRes, itemsRes, linksRes] = await Promise.all([
     supabase.from('design_boards').select('*').order('created_at', { ascending: false }),
     supabase
       .from('design_items')
-      .select('board_id, image_url, created_at')
+      .select('id, board_id, image_url, created_at')
       .order('created_at', { ascending: false }),
+    supabase.from('design_item_boards').select('item_id, board_id'),
   ]);
   if (boardsRes.error) throw boardsRes.error;
   if (itemsRes.error) throw itemsRes.error;
+  if (linksRes.error) throw linksRes.error;
 
-  const counts = new Map<string, number>();
-  const covers = new Map<string, string[]>();
-  for (const r of (itemsRes.data ?? []) as { board_id: string; image_url: string | null }[]) {
-    counts.set(r.board_id, (counts.get(r.board_id) ?? 0) + 1);
-    if (!r.image_url) continue; // no thumb_path/transform pass here yet — skip rather than break <img>
-    const c = covers.get(r.board_id) ?? [];
-    if (c.length < 4) c.push(r.image_url);
-    covers.set(r.board_id, c);
+  type Row = { id: string; board_id: string; image_url: string | null };
+  const items = (itemsRes.data ?? []) as Row[]; // newest first
+  const byId = new Map(items.map((it) => [it.id, it]));
+
+  // A board's members: items homed there, then items cross-listed into it —
+  // Set-deduped so a redundant link to an item's own home never double-counts.
+  // items is newest-first and links are folded in by that same order, so the
+  // first four members with an image are the four most recent.
+  const members = new Map<string, Set<string>>();
+  const home = new Map<string, number>();
+  const add = (boardId: string, itemId: string) => {
+    const set = members.get(boardId) ?? new Set<string>();
+    set.add(itemId);
+    members.set(boardId, set);
+  };
+  for (const it of items) {
+    add(it.board_id, it.id);
+    home.set(it.board_id, (home.get(it.board_id) ?? 0) + 1);
+  }
+  for (const l of (linksRes.data ?? []) as { item_id: string; board_id: string }[]) {
+    if (byId.has(l.item_id)) add(l.board_id, l.item_id);
   }
 
-  return (boardsRes.data as DesignBoard[]).map((b) => ({
-    ...b,
-    itemCount: counts.get(b.id) ?? 0,
-    covers: covers.get(b.id) ?? [],
-  }));
+  const order = new Map(items.map((it, i) => [it.id, i]));
+  return (boardsRes.data as DesignBoard[]).map((b) => {
+    const ids = [...(members.get(b.id) ?? [])].sort((x, y) => order.get(x)! - order.get(y)!);
+    const covers: string[] = [];
+    for (const id of ids) {
+      const src = byId.get(id)!.image_url;
+      if (src && covers.length < 4) covers.push(src); // no thumb_path/transform pass here yet — skip null rather than break <img>
+    }
+    return { ...b, itemCount: ids.length, homeCount: home.get(b.id) ?? 0, covers };
+  });
+}
+
+/** Every cross-listing row for this user — small (one per extra board an item
+ *  appears in), so fetched whole rather than per item. */
+export async function listItemBoardLinks(): Promise<ItemBoardLink[]> {
+  const { data, error } = await supabase.from('design_item_boards').select('item_id, board_id');
+  if (error) throw error;
+  return data as ItemBoardLink[];
 }
 
 export async function saveBoard(input: NewBoard): Promise<void> {
@@ -51,12 +79,10 @@ export async function deleteBoard(id: string): Promise<void> {
 }
 
 // ---------- items ----------
+/** A board's items: homed there OR cross-listed into it (design_board_items,
+ *  0037 — one select, RLS-scoped, already newest-first). */
 export async function listItems(boardId: string): Promise<DesignItem[]> {
-  const { data, error } = await supabase
-    .from('design_items')
-    .select('*')
-    .eq('board_id', boardId)
-    .order('created_at', { ascending: false });
+  const { data, error } = await supabase.rpc('design_board_items', { p_board_id: boardId });
   if (error) throw error;
   return data as DesignItem[];
 }

@@ -62,7 +62,7 @@ components, not business logic.
 | **Secrets** (password/vault) | `SecretsPage` | 0003 | Shipped |
 | **Work** (freelance: clients/projects/invoices) | `WorkPage`, `ProjectDetailPage`, `InvoicesPage`, `InvoiceViewPage` | 0004, 0008 | Shipped |
 | **Office** (tasks/calendar/journal) | `OfficeDayPage` | 0009, 0010 | Shipped |
-| **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011, 0029–0032, 0036 | Shipped; Discover is parked (route and `DiscoverView` kept, no nav link to it) |
+| **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011, 0029–0032, 0036, 0037 | Shipped; Discover is parked (route and `DiscoverView` kept, no nav link to it) |
 | **Goals** | `GoalsPage` | 0016 | Shipped, Phase 1 (manual goals only — no auto-progress from other modules yet) |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped |
 
@@ -234,6 +234,16 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   or that never went through ingest (gif — no header parser — or a manual page-only
   save); such a card gets no `--item-ratio`, no `--sized` class, and stays in natural
   flow (`width: 100%; height: auto`), uncapped. URL-only — no file uploads.
+- `design_item_boards` (0037) — multi-membership: `(item_id, board_id)` primary key,
+  `added_at`; both FKs cascade. `design_items.board_id` is unchanged and is the item's
+  **home** (the Inbox, for anything captured) — this table only records the *additional*
+  boards an item appears in, and nothing requires a row here. Written by `design-capture`
+  (medium routing), the Sort Inbox sweep and the per-card board picker; none of them touch
+  `board_id`. A board's contents are `design_board_items(p_board_id)` — homed **or**
+  cross-listed, one select, `security invoker`. So a board's `itemCount` is that union
+  (tiles overlap by design and don't sum to the library), `homeCount` is items homed there
+  (each item has exactly one home, so it *does* sum, and it is what deleting the board
+  deletes — cross-listed items just lose that membership). Use `homeCount` for any total.
 - `design_media_orphans` (0030) — logs `thumb_path` on delete for a manual sweep;
   Storage has no FK to `design_items`, so the row's own delete can't cascade the object.
 
@@ -257,6 +267,9 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 - Privileged operations (secret encrypt/decrypt, invoice numbering, ingestion) are
   Postgres RPCs marked `security definer`, not client-side logic — keep it that way for
   anything touching the Vault key or needing atomic sequence generation.
+- **`design_item_boards` has no `user_id`** — a deliberate exception to the owner-all
+  pattern: ownership is the item's (`exists` on `design_items`), and a write also requires
+  the *board* to be the caller's so a row can never link into someone else's board.
 - **Design module UI** uses the app's ground/theme like every other module — no ground
   override. The `--design-*` tokens in `tokens.css` are *aliases* onto the active preset's
   own tokens (`--surface`, `--text`, `--base`…; muted text and borders are `color-mix`es of
@@ -274,9 +287,10 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   sweep: a dry run groups Inbox items that have a medium by the board their medium names
   (same rule as `design-capture`'s capture-time routing — the two are kept identical by
   hand, since one is Deno; the Inbox is never a target; items with no medium are ignored;
-  a medium with no board goes under a non-selectable "No matching board" group). It is
-  read-only for now: the "Move N items" confirm is deliberately disabled until the move
-  is wired up.
+  a medium with no board goes under a non-selectable "No matching board" group; a pair
+  already in `design_item_boards` is dropped, so a re-run shows nothing new). Items never
+  leave the Inbox — the sweep only ever *adds* cross-listings. It is read-only for now:
+  the "Add N items" confirm is deliberately disabled until the write is wired up.
 - See [`docs/MVP.md`](docs/MVP.md) for product spec and [`supabase/README.md`](supabase/README.md)
   for local setup (migrations, Vault key, turning off signups).
 

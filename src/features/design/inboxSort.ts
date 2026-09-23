@@ -1,4 +1,4 @@
-import type { BoardWithCover, DesignItem } from './types';
+import type { BoardWithCover, DesignItem, ItemBoardLink } from './types';
 
 /** The board a medium routes to: the oldest board whose trimmed name equals
  *  the medium slug, case-insensitively (the slugs are the labels lower-cased —
@@ -20,10 +20,18 @@ export interface InboxSortGroup {
 }
 
 /** Dry run only — reads, never writes. Every item with a non-null medium is
- *  placed under the board it would move to, or under the "no matching board"
- *  group (board: null), which is excluded from any move. Items with no medium
- *  are not evidence of anything and don't appear at all. */
-export function planInboxSort(items: DesignItem[], boards: BoardWithCover[]): InboxSortGroup[] {
+ *  placed under the board it would ALSO be listed in, or under the "no
+ *  matching board" group (board: null), which is excluded from any change.
+ *  Items with no medium are not evidence of anything and don't appear at all.
+ *  A pair already present in design_item_boards is dropped, so once an item is
+ *  cross-listed a re-run shows nothing new for it. Inbox membership is never
+ *  touched either way. */
+export function planInboxSort(
+  items: DesignItem[],
+  boards: BoardWithCover[],
+  links: ItemBoardLink[],
+): InboxSortGroup[] {
+  const existing = new Set(links.map((l) => `${l.item_id}:${l.board_id}`));
   const byBoard = new Map<string, InboxSortGroup>();
   const unmatched: DesignItem[] = [];
   for (const it of items) {
@@ -33,6 +41,7 @@ export function planInboxSort(items: DesignItem[], boards: BoardWithCover[]): In
       unmatched.push(it);
       continue;
     }
+    if (existing.has(`${it.id}:${target.id}`)) continue; // already cross-listed there
     const g = byBoard.get(target.id);
     if (g) g.items.push(it);
     else byBoard.set(target.id, { board: target, items: [it] });
