@@ -5,6 +5,7 @@ import { FilterBar } from './FilterBar';
 import { ItemCard } from './ItemCard';
 import { MediumFilter } from './MediumFilter';
 import { useRetryIngest, useThumbUrls } from './hooks';
+import { hostOf } from './tags';
 import type { DesignItem } from './types';
 
 // ~2x the masonry column width (240px, base.css) for legible retina tiles
@@ -49,8 +50,10 @@ export function ReferenceGrid({
       .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
   }, [items]);
 
-  // Client-side substring match on caption + tags — stands in until semantic
-  // search (docs/DESIGN.md Step 7) replaces it behind the same field.
+  // Client-side substring match on caption, tags and the source domain parsed
+  // from link_url (so "pinterest" finds in.pinterest.com pins) — stands in
+  // until semantic search (docs/DESIGN.md Step 7) replaces it behind the
+  // same field.
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (items ?? []).filter(
@@ -59,7 +62,8 @@ export function ReferenceGrid({
         (activeMediums.length === 0 || (it.medium !== null && activeMediums.includes(it.medium))) &&
         (q === '' ||
           (it.caption ?? '').toLowerCase().includes(q) ||
-          it.tags.some((t) => t.toLowerCase().includes(q))),
+          it.tags.some((t) => t.toLowerCase().includes(q)) ||
+          (hostOf(it.link_url ?? '') ?? '').includes(q)),
     );
   }, [items, query, activeTags, activeMediums]);
 
