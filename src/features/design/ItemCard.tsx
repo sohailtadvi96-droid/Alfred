@@ -19,7 +19,6 @@ export function ItemCard({
   thumbUrl,
   onEdit,
   onDelete,
-  onTagClick,
   onRetry,
   retrying,
 }: {
@@ -29,7 +28,6 @@ export function ItemCard({
   thumbUrl: string | undefined;
   onEdit: (item: DesignItem) => void;
   onDelete: (item: DesignItem) => void;
-  onTagClick: (tag: string) => void;
   onRetry: (item: DesignItem) => void;
   retrying: boolean;
 }) {
@@ -55,6 +53,9 @@ export function ItemCard({
     lightboxOpen,
   );
   const lightboxSrc = item.thumb_path ? originalUrl : (item.image_url ?? item.poster_url ?? undefined);
+
+  // Hover metadata only sits on a card that actually shows an image.
+  const showMeta = !isPending && !isFailed && !broken && !!displaySrc && !!(item.title || source);
 
   const rawRatio = item.width && item.height ? item.width / item.height : null;
   const frameStyle =
@@ -93,6 +94,12 @@ export function ItemCard({
             onClick={() => setLightboxOpen(true)}
           />
         )}
+        {showMeta && (
+          <div className="item-card-meta">
+            {item.title && <span className="item-card-meta-title">{item.title}</span>}
+            {source && <span className="item-card-meta-src">{source}</span>}
+          </div>
+        )}
         <div className="item-card-actions">
           <a
             href={href}
@@ -124,26 +131,6 @@ export function ItemCard({
           </button>
         </div>
       </div>
-
-      {(item.title || source || item.note || item.tags.length > 0) && (
-        <figcaption className="item-card-body">
-          {item.title && <span className="item-card-title">{item.title}</span>}
-          {item.note && <p className="item-card-note">{item.note}</p>}
-          <div className="item-card-foot">
-            {source && <span className="item-card-src">{source}</span>}
-            {item.tags.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className="tag as-button"
-                onClick={() => onTagClick(t)}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </figcaption>
-      )}
 
       <Lightbox
         open={lightboxOpen}

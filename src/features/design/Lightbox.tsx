@@ -23,7 +23,7 @@ export function Lightbox({
 }) {
   const href = item.link_url ?? item.image_url ?? undefined;
   const source = item.source ?? hostOf(item.link_url ?? item.image_url ?? '');
-  const hasMeta = item.title || item.caption || source || item.tags.length > 0;
+  const hasMeta = item.title || item.caption || item.note || source || item.tags.length > 0;
 
   return (
     <RD.Root open={open} onOpenChange={onOpenChange}>
@@ -54,6 +54,7 @@ export function Lightbox({
                 <div className="lightbox-meta">
                   {item.title && <span className="lightbox-title">{item.title}</span>}
                   {item.caption && <p className="lightbox-caption">{item.caption}</p>}
+                  {item.note && <p className="lightbox-caption">{item.note}</p>}
                   {(source || item.tags.length > 0) && (
                     <div className="lightbox-foot">
                       {source && <span className="lightbox-src">{source}</span>}

@@ -104,3 +104,29 @@
   --sh: 0 1px 2px rgba(50, 40, 18, 0.12), 0 14px 34px -18px rgba(50, 40, 18, 0.26);
   --sh-sm: 0 1px 2px rgba(50, 40, 18, 0.12), 0 6px 16px -10px rgba(50, 40, 18, 0.2);
 }
+
+/* ===================== Design module tokens =====================
+   Aliases onto the active ground's own tokens — nothing here is a fixed
+   colour, so the Design module follows whichever preset is selected (dark or
+   light) like every other module. Namespaced (--design-*) so the search field,
+   chips, popover and board tiles read one vocabulary; defined on :root, the
+   same element [data-ground] sets --surface/--text/--base on, so they resolve
+   per preset. Muted/secondary text and borders are mixes of --text into the
+   ground rather than fixed hexes, which keeps the same hierarchy on light
+   grounds where a fixed pale grey would vanish.
+   The one deliberate exception is the card hover scrim (.item-card-meta): it
+   sits over arbitrary image pixels, not over the ground, so it stays a fixed
+   dark gradient with fixed light text.                                       */
+:root {
+  --design-surface: var(--surface);
+  --design-surface-2: var(--surface-2);
+  --design-border: color-mix(in srgb, var(--text) 10%, transparent);
+  --design-border-hover: color-mix(in srgb, var(--text) 28%, transparent);
+  --design-text: var(--text);
+  --design-text-2: color-mix(in srgb, var(--text) 92%, var(--ground));
+  --design-text-muted: color-mix(in srgb, var(--text) 60%, var(--ground));
+  --design-text-muted-2: color-mix(in srgb, var(--text) 75%, var(--ground));
+  --design-chip-text: color-mix(in srgb, var(--text) 86%, var(--ground));
+  --design-accent: var(--base);
+  --design-accent-ink: var(--base-ink);
+}

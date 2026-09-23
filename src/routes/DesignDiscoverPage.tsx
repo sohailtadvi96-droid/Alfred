@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
-import { DesignTabs } from '@/features/design/DesignTabs';
 import { DiscoverView } from '@/features/design/DiscoverView';
 
 export function DesignDiscoverPage() {
@@ -17,7 +16,6 @@ export function DesignDiscoverPage() {
         }
       />
       <div className="wrap design-wrap">
-        <DesignTabs />
         <DiscoverView />
       </div>
     </>

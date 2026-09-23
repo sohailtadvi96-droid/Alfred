@@ -59,7 +59,7 @@ components, not business logic.
 | **Secrets** (password/vault) | `SecretsPage` | 0003 | Shipped |
 | **Work** (freelance: clients/projects/invoices) | `WorkPage`, `ProjectDetailPage`, `InvoicesPage`, `InvoiceViewPage` | 0004, 0008 | Shipped |
 | **Office** (tasks/calendar/journal) | `OfficeDayPage` | 0009, 0010 | Shipped |
-| **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011, 0029–0032, 0036 | Shipped |
+| **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011, 0029–0032, 0036 | Shipped; Discover is parked (route and `DiscoverView` kept, no nav link to it) |
 | **Goals** | `GoalsPage` | 0016 | Shipped, Phase 1 (manual goals only — no auto-progress from other modules yet) |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped |
 
@@ -222,7 +222,7 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   runs automatically; re-run while `has_more` is true) re-parses the cached `thumb_path`
   bytes of any row with a null width, without re-hitting the source URL or re-running
   vision/embedding. The only UI trigger is `BackfillDimensionsButton` ("Fill in missing
-  dimensions", in the `DesignPage` TopBar action, next to "New board"): a dev/maintenance
+  dimensions", inside the `⋯` overflow popover in the `DesignPage` TopBar): a dev/maintenance
   affordance that calls `api.backfillDimensions()` (under the session's own token) in a
   loop until `has_more` is false, shows a running filled/unparsed/failed count, then
   invalidates the `['design']` query cache so the grid re-renders with the new dims — safe
@@ -254,6 +254,19 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 - Privileged operations (secret encrypt/decrypt, invoice numbering, ingestion) are
   Postgres RPCs marked `security definer`, not client-side logic — keep it that way for
   anything touching the Vault key or needing atomic sequence generation.
+- **Design module UI** uses the app's ground/theme like every other module — no ground
+  override. The `--design-*` tokens in `tokens.css` are *aliases* onto the active preset's
+  own tokens (`--surface`, `--text`, `--base`…; muted text and borders are `color-mix`es of
+  `--text` into `--ground`), so it follows all 12 presets, light and dark; never hardcode
+  hex there. The one deliberate fixed-colour exception is the card hover scrim
+  (`.item-card-meta`): it sits over arbitrary image pixels, not the ground, so it is a fixed
+  dark gradient with fixed light text. Cards have no panel: the image is the card
+  (`.item-card`, 10px radius), hover scales the image and fades in a title + source-domain
+  overlay; tags live only in the lightbox. Filtering is client-side in `ReferenceGrid`
+  (search over caption + tags, tag popover, multi-select medium chips) until semantic search
+  replaces it behind the same field. The gallery pages use `.design-wrap-wide`; Discover
+  (parked, deliberately unchanged) keeps the standard `.wrap` width. The popover
+  (`DesignPopover`) is hand-rolled — `@radix-ui/react-popover` is not a dependency.
 - See [`docs/MVP.md`](docs/MVP.md) for product spec and [`supabase/README.md`](supabase/README.md)
   for local setup (migrations, Vault key, turning off signups).
 

@@ -41,11 +41,6 @@ export function DesignView({
 
   return (
     <div className="design">
-      <p className="design-intro">
-        A private swipe file. Save a reference by its image URL, drop it on a board, tag it so you
-        can find it again.
-      </p>
-
       {banner && <div className="err">{banner}</div>}
 
       {error ? (
@@ -69,7 +64,7 @@ export function DesignView({
 
           <section className="design-boards-section">
             <h3 className="design-boards-heading">Boards</h3>
-            <BoardGrid boards={boards ?? []} onEdit={setEditBoard} />
+            <BoardGrid boards={boards ?? []} onEdit={setEditBoard} onNew={() => onNewBoardOpenChange(true)} />
           </section>
         </>
       )}

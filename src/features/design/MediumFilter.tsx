@@ -1,53 +1,36 @@
-import { useMemo } from 'react';
-
-const MEDIUMS: { slug: string; label: string }[] = [
+// Fixed row, always all six — not filtered by what's in the library. A
+// packaging or type item is still shown (no medium chip selected shows
+// everything) but has no chip of its own.
+export const MEDIUMS: { slug: string; label: string }[] = [
   { slug: 'identity', label: 'Identity' },
-  { slug: 'packaging', label: 'Packaging' },
   { slug: 'editorial', label: 'Editorial' },
   { slug: 'motion', label: 'Motion' },
-  { slug: 'type', label: 'Type' },
   { slug: 'web', label: 'Web' },
   { slug: 'illustration', label: 'Illustration' },
   { slug: 'other', label: 'Other' },
 ];
 
-/** Single-select — an item has at most one medium, unlike tags. */
+/** Multi-select: any selected medium matches (OR). */
 export function MediumFilter({
-  items,
   active,
-  onChange,
+  onToggle,
 }: {
-  items: { medium: string | null }[];
-  active: string | null;
-  onChange: (medium: string | null) => void;
+  active: string[];
+  onToggle: (medium: string) => void;
 }) {
-  const counts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const it of items) if (it.medium) m.set(it.medium, (m.get(it.medium) ?? 0) + 1);
-    return m;
-  }, [items]);
-
-  const present = MEDIUMS.filter((m) => (counts.get(m.slug) ?? 0) > 0);
-  if (present.length === 0) return null;
-
   return (
-    <div className="tag-filter medium-filter">
-      {present.map((m) => (
+    <div className="ref-mediums">
+      {MEDIUMS.map((m) => (
         <button
           key={m.slug}
           type="button"
-          className={`tag as-button${active === m.slug ? ' on' : ''}`}
-          onClick={() => onChange(active === m.slug ? null : m.slug)}
+          className="ref-medium"
+          aria-pressed={active.includes(m.slug)}
+          onClick={() => onToggle(m.slug)}
         >
           {m.label}
-          <span className="tag-n">{counts.get(m.slug)}</span>
         </button>
       ))}
-      {active && (
-        <button type="button" className="tag-filter-clear" onClick={() => onChange(null)}>
-          Clear
-        </button>
-      )}
     </div>
   );
 }

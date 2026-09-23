@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { TopBar } from '@/components/TopBar';
 import { BackfillDimensionsButton } from '@/features/design/BackfillDimensionsButton';
-import { DesignTabs } from '@/features/design/DesignTabs';
+import { DesignPopover } from '@/features/design/DesignPopover';
 import { DesignView } from '@/features/design/DesignView';
 import { useBoards } from '@/features/design/hooks';
 
@@ -19,7 +19,24 @@ export function DesignPage() {
         showWallet={false}
         action={
           <>
-            <BackfillDimensionsButton />
+            <DesignPopover
+              label="More actions"
+              panelClassName="design-overflow-panel"
+              renderTrigger={({ open, toggle }) => (
+                <button
+                  type="button"
+                  className="design-overflow-btn"
+                  aria-label="More actions"
+                  aria-haspopup="dialog"
+                  aria-expanded={open}
+                  onClick={toggle}
+                >
+                  ⋯
+                </button>
+              )}
+            >
+              <BackfillDimensionsButton />
+            </DesignPopover>
             <button className="btn sec" onClick={() => setNewBoardOpen(true)}>
               New board
             </button>
@@ -34,8 +51,7 @@ export function DesignPage() {
           </>
         }
       />
-      <div className="wrap design-wrap">
-        <DesignTabs />
+      <div className="wrap design-wrap design-wrap-wide">
         <DesignView
           newBoardOpen={newBoardOpen}
           onNewBoardOpenChange={setNewBoardOpen}

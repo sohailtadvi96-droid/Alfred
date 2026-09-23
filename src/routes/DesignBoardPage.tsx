@@ -17,7 +17,7 @@ export function DesignBoardPage() {
           </Link>
         }
       />
-      <div className="wrap design-wrap">
+      <div className="wrap design-wrap design-wrap-wide">
         <BoardDetail boardId={boardId} />
       </div>
     </>

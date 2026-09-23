@@ -2,46 +2,59 @@ import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import type { BoardWithCover } from './types';
 
+/** Compact board row at the bottom of the page: a 2×2 mosaic of the board's
+ *  four most recent items (BoardWithCover.covers is already newest-first),
+ *  name and reference count, then a dashed "New board" tile the same size. */
 export function BoardGrid({
   boards,
   onEdit,
+  onNew,
 }: {
   boards: BoardWithCover[];
   onEdit: (board: BoardWithCover) => void;
+  onNew: () => void;
 }) {
   return (
-    <div className="board-grid">
+    <div className="board-row">
       {boards.map((b) => (
-        <div className="board-card" key={b.id}>
-          <Link to={`/design/${b.id}`} className="board-card-link">
-            <div className={`board-cover n${Math.min(b.covers.length, 4)}`}>
+        <div className="board-tile" key={b.id}>
+          <Link
+            to={`/design/${b.id}`}
+            className="board-tile-link"
+            aria-label={`Open board: ${b.name}, ${b.itemCount} ${b.itemCount === 1 ? 'reference' : 'references'}`}
+          >
+            <div className="board-tile-mosaic">
               {b.covers.length === 0 ? (
-                <span className="board-cover-empty">
+                <span className="board-tile-empty">
                   <Icon name="design" size={22} />
                 </span>
               ) : (
-                b.covers.map((src, i) => <img key={i} src={src} alt="" loading="lazy" />)
+                b.covers.slice(0, 4).map((src, i) => <img key={i} src={src} alt="" loading="lazy" />)
               )}
             </div>
-            <div className="board-card-meta">
-              <span className="board-card-name">{b.name}</span>
-              <span className="board-card-count">
-                {b.itemCount} {b.itemCount === 1 ? 'ref' : 'refs'}
-              </span>
-            </div>
-            {b.description && <p className="board-card-desc">{b.description}</p>}
+            <span className="board-tile-name">{b.name}</span>
+            <span className="board-tile-count">
+              {b.itemCount} {b.itemCount === 1 ? 'reference' : 'references'}
+            </span>
           </Link>
           <button
-            className="board-card-edit"
+            className="board-tile-edit"
             type="button"
             onClick={() => onEdit(b)}
-            data-tip="Edit board"
             aria-label={`Edit ${b.name}`}
           >
-            <Icon name="pencil" size={13} />
+            <Icon name="pencil" size={12} />
           </button>
         </div>
       ))}
+      <div className="board-tile">
+        <button type="button" className="board-tile-new" onClick={onNew} aria-label="Create a new board">
+          <div className="board-tile-mosaic">
+            <span className="board-tile-plus">+</span>
+          </div>
+          <span className="board-tile-name">New board</span>
+        </button>
+      </div>
     </div>
   );
 }
