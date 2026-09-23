@@ -292,6 +292,12 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   already in `design_item_boards` is dropped, so a re-run shows nothing new). Items never
   leave the Inbox — the sweep only ever *adds* cross-listings. It is read-only for now:
   the "Add N items" confirm is deliberately disabled until the write is wired up.
+  **Board picker** (`BoardPicker`, on every `ItemCard`): right-click the image (at the cursor)
+  or the hover `+` button opens an "Also show in" checklist. Ticking upserts a
+  `design_item_boards` row (ignore-duplicates), unticking deletes it; the item's home board is
+  shown checked + disabled and `board_id` is never written. It replaces the browser's own
+  right-click menu on cards. State lives in the shared links query (`useItemBoardLinks`,
+  updated optimistically by `useSetItemBoard`).
 - See [`docs/MVP.md`](docs/MVP.md) for product spec and [`supabase/README.md`](supabase/README.md)
   for local setup (migrations, Vault key, turning off signups).
 

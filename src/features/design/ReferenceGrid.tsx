@@ -4,13 +4,15 @@ import { ActiveFilters } from './ActiveFilters';
 import { FilterBar } from './FilterBar';
 import { ItemCard } from './ItemCard';
 import { MediumFilter } from './MediumFilter';
-import { useRetryIngest, useThumbUrls } from './hooks';
+import { useBoards, useItemBoardLinks, useRetryIngest, useSetItemBoard, useThumbUrls } from './hooks';
 import { hostOf } from './tags';
 import type { DesignItem } from './types';
 
 // ~2x the masonry column width (240px, base.css) for legible retina tiles
 // without requesting a full-size original.
 const GRID_THUMB_PX = 480;
+
+const NO_BOARDS: string[] = [];
 
 /** The filterable, browsable set of references — search, tag/medium filters,
  *  batched thumbnails, retry, the item grid itself. Shared by BoardDetail
@@ -36,6 +38,9 @@ export function ReferenceGrid({
 }) {
   const { data: thumbUrls } = useThumbUrls(items, GRID_THUMB_PX);
   const retryIngest = useRetryIngest();
+  const { data: boards } = useBoards();
+  const { data: links } = useItemBoardLinks();
+  const setItemBoard = useSetItemBoard();
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -73,6 +78,20 @@ export function ReferenceGrid({
 
   function toggleMedium(medium: string) {
     setActiveMediums((prev) => (prev.includes(medium) ? prev.filter((m) => m !== medium) : [...prev, medium]));
+  }
+
+  // item id -> the extra boards it is cross-listed into (for the card picker)
+  const linkedByItem = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const l of links ?? []) m.set(l.item_id, [...(m.get(l.item_id) ?? []), l.board_id]);
+    return m;
+  }, [links]);
+
+  function toggleBoard(itemId: string, boardId: string, on: boolean) {
+    setItemBoard.mutate(
+      { itemId, boardId, on },
+      { onError: (err) => setBanner(errMessage(err, 'Could not update that board.')) },
+    );
   }
 
   function clearFilters() {
@@ -132,6 +151,9 @@ export function ReferenceGrid({
                 onDelete={onDelete}
                 onRetry={onRetryItem}
                 retrying={retryingId === it.id}
+                boards={boards ?? []}
+                linkedBoardIds={linkedByItem.get(it.id) ?? NO_BOARDS}
+                onToggleBoard={(boardId, on) => toggleBoard(it.id, boardId, on)}
               />
             ))}
           </div>

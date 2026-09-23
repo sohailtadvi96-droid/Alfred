@@ -6,11 +6,12 @@ import {
 } from '@tanstack/react-query';
 import * as api from './api';
 import { searchInspiration, type SourceId } from './discover';
-import { ALL_BOARD, type DesignItem, type NewBoard, type NewItem } from './types';
+import { ALL_BOARD, type DesignItem, type ItemBoardLink, type NewBoard, type NewItem } from './types';
 
 const keys = {
   boards: ['design', 'boards'] as const,
   items: (boardId: string) => ['design', 'items', boardId] as const,
+  links: ['design', 'item-board-links'] as const,
 };
 
 /** single-user app — after any write just refresh the whole Design subtree */
@@ -26,7 +27,31 @@ export function useBoards() {
 
 /** Cross-listing rows (design_item_boards) — for the Sort Inbox dry run. */
 export function useItemBoardLinks() {
-  return useQuery({ queryKey: ['design', 'item-board-links'], queryFn: api.listItemBoardLinks });
+  return useQuery({ queryKey: keys.links, queryFn: api.listItemBoardLinks });
+}
+
+/** Tick/untick one board for one item in the picker. The links cache is
+ *  updated optimistically so the checkmark responds at once; the refresh in
+ *  onSettled then reconciles it and refetches board contents and counts. */
+export function useSetItemBoard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { itemId: string; boardId: string; on: boolean }) =>
+      api.setItemBoard(v.itemId, v.boardId, v.on),
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: keys.links });
+      const prev = qc.getQueryData<ItemBoardLink[]>(keys.links);
+      qc.setQueryData<ItemBoardLink[]>(keys.links, (old = []) => {
+        const rest = old.filter((l) => !(l.item_id === v.itemId && l.board_id === v.boardId));
+        return v.on ? [...rest, { item_id: v.itemId, board_id: v.boardId }] : rest;
+      });
+      return { prev };
+    },
+    onError: (_err, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(keys.links, ctx.prev);
+    },
+    onSettled: () => refresh(qc),
+  });
 }
 
 /** Items for one board, or every item when boardId is the ALL_BOARD id.

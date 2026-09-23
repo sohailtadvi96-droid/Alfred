@@ -54,6 +54,25 @@ export async function listBoards(): Promise<BoardWithCover[]> {
   });
 }
 
+/** Add (on) or remove (off) one cross-listing. Adding is an upsert that
+ *  ignores an existing row, so a double-click is harmless. Never touches
+ *  design_items.board_id. */
+export async function setItemBoard(itemId: string, boardId: string, on: boolean): Promise<void> {
+  if (on) {
+    const { error } = await supabase
+      .from('design_item_boards')
+      .upsert({ item_id: itemId, board_id: boardId }, { onConflict: 'item_id,board_id', ignoreDuplicates: true });
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('design_item_boards')
+      .delete()
+      .eq('item_id', itemId)
+      .eq('board_id', boardId);
+    if (error) throw error;
+  }
+}
+
 /** Every cross-listing row for this user — small (one per extra board an item
  *  appears in), so fetched whole rather than per item. */
 export async function listItemBoardLinks(): Promise<ItemBoardLink[]> {

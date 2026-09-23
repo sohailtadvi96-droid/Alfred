@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { useOriginalUrl } from './hooks';
+import { BoardPicker } from './BoardPicker';
 import { Lightbox } from './Lightbox';
 import { hostOf } from './tags';
-import type { DesignItem } from './types';
+import type { BoardWithCover, DesignItem } from './types';
 
 // Card aspect ratio (width/height) is floored at 1:2.1 so one extremely
 // tall image can't dominate a masonry column — the frame (see
@@ -21,6 +22,9 @@ export function ItemCard({
   onDelete,
   onRetry,
   retrying,
+  boards,
+  linkedBoardIds,
+  onToggleBoard,
 }: {
   item: DesignItem;
   /** Batched, transformed signed URL for item.thumb_path — undefined while
@@ -30,9 +34,21 @@ export function ItemCard({
   onDelete: (item: DesignItem) => void;
   onRetry: (item: DesignItem) => void;
   retrying: boolean;
+  boards: BoardWithCover[];
+  /** boards this item is cross-listed into, besides its home (board_id) */
+  linkedBoardIds: string[];
+  onToggleBoard: (boardId: string, on: boolean) => void;
 }) {
   const [broken, setBroken] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  // Board picker: opened by right-click anywhere on the image (at the cursor)
+  // or by the hover "+" button; point is relative to the frame.
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [picker, setPicker] = useState<{ x: number; y: number } | null>(null);
+  function openPickerAt(clientX: number, clientY: number) {
+    const r = frameRef.current?.getBoundingClientRect();
+    if (r) setPicker({ x: clientX - r.left, y: clientY - r.top });
+  }
   const href = item.link_url ?? item.image_url ?? undefined;
   const source = item.source ?? hostOf(item.link_url ?? item.image_url ?? '');
 
@@ -63,8 +79,17 @@ export function ItemCard({
   const frameClass = rawRatio === null ? 'item-card-frame' : 'item-card-frame item-card-frame--sized';
 
   return (
-    <figure className="item-card">
-      <div className={frameClass} style={frameStyle}>
+    <figure
+      className="item-card"
+      onContextMenu={(e) => {
+        // The lightbox is portaled but still a React child of the card, so
+        // its right-clicks bubble here — only the card's own frame counts.
+        if (!frameRef.current?.contains(e.target as Node)) return;
+        e.preventDefault();
+        openPickerAt(e.clientX, e.clientY);
+      }}
+    >
+      <div ref={frameRef} className={frameClass} style={frameStyle}>
         {isPending ? (
           <div className="item-card-shimmer" aria-label="Processing…" />
         ) : isFailed ? (
@@ -101,6 +126,18 @@ export function ItemCard({
           </div>
         )}
         <div className="item-card-actions">
+          <button
+            className="item-card-btn"
+            type="button"
+            onClick={(e) => {
+              const b = e.currentTarget.getBoundingClientRect();
+              openPickerAt(b.left, b.bottom);
+            }}
+            data-tip="Also show in…"
+            aria-label="Choose boards for this reference"
+          >
+            +
+          </button>
           <a
             href={href}
             target="_blank"
@@ -131,6 +168,16 @@ export function ItemCard({
           </button>
         </div>
       </div>
+
+      <BoardPicker
+        open={picker !== null}
+        onOpenChange={(v) => !v && setPicker(null)}
+        point={picker ?? { x: 0, y: 0 }}
+        homeBoardId={item.board_id}
+        boards={boards}
+        linkedBoardIds={linkedBoardIds}
+        onToggle={onToggleBoard}
+      />
 
       <Lightbox
         open={lightboxOpen}
