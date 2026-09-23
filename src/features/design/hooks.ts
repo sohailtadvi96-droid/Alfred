@@ -47,7 +47,9 @@ export function useItems(boardId: string) {
 export function useThumbUrls(items: DesignItem[] | undefined, gridWidthPx: number) {
   const withThumb = (items ?? []).filter((it) => it.thumb_path);
   const pathKey = withThumb
-    .map((it) => `${it.media_type === 'gif' ? 'g' : 'i'}:${it.thumb_path}`)
+    // width/height are part of the key: the rendition request depends on
+    // them, and a backfill changes them without changing thumb_path.
+    .map((it) => `${it.media_type === 'gif' ? 'g' : 'i'}:${it.thumb_path}:${it.width ?? ''}x${it.height ?? ''}`)
     .sort()
     .join(',');
 

@@ -4383,27 +4383,36 @@ textarea.office-journal {
 }
 .item-card-frame {
   position: relative;
+  overflow: hidden;
   line-height: 0;
   background: var(--surface-2);
 }
 .item-card-frame img {
   width: 100%;
+  height: auto;
   display: block;
   cursor: zoom-in;
 }
-/* Applied only once design-ingest has parsed real dimensions (item.width/
-   height); a pre-migration or never-ingested row has no --item-ratio and
-   keeps the plain rule above — natural layout height, exactly as before.
-   --item-ratio is width/height already floored at 1:2.1 in ItemCard.tsx
-   (Pinterest-style — only the tall side is capped), so this never needs
-   its own min here: a landscape/square/mildly-portrait image's ratio
-   passes through unchanged and renders uncropped (the box matches the
-   image's own ratio); only an image taller than 1:2.1 gets its ratio
-   floored, and object-fit crops the excess height, top-anchored so a
-   long screenshot keeps its head in frame. */
-.item-card-img-sized {
+/* Only for a row with real stored dimensions (ItemCard.tsx adds the
+   modifier and sets --item-ratio inline): the frame owns the card's height
+   and the image fills it, so the box is sized before the image loads and
+   the image can never push the card taller or overflow it sideways. The
+   ratio is the image's TRUE width/height, floored at 1:2.1 (ItemCard.tsx),
+   so object-fit: cover crops
+   nothing for any image inside that band (a box matching the image's own
+   ratio is fully covered by the whole image) and, unlike the default fill,
+   never stretches it. Only an image taller than 1:2.1 is cropped, and
+   object-position: top keeps a long screenshot's head in frame. A
+   row with no dimensions (pre-backfill, and gif) gets none of this and
+   stays in natural flow, uncapped, as the rules above. */
+.item-card-frame--sized {
+  width: 100%;
   aspect-ratio: var(--item-ratio);
-  height: auto;
+}
+.item-card-frame--sized img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
   object-fit: cover;
   object-position: top;
 }
@@ -4664,6 +4673,22 @@ textarea.office-journal {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---- 0036 dimensions backfill: dev/maintenance affordance, TopBar action ---- */
+.design-backfill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.design-backfill-result {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.design-backfill-error {
+  color: var(--neg);
 }
 
 /* ---- add/edit reference: image preview ---- */

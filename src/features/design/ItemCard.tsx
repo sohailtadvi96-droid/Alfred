@@ -6,10 +6,12 @@ import { hostOf } from './tags';
 import type { DesignItem } from './types';
 
 // Card aspect ratio (width/height) is floored at 1:2.1 so one extremely
-// tall image can't dominate a masonry column — excess height is cropped
-// off, top-anchored (see item-card-img-sized in base.css). Only the tall
-// side is capped, Pinterest-style: a landscape or square image renders at
-// its natural ratio uncropped, same as before.
+// tall image can't dominate a masonry column — the frame (see
+// .item-card-frame--sized in base.css) owns that height. Only an image taller
+// than that gets cropped to it (top-anchored); everything else shows
+// uncropped at its true ratio. Only the tall side is capped, Pinterest-style:
+// a landscape or square image's frame matches its natural ratio. A row with
+// no stored dimensions gets no ratio and no cropping — natural flow.
 const MIN_RATIO = 1 / 2.1;
 
 export function ItemCard({
@@ -55,12 +57,13 @@ export function ItemCard({
   const lightboxSrc = item.thumb_path ? originalUrl : (item.image_url ?? item.poster_url ?? undefined);
 
   const rawRatio = item.width && item.height ? item.width / item.height : null;
-  const clampedRatio = rawRatio === null ? null : Math.max(rawRatio, MIN_RATIO);
-  const imgStyle = clampedRatio !== null ? ({ '--item-ratio': clampedRatio } as React.CSSProperties) : undefined;
+  const frameStyle =
+    rawRatio === null ? undefined : ({ '--item-ratio': Math.max(rawRatio, MIN_RATIO) } as React.CSSProperties);
+  const frameClass = rawRatio === null ? 'item-card-frame' : 'item-card-frame item-card-frame--sized';
 
   return (
     <figure className="item-card">
-      <div className="item-card-frame">
+      <div className={frameClass} style={frameStyle}>
         {isPending ? (
           <div className="item-card-shimmer" aria-label="Processing…" />
         ) : isFailed ? (
@@ -86,8 +89,6 @@ export function ItemCard({
             src={displaySrc}
             alt={item.title ?? ''}
             loading="lazy"
-            className={clampedRatio !== null ? 'item-card-img-sized' : undefined}
-            style={imgStyle}
             onError={() => setBroken(true)}
             onClick={() => setLightboxOpen(true)}
           />

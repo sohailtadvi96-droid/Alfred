@@ -113,20 +113,44 @@ export async function retryIngest(itemId: string): Promise<void> {
   if (error) throw error;
 }
 
+export interface BackfillDimensionsBatch {
+  scanned: number;
+  updated: number;
+  unparsed: number;
+  failed: number;
+  failures: { id: string; error: string }[];
+  has_more: boolean;
+}
+
+/** One page of the 0036 dimensions backfill (see design-backfill-dimensions's
+ *  own file header) — runs under this session's own token, RLS-scoped to
+ *  the caller's own rows. Caller loops on has_more until it's false. */
+export async function backfillDimensions(): Promise<BackfillDimensionsBatch> {
+  const { data, error } = await supabase.functions.invoke('design-backfill-dimensions', { body: {} });
+  if (error) {
+    // A non-2xx surfaces as a generic "non-2xx status code" message — the
+    // function's own { error } body says what actually went wrong.
+    const body = await (error as { context?: Response }).context?.json?.().catch(() => null);
+    throw new Error(body?.error ?? (error as Error).message);
+  }
+  return data as BackfillDimensionsBatch;
+}
+
+type Transform = { width: number; height?: number; resize?: 'cover' | 'contain' | 'fill'; quality?: number };
+
 /** One signed URL per path, not Storage's batched createSignedUrls: the
  *  installed storage-js's batch method never forwards a `transform` option
  *  to the server at all (confirmed by reading its request body — only the
  *  singular createSignedUrl sends `transform`), so a batched call here
  *  would silently serve full-size originals instead of grid-sized
- *  renditions. Paths are still split by transform option one level up
- *  (getThumbUrls), so gifs never get a transform request. */
+ *  renditions. Each entry carries its own transform (or none, for a gif —
+ *  see getThumbUrls). */
 async function signedUrlsFor(
-  paths: string[],
-  transform?: { width: number; quality?: number },
+  entries: { path: string; transform?: Transform }[],
 ): Promise<Record<string, string>> {
-  if (paths.length === 0) return {};
-  const entries = await Promise.all(
-    paths.map(async (path) => {
+  if (entries.length === 0) return {};
+  const signed = await Promise.all(
+    entries.map(async ({ path, transform }) => {
       const { data, error } = await supabase.storage
         .from(MEDIA_BUCKET)
         .createSignedUrl(path, SIGNED_URL_TTL, transform ? { transform } : undefined);
@@ -134,27 +158,49 @@ async function signedUrlsFor(
       return [path, data.signedUrl] as const;
     }),
   );
-  return Object.fromEntries(entries);
+  return Object.fromEntries(signed);
+}
+
+// Storage's image transform rejects sides over 2500px.
+const MAX_TRANSFORM_SIDE = 2400;
+
+/** The rendition request for one item. With stored dimensions it asks for
+ *  the exact true-ratio box (`contain`, so nothing is cropped or stretched):
+ *  a bare `width` leaves the height to Storage, whose default resize mode is
+ *  `cover` — it reshaped renditions to the wrong aspect, which is what made
+ *  a card look right on the original image_url and wrong a second later when
+ *  the rendition replaced it. No dimensions (never backfilled) falls back to
+ *  the width-only request. */
+function transformFor(
+  it: Pick<DesignItem, 'width' | 'height'>,
+  gridWidthPx: number,
+): Transform {
+  if (!it.width || !it.height) return { width: gridWidthPx, quality: 70 };
+  let w = gridWidthPx;
+  let h = Math.round((gridWidthPx * it.height) / it.width);
+  if (h > MAX_TRANSFORM_SIDE) {
+    h = MAX_TRANSFORM_SIDE;
+    w = Math.max(1, Math.round((MAX_TRANSFORM_SIDE * it.width) / it.height));
+  }
+  return { width: w, height: h, resize: 'contain', quality: 70 };
 }
 
 /** Per page of results (see signedUrlsFor): every non-gif thumb_path gets
  *  a grid-sized transformed rendition, every gif path gets its original
  *  signed URL so the grid renders it directly. */
 export async function getThumbUrls(
-  items: Pick<DesignItem, 'thumb_path' | 'media_type'>[],
+  items: Pick<DesignItem, 'thumb_path' | 'media_type' | 'width' | 'height'>[],
   gridWidthPx: number,
 ): Promise<Record<string, string>> {
-  const transformablePaths: string[] = [];
-  const gifPaths: string[] = [];
+  const entries: { path: string; transform?: Transform }[] = [];
   for (const it of items) {
     if (!it.thumb_path) continue;
-    (it.media_type === 'gif' ? gifPaths : transformablePaths).push(it.thumb_path);
+    entries.push({
+      path: it.thumb_path,
+      transform: it.media_type === 'gif' ? undefined : transformFor(it, gridWidthPx),
+    });
   }
-  const [transformed, plain] = await Promise.all([
-    signedUrlsFor(transformablePaths, { width: gridWidthPx, quality: 70 }),
-    signedUrlsFor(gifPaths),
-  ]);
-  return { ...transformed, ...plain };
+  return signedUrlsFor(entries);
 }
 
 /** Untransformed signed URL for one cached original — the lightbox's "click

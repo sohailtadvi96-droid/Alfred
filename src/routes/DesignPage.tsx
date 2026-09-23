@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { BackfillDimensionsButton } from '@/features/design/BackfillDimensionsButton';
 import { DesignTabs } from '@/features/design/DesignTabs';
 import { DesignView } from '@/features/design/DesignView';
 import { useBoards } from '@/features/design/hooks';
@@ -18,6 +19,7 @@ export function DesignPage() {
         showWallet={false}
         action={
           <>
+            <BackfillDimensionsButton />
             <button className="btn sec" onClick={() => setNewBoardOpen(true)}>
               New board
             </button>

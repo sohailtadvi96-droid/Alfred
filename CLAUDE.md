@@ -206,14 +206,31 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   downloaded bytes' file header (PNG IHDR / JPEG SOF / WebP VP8-VP8L-VP8X — no image
   codec survives the edge runtime, so no library; parsers live in
   `_shared/imageDimensions.ts`) — the grid uses these to size masonry cards from real
-  aspect ratio, floored at 1:2.1 (Pinterest-style — only the tall side is capped,
-  excess height cropped off top-anchored; a landscape/square image is never cropped).
-  `design-backfill-dimensions` (manual-only, like `pair_internal_transfers()` — not
-  wired to any UI, re-run while `has_more` is true) re-parses the cached `thumb_path`
+  aspect ratio: `ItemCard` sets `--item-ratio` (width/height, floored at 1:2.1) on
+  `.item-card-frame--sized`, the frame owns the card's height and the `<img>` fills it
+  absolutely with `object-fit: cover; object-position: top`. Pinterest-style — only the
+  tall side is capped: cover crops nothing when the ratio is the image's own, so
+  landscape/square/normal-portrait images show whole and only an image taller than 1:2.1
+  is cropped (top kept). Never apply `object-fit: fill` here — it stretches. The grid's
+  Storage-transformed rendition (`api.transformFor`) must be requested with **both**
+  `width` and `height` at the true ratio and `resize: 'contain'`: a bare `width` leaves
+  the height to Storage, whose default `resize=cover` reshapes the rendition (cards looked
+  right on the raw `image_url`, then wrong once the rendition swapped in). Heights are
+  capped at 2400 (Storage rejects sides over 2500), and `useThumbUrls`' cache key includes
+  width/height because a backfill changes them without changing `thumb_path`.
+  `design-backfill-dimensions` (manual-only, like `pair_internal_transfers()` — never
+  runs automatically; re-run while `has_more` is true) re-parses the cached `thumb_path`
   bytes of any row with a null width, without re-hitting the source URL or re-running
-  vision/embedding. Null for anything not yet backfilled or that never went through
-  ingest (gif, or a manual page-only save); the grid falls back to natural CSS layout
-  sizing in that case. URL-only — no file uploads.
+  vision/embedding. The only UI trigger is `BackfillDimensionsButton` ("Fill in missing
+  dimensions", in the `DesignPage` TopBar action, next to "New board"): a dev/maintenance
+  affordance that calls `api.backfillDimensions()` (under the session's own token) in a
+  loop until `has_more` is false, shows a running filled/unparsed/failed count, then
+  invalidates the `['design']` query cache so the grid re-renders with the new dims — safe
+  to remove once every row has had a first pass (the line shows the latest run only, so a
+  re-click after the sweep is done reads "0 filled"). Null for anything not yet backfilled
+  or that never went through ingest (gif — no header parser — or a manual page-only
+  save); such a card gets no `--item-ratio`, no `--sized` class, and stays in natural
+  flow (`width: 100%; height: auto`), uncapped. URL-only — no file uploads.
 - `design_media_orphans` (0030) — logs `thumb_path` on delete for a manual sweep;
   Storage has no FK to `design_items`, so the row's own delete can't cascade the object.
 
