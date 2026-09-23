@@ -2,6 +2,8 @@ export interface DesignBoard {
   id: string;
   name: string;
   description: string | null;
+  /** the one catch-all board per user (0029) */
+  is_inbox: boolean;
   created_at: string;
   updated_at: string;
 }

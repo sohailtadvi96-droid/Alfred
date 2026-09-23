@@ -8,6 +8,7 @@ export function Dialog({
   description,
   children,
   footer,
+  wide,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -15,12 +16,13 @@ export function Dialog({
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  wide?: boolean;
 }) {
   return (
     <RD.Root open={open} onOpenChange={onOpenChange}>
       <RD.Portal>
         <RD.Overlay className="dlg-overlay" />
-        <RD.Content className="dlg" aria-describedby={description ? undefined : 'dlg-no-desc'}>
+        <RD.Content className={wide ? 'dlg dlg-wide' : 'dlg'} aria-describedby={description ? undefined : 'dlg-no-desc'}>
           <div className="dlg-h">
             <RD.Title asChild>
               <h3>{title}</h3>

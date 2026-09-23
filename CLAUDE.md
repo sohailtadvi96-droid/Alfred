@@ -270,6 +270,13 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   replaces it behind the same field. The gallery pages use `.design-wrap-wide`; Discover
   (parked, deliberately unchanged) keeps the standard `.wrap` width. The popover
   (`DesignPopover`) is hand-rolled — `@radix-ui/react-popover` is not a dependency.
+  **Sort Inbox** (Inbox board only, `SortInboxDialog` + `inboxSort.ts`) is a preview-first
+  sweep: a dry run groups Inbox items that have a medium by the board their medium names
+  (same rule as `design-capture`'s capture-time routing — the two are kept identical by
+  hand, since one is Deno; the Inbox is never a target; items with no medium are ignored;
+  a medium with no board goes under a non-selectable "No matching board" group). It is
+  read-only for now: the "Move N items" confirm is deliberately disabled until the move
+  is wired up.
 - See [`docs/MVP.md`](docs/MVP.md) for product spec and [`supabase/README.md`](supabase/README.md)
   for local setup (migrations, Vault key, turning off signups).
 

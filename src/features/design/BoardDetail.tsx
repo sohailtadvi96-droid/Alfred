@@ -4,6 +4,7 @@ import { errMessage } from '@/lib/errors';
 import { BoardFormDialog } from './BoardFormDialog';
 import { ItemFormDialog } from './ItemFormDialog';
 import { ReferenceGrid } from './ReferenceGrid';
+import { SortInboxDialog } from './SortInboxDialog';
 import { useBoards, useDeleteBoard, useDeleteItem, useItems } from './hooks';
 import { ALL_BOARD, type DesignItem } from './types';
 
@@ -21,6 +22,7 @@ export function BoardDetail({ boardId }: { boardId: string }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState<DesignItem | undefined>();
   const [editBoardOpen, setEditBoardOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
 
   async function onDeleteBoard() {
@@ -67,6 +69,11 @@ export function BoardDetail({ boardId }: { boardId: string }) {
               </button>
             </>
           )}
+          {board?.is_inbox && (
+            <button className="btn sec sm" type="button" onClick={() => setSortOpen(true)}>
+              Sort Inbox
+            </button>
+          )}
           <button
             className="btn primary sm"
             type="button"
@@ -102,6 +109,14 @@ export function BoardDetail({ boardId }: { boardId: string }) {
         boards={boards ?? []}
         edit={editItem}
       />
+      {board?.is_inbox && (
+        <SortInboxDialog
+          open={sortOpen}
+          onOpenChange={setSortOpen}
+          inboxItems={items ?? []}
+          boards={boards ?? []}
+        />
+      )}
       {board && (
         <BoardFormDialog open={editBoardOpen} onOpenChange={setEditBoardOpen} edit={board} />
       )}
