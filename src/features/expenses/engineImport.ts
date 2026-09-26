@@ -116,6 +116,33 @@ export interface RecategoriseUpdate {
   confidence: string;
 }
 
+/** An entity_keys row joined to its entity's default_category. */
+export interface EntityKeyCategoryRow {
+  key_type: string;
+  key_value: string;
+  ambiguity_state: string;
+  default_category: string | null;
+}
+
+/** Key states allowed to drive categorisation. `needs_review` is an unresolved
+ *  collision (the key may belong to more than one payee) and `separated` is a
+ *  tombstone — neither may pick a category. Allow-list, so a state added later
+ *  is excluded until someone decides it belongs here. */
+const CATEGORISING_STATES = new Set(['unknown', 'same_entity']);
+
+/** entity_keys → the two lookup maps classify() reads (see Lists). */
+export function buildEntityCategoryMaps(rows: EntityKeyCategoryRow[]): Pick<Lists, 'entityCategoryByVpa' | 'entityCategoryByName'> {
+  const entityCategoryByVpa = new Map<string, string>();
+  const entityCategoryByName = new Map<string, string>();
+  for (const r of rows) {
+    if (!r.default_category || !r.key_value || !CATEGORISING_STATES.has(r.ambiguity_state)) continue;
+    if (r.key_type === 'vpa_prefix') entityCategoryByVpa.set(r.key_value, r.default_category);
+    else if (r.key_type === 'merchant_name' || r.key_type === 'counterparty')
+      entityCategoryByName.set(r.key_value.toUpperCase(), r.default_category);
+  }
+  return { entityCategoryByVpa, entityCategoryByName };
+}
+
 export function recategoriseStored(rows: StoredTxn[], lists: Lists): RecategoriseUpdate[] {
   const out: RecategoriseUpdate[] = [];
   for (const r of rows) {

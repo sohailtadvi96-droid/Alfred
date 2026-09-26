@@ -3,7 +3,7 @@ import { addMonths, monthRange } from '@/lib/format';
 import { dayMatchedWindow, lastDayOfMonthFrom, summarizeComparison } from '@/lib/periodComparison';
 import type { Direction, RawCategoryRow } from './categories';
 import type { Lists } from './categorize';
-import { recategoriseStored, type RecategoriseUpdate, type StoredTxn } from './engineImport';
+import { buildEntityCategoryMaps, recategoriseStored, type RecategoriseUpdate, type StoredTxn } from './engineImport';
 import type {
   Account,
   AccountBalance,
@@ -98,13 +98,19 @@ export async function recategorizeAll(): Promise<number> {
 /** Load the engine's Lists (family VPAs, Ferrari shops, merchant overrides)
  *  from Supabase. Falls back to empty if the engine tables aren't there yet. */
 export async function loadEngineLists(): Promise<Lists> {
-  const empty: Lists = { familyVpas: new Set(), ferrariShops: new Set(), overrides: new Map() };
+  const empty: Lists = {
+    familyVpas: new Set(),
+    ferrariShops: new Set(),
+    overrides: new Map(),
+    entityCategoryByVpa: new Map(),
+    entityCategoryByName: new Map(),
+  };
   try {
     // Sourced from entities/entity_keys (0023), not people/ferrari_shops
     // directly — those tables are left in place but unread. Only
     // key_type = 'vpa_prefix' keys are meaningful here since these sets
     // are checked against a transaction's own vpa in classify().
-    const [familyKeys, ferrariKeys, rules] = await Promise.all([
+    const [familyKeys, ferrariKeys, rules, categoryKeys] = await Promise.all([
       supabase
         .from('entity_keys')
         .select('key_value, entities!inner(is_family)')
@@ -116,9 +122,34 @@ export async function loadEngineLists(): Promise<Lists> {
         .eq('key_type', 'vpa_prefix')
         .eq('entities.is_ferrari', true),
       supabase.from('merchant_rules').select('match_type,match_value,category,merchant'),
+      // Resolved entities that carry a default category — see buildEntityCategoryMaps
+      // for which key states may drive categorisation.
+      selectAll<{ key_type: string; key_value: string; ambiguity_state: string; entities: unknown }>((from, to) =>
+        supabase
+          .from('entity_keys')
+          .select('id,key_type,key_value,ambiguity_state,entities!inner(default_category)')
+          .in('key_type', ['vpa_prefix', 'merchant_name', 'counterparty'])
+          .not('entities.default_category', 'is', null)
+          .order('id')
+          .range(from, to),
+      ).then(
+        (data) => ({ data, error: null }),
+        (error: unknown) => ({ data: null, error }),
+      ),
     ]);
-    if (familyKeys.error || ferrariKeys.error || rules.error) return empty;
+    if (familyKeys.error || ferrariKeys.error || rules.error || categoryKeys.error) return empty;
     return {
+      ...buildEntityCategoryMaps(
+        (categoryKeys.data ?? []).map((r) => {
+          const e = Array.isArray(r.entities) ? r.entities[0] : r.entities;
+          return {
+            key_type: r.key_type,
+            key_value: r.key_value,
+            ambiguity_state: r.ambiguity_state,
+            default_category: (e as { default_category?: string | null } | undefined)?.default_category ?? null,
+          };
+        }),
+      ),
       familyVpas: new Set((familyKeys.data ?? []).map((r) => r.key_value as string)),
       ferrariShops: new Set((ferrariKeys.data ?? []).map((r) => r.key_value as string)),
       overrides: new Map(

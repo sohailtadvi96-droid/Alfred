@@ -35,10 +35,16 @@ export interface Lists {
   familyVpas: Set<string>;    // people.vpa where is_family = true
   ferrariShops: Set<string>;  // ferrari_shops.vpa
   overrides: Map<string, { category: string; merchant?: string }>; // merchant_rules
+  /** entity_keys(vpa_prefix).key_value -> entities.default_category, as stored. */
+  entityCategoryByVpa: Map<string, string>;
+  /** entity_keys(merchant_name | counterparty).key_value UPPERCASED ->
+   *  entities.default_category — matches how classify() looks up the payee. */
+  entityCategoryByName: Map<string, string>;
 }
 
 export const EMPTY_LISTS: Lists = {
   familyVpas: new Set(), ferrariShops: new Set(), overrides: new Map(),
+  entityCategoryByVpa: new Map(), entityCategoryByName: new Map(),
 };
 
 /* ---------------- ORDER MATTERS: first match wins ---------------- */
@@ -95,7 +101,7 @@ export interface Result { category: string; merchant: string; matchedBy: string;
 export function classify(
   f: Fields, direction: Direction, amount: number, lists: Lists = EMPTY_LISTS
 ): Result {
-  const { familyVpas, ferrariShops, overrides } = lists;
+  const { familyVpas, ferrariShops, overrides, entityCategoryByVpa, entityCategoryByName } = lists;
   const hay = `${f.vpa} ${f.counterparty}`.toLowerCase();
   const cr = direction === "CR";
   const hit = (category: string, merchant: string, matchedBy: string,
@@ -121,6 +127,13 @@ export function classify(
   // 3 — family
   if (familyVpas.has(f.vpa))
     return hit(cr ? "Income" : "Family", title(f.counterparty), "family");
+
+  // 3b — a resolved entity's default category, reached through any of its keys
+  // (one shop, several VPAs → one answer). Below ferrari/family, so flagged
+  // entities keep their exact behaviour; below tier 0, so an explicit pin wins.
+  const entityCat =
+    (f.vpa && entityCategoryByVpa.get(f.vpa)) || entityCategoryByName.get(f.counterparty.toUpperCase());
+  if (entityCat) return hit(entityCat, title(f.counterparty), "entity");
 
   // 4 — brands
   for (const [cat, re] of RULES) if (re.test(hay)) return hit(cat, title(f.counterparty), "brand");

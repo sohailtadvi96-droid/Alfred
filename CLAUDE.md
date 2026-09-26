@@ -122,7 +122,13 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   per-vpa model above (the data is many-to-many: a truncated `vpa_prefix` can cover
   more than one real payee, and one payee can appear under more than one prefix).
   `entities`: `display_name`, `entity_type` (person/merchant/self), `default_category`,
-  `is_family`, `is_ferrari`, `notes`, `resolved_at`. `entity_keys`: `entity_id`,
+  `is_family`, `is_ferrari`, `notes`, `resolved_at`. The engine reads `default_category`
+  as tier 3b in `classify()` (after family/ferrari, before the brand RULES; `merchant_rules`
+  pins in tier 0 still win): `loadEngineLists` builds `entityCategoryByVpa` /
+  `entityCategoryByName` from keys of entities that have one, skipping keys whose
+  `ambiguity_state` is `needs_review` or `separated` (`buildEntityCategoryMaps`). It
+  applies at any amount and either direction, so a `my_ferrari` default bypasses the
+  ferrari amount pattern that the `is_ferrari` flag enforces. `entity_keys`: `entity_id`,
   `key_type` (vpa_prefix/merchant_name/counterparty), `key_value`, `confidence`
   (exact/prefix) — unique on `(user_id, key_type, key_value)`, so a key is claimed by at
   most one entity. `confidence = 'exact'` means "not a truncated prefix, cannot silently
