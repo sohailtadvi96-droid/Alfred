@@ -11,6 +11,7 @@
 import { categorise, type Lists } from './categorize';
 import type { IciciTxn } from './icici';
 import { djb2, normDesc, parseDate, type NormalizedRow, type ParseResult } from './statement';
+import { resolveCategories, type RawCategoryRow } from './categories';
 import { fromDR, slugForCategory } from './taxonomy';
 
 /** NormalizedRow plus the engine's parsed + classified fields, which
@@ -133,6 +134,18 @@ export interface EntityKeyCategoryRow {
  *  tombstone — neither may pick a category. Allow-list, so a state added later
  *  is excluded until someone decides it belongs here. */
 const CATEGORISING_STATES = new Set(['unknown', 'same_entity']);
+
+/** categories rows → the slugs of expense-kind categories (debit side, resolved
+ *  the way the client shows them: a user row shadows the system row, and a null
+ *  kind defaults from the direction). Used to keep an entity's expense default
+ *  off a credit — see Lists.expenseCategories. */
+export function buildExpenseCategories(rows: RawCategoryRow[]): Set<string> {
+  return new Set(
+    resolveCategories(rows)
+      .filter((c) => c.direction === 'debit' && c.kind === 'expense')
+      .map((c) => c.slug),
+  );
+}
 
 /** entity_keys → the two lookup maps classify() reads (see Lists). */
 export function buildEntityCategoryMaps(rows: EntityKeyCategoryRow[]): Pick<Lists, 'entityCategoryByVpa' | 'entityCategoryByName'> {

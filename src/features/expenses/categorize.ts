@@ -40,11 +40,16 @@ export interface Lists {
   /** entity_keys(merchant_name | counterparty).key_value UPPERCASED ->
    *  entities.default_category — matches how classify() looks up the payee. */
   entityCategoryByName: Map<string, string>;
+  /** Slugs of expense-kind categories (categories.kind, debit side). An entity
+   *  default in one of these is never applied to a CREDIT: transaction_flows
+   *  reads flow_kind from the category, so a credit landing in an expense
+   *  category is summed into spend. */
+  expenseCategories: Set<string>;
 }
 
 export const EMPTY_LISTS: Lists = {
   familyVpas: new Set(), ferrariShops: new Set(), overrides: new Map(),
-  entityCategoryByVpa: new Map(), entityCategoryByName: new Map(),
+  entityCategoryByVpa: new Map(), entityCategoryByName: new Map(), expenseCategories: new Set(),
 };
 
 /* ---------------- ORDER MATTERS: first match wins ---------------- */
@@ -101,7 +106,7 @@ export interface Result { category: string; merchant: string; matchedBy: string;
 export function classify(
   f: Fields, direction: Direction, amount: number, lists: Lists = EMPTY_LISTS
 ): Result {
-  const { familyVpas, ferrariShops, overrides, entityCategoryByVpa, entityCategoryByName } = lists;
+  const { familyVpas, ferrariShops, overrides, entityCategoryByVpa, entityCategoryByName, expenseCategories } = lists;
   const hay = `${f.vpa} ${f.counterparty}`.toLowerCase();
   const cr = direction === "CR";
   const hit = (category: string, merchant: string, matchedBy: string,
@@ -131,9 +136,11 @@ export function classify(
   // 3b — a resolved entity's default category, reached through any of its keys
   // (one shop, several VPAs → one answer). Below ferrari/family, so flagged
   // entities keep their exact behaviour; below tier 0, so an explicit pin wins.
+  // A default describes what you SPEND there: a credit from the payee (a refund,
+  // a transfer back) must not inherit an expense category, so it falls through.
   const entityCat =
     (f.vpa && entityCategoryByVpa.get(f.vpa)) || entityCategoryByName.get(f.counterparty.toUpperCase());
-  if (entityCat) return hit(entityCat, title(f.counterparty), "entity");
+  if (entityCat && !(cr && expenseCategories.has(entityCat))) return hit(entityCat, title(f.counterparty), "entity");
 
   // 4 — brands
   for (const [cat, re] of RULES) if (re.test(hay)) return hit(cat, title(f.counterparty), "brand");

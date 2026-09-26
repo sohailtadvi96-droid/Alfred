@@ -127,7 +127,10 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   pins in tier 0 still win): `loadEngineLists` builds `entityCategoryByVpa` /
   `entityCategoryByName` from keys of entities that have one, skipping keys whose
   `ambiguity_state` is `needs_review` or `separated` (`buildEntityCategoryMaps`). It
-  applies at any amount, so a `my_ferrari` default would bypass the ferrari amount pattern
+  is never applied to a credit when the default is an expense-kind category
+  (`Lists.expenseCategories`, from `categories.kind`) — `transaction_flows` reads
+  `flow_kind` from the category, so that credit would be summed into spend; it falls
+  through to the later tiers instead. It applies at any amount, so a `my_ferrari` default would bypass the ferrari amount pattern
   that the `is_ferrari` flag enforces — the resolve and separate dialogs therefore don't
   offer it (`entityCategories.ts`); tag the payee as a Ferrari shop instead. `entity_keys`: `entity_id`,
   `key_type` (vpa_prefix/merchant_name/counterparty), `key_value`, `confidence`

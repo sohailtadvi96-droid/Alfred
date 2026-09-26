@@ -4,7 +4,7 @@ import { addMonths, monthRange } from '@/lib/format';
 import { dayMatchedWindow, lastDayOfMonthFrom, summarizeComparison } from '@/lib/periodComparison';
 import type { Direction, RawCategoryRow } from './categories';
 import type { Lists } from './categorize';
-import { buildEntityCategoryMaps, recategoriseStored, type RecategoriseUpdate, type StoredTxn } from './engineImport';
+import { buildEntityCategoryMaps, buildExpenseCategories, recategoriseStored, type RecategoriseUpdate, type StoredTxn } from './engineImport';
 import type {
   Account,
   AccountBalance,
@@ -112,7 +112,7 @@ export async function loadEngineLists(): Promise<Lists> {
     // are checked against a transaction's own vpa in classify().
     // Every read is paged (selectAll): a response cut off at max_rows would be
     // as silent — and as wrong — as an empty one.
-    const [familyKeys, ferrariKeys, rules, categoryKeys] = await Promise.all([
+    const [familyKeys, ferrariKeys, rules, categoryKeys, categoryRows] = await Promise.all([
       selectAll<{ key_value: string }>((from, to) =>
         supabase
           .from('entity_keys')
@@ -150,8 +150,10 @@ export async function loadEngineLists(): Promise<Lists> {
           .order('id')
           .range(from, to),
       ),
+      listCategories(), // which slugs are expense-kind — see Lists.expenseCategories
     ]);
     return {
+      expenseCategories: buildExpenseCategories(categoryRows),
       ...buildEntityCategoryMaps(
         categoryKeys.map((r) => {
           const e = Array.isArray(r.entities) ? r.entities[0] : r.entities;
