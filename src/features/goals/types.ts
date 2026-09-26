@@ -30,6 +30,7 @@ export interface Goal {
   start_date: string;
   target_date: string | null;
   source: GoalSource;
+  cadence: GoalCadence;
   module_id: ModuleId | null;
   status: GoalStatus;
   milestones: Milestone[] | null;
@@ -69,7 +70,9 @@ export interface NewGoal {
   cadence?: GoalCadence;
 }
 
-export type PaceStatus = 'ahead' | 'on-track' | 'behind' | 'at-risk' | 'no-deadline';
+/** 'no-data' = there is nothing honest to say yet (a savings goal with no
+ *  complete month of history, or a plan that could not be read). */
+export type PaceStatus = 'ahead' | 'on-track' | 'behind' | 'at-risk' | 'no-deadline' | 'no-data';
 
 /** goal_pace's return shape -- the single pace engine, computed in SQL
  *  (0035). Covers manual linear, recurring, and streak goals alike.

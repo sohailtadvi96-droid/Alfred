@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as api from './api';
+import { statusFromPlan } from './savingsPlanView';
 import type { Goal, GoalPace, GoalStatus, Milestone, NewGoal } from './types';
 
 const keys = {
@@ -33,14 +34,20 @@ export function useGoalPace(goal: Pick<Goal, 'id' | 'type'> | undefined) {
   });
 }
 
-/** savings_plan for one goal. Only ever enabled for source.kind ===
- *  'savings_target' -- never fanned out across the goal list, and the
- *  caller mounts it only while the row is expanded. */
-export function useSavingsPlan(goal: Pick<Goal, 'id' | 'source'> | undefined) {
+/** A goal whose header status and body both come from savings_plan rather
+ *  than goal_pace: an ACTIVE savings_target goal. Nothing else ever asks for
+ *  a plan, so it is never fanned out across the other kinds. */
+function wantsPlan(goal: Pick<Goal, 'source' | 'status'>): boolean {
+  return goal.source.kind === 'savings_target' && goal.status === 'active';
+}
+
+/** savings_plan for one goal. Every caller (the list's header status, the row's
+ *  why-line, the expanded body) shares one cache entry, so it is one RPC. */
+export function useSavingsPlan(goal: Pick<Goal, 'id' | 'source' | 'status'> | undefined) {
   return useQuery({
     queryKey: goal ? keys.savingsPlan(goal.id) : keys.savingsPlan('none'),
     queryFn: () => api.fetchSavingsPlan((goal as Goal).id),
-    enabled: !!goal && goal.source.kind === 'savings_target',
+    enabled: !!goal && wantsPlan(goal),
   });
 }
 
@@ -59,7 +66,15 @@ export function useGoalCurrentValue(goalId: string | undefined, from: string, to
 /** Every goal paired with its computed pace from goal_pace — the shape
  *  both the module page and the Home rollup read from. Milestone goals
  *  carry pace: null (they read their checklist fraction directly, never
- *  call the RPC); everything else gets a live server-computed pace. */
+ *  call the RPC); everything else gets a live server-computed pace.
+ *
+ *  Except an active savings_target goal: goal_pace's linear expectation is
+ *  wrong for a lump-sum salary (it said "On track" over a plan that said
+ *  ₹27,615 short), so its status is taken from the plan's own projection
+ *  (statusFromPlan) and the two linear-model fields (expectedByToday,
+ *  projectedEnd) are dropped. `actual` -- the net so far -- is still
+ *  goal_pace's. This is the one place that overlay happens, so the module
+ *  page, its grouping and the Home tile can never disagree with the body. */
 export function useGoalsWithPace() {
   const { data: goals, isLoading: goalsLoading } = useGoals();
 
@@ -71,15 +86,29 @@ export function useGoalsWithPace() {
     })),
   });
 
+  // same query key as useSavingsPlan, so the row that later expands reads the cache
+  const planQueries = useQueries({
+    queries: (goals ?? []).map((goal) => ({
+      queryKey: keys.savingsPlan(goal.id),
+      queryFn: () => api.fetchSavingsPlan(goal.id),
+      enabled: wantsPlan(goal),
+    })),
+  });
+
   const goalsWithPace = useMemo(() => {
     if (!goals) return undefined;
-    return goals.map((goal, i) => ({
-      goal,
-      pace: goal.type === 'milestone' ? null : ((paceQueries[i]?.data ?? null) as GoalPace | null),
-    }));
-  }, [goals, paceQueries]);
+    return goals.map((goal, i) => {
+      const pace = goal.type === 'milestone' ? null : ((paceQueries[i]?.data ?? null) as GoalPace | null);
+      if (!wantsPlan(goal)) return { goal, pace };
+      const status = statusFromPlan(planQueries[i]?.data ?? undefined);
+      return {
+        goal,
+        pace: { actual: pace?.actual ?? 0, expectedByToday: null, projectedEnd: null, status } as GoalPace,
+      };
+    });
+  }, [goals, paceQueries, planQueries]);
 
-  const paceLoading = paceQueries.some((q) => q.isLoading);
+  const paceLoading = paceQueries.some((q) => q.isLoading) || planQueries.some((q) => q.isLoading);
   return { goalsWithPace, isLoading: goalsLoading || paceLoading };
 }
 

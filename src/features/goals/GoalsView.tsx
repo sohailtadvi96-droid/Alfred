@@ -19,6 +19,7 @@ function byTargetDateAsc(a: Goal, b: Goal): number {
 export function GoalsView() {
   const { goalsWithPace, isLoading } = useGoalsWithPace();
   const { data: progress } = useGoalProgress();
+  const [pausedOpen, setPausedOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
   if (isLoading || !goalsWithPace) {
@@ -28,6 +29,11 @@ export function GoalsView() {
   const active = goalsWithPace.filter((g) => g.goal.status === 'active');
   const attention = active.filter((g) => needsAttention(g.pace));
   const rest = active.filter((g) => !needsAttention(g.pace)).sort((a, b) => byTargetDateAsc(a.goal, b.goal));
+  // paused goals used to be listed nowhere, so pausing was a one-way door and
+  // Resume was unreachable; they get their own folded group, most recently touched first
+  const paused = goalsWithPace
+    .filter((g) => g.goal.status === 'paused')
+    .sort((a, b) => b.goal.updated_at.localeCompare(a.goal.updated_at));
   const archived = goalsWithPace
     .filter((g) => g.goal.status === 'achieved' || g.goal.status === 'abandoned')
     .sort((a, b) => (b.goal.achieved_at ?? b.goal.created_at).localeCompare(a.goal.achieved_at ?? a.goal.created_at));
@@ -63,6 +69,18 @@ export function GoalsView() {
           ))
         )}
       </section>
+
+      {paused.length > 0 && (
+        <section>
+          <button type="button" className="goals-section-label goals-archive-toggle" onClick={() => setPausedOpen((v) => !v)}>
+            Paused ({paused.length}) {pausedOpen ? '▾' : '▸'}
+          </button>
+          {pausedOpen &&
+            paused.map(({ goal, pace }) => (
+              <GoalRow key={goal.id} goal={goal} pace={pace} progress={progress ?? []} />
+            ))}
+        </section>
+      )}
 
       {archived.length > 0 && (
         <section>

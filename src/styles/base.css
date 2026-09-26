@@ -5974,19 +5974,33 @@ textarea.office-journal {
 .goal-row-head {
   width: 100%;
   display: grid;
-  grid-template-columns: auto minmax(120px, 220px) 1fr auto auto;
+  grid-template-columns: auto minmax(150px, 270px) 1fr auto auto;
   align-items: center;
-  gap: 14px;
-  padding: 12px 16px;
+  gap: 12px;
+  padding: 9px 16px;
   background: none;
   border: none;
   cursor: pointer;
   text-align: left;
   color: var(--text);
 }
+.goal-row-titleblock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 .goal-row-title {
   font-weight: 600;
   font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* the one short line a row may add, only where it changes the read */
+.goal-row-why {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6008,6 +6022,9 @@ textarea.office-journal {
   letter-spacing: 0.04em;
   color: var(--text-dim);
   white-space: nowrap;
+  /* fixed width, so every row's progress bar ends at the same x */
+  min-width: 104px;
+  text-align: right;
 }
 .goal-row-chevron {
   transition: transform 0.15s ease;
@@ -6018,21 +6035,78 @@ textarea.office-journal {
 }
 
 .goal-row-body {
-  padding: 4px 16px 16px;
+  padding: 0 16px 10px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   border-top: 1px solid var(--line-soft);
+}
+/* three zones, always in this order: verdict, detail, actions */
+.goal-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.goal-zone-verdict {
+  padding: 12px 0 4px;
+}
+.goal-zone-detail {
+  padding: 10px 0 4px;
+}
+.goal-zone-actions {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+  gap: 8px;
 }
 .goal-row-spark {
   color: var(--base);
-  padding-top: 8px;
 }
-.goal-row-required,
-.goal-row-source {
-  font-size: 12px;
-  color: var(--text-dim);
+.goal-verdict {
+  border-left: 3px solid var(--text-faint);
+  border-radius: 0 8px 8px 0;
+  background: var(--surface-2);
+  padding: 10px 14px;
+}
+.goal-verdict[data-tone='ok'] { border-left-color: var(--pos); }
+.goal-verdict[data-tone='warn'] { border-left-color: var(--c-ochre); }
+.goal-verdict[data-tone='bad'] { border-left-color: var(--neg); }
+.goal-verdict-main {
   margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--text);
+}
+.goal-verdict-sub {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+/* reassurance, not a headline */
+.goal-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-faint);
+}
+.goal-actions {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.goal-actions .btn {
+  color: var(--text-dim);
+}
+.goal-actions .goal-abandon:hover {
+  color: var(--neg);
+}
+.goal-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0 2px;
 }
 
 .goal-bar {
@@ -6064,8 +6138,9 @@ textarea.office-journal {
 .goal-pace-dot.pace-at-risk, .goal-bar-fill.pace-at-risk { background: var(--neg); }
 .pace-streak { color: var(--wip); }
 .goal-pace-dot.pace-streak, .goal-bar-fill.pace-streak { background: var(--wip); }
-.pace-no-deadline { color: var(--text-faint); }
-.goal-pace-dot.pace-no-deadline, .goal-bar-fill.pace-no-deadline { background: var(--text-faint); }
+.pace-no-deadline, .pace-no-data { color: var(--text-faint); }
+.goal-pace-dot.pace-no-deadline, .goal-bar-fill.pace-no-deadline,
+.goal-pace-dot.pace-no-data, .goal-bar-fill.pace-no-data { background: var(--text-faint); }
 
 .goal-spark-empty {
   font-size: 11.5px;
@@ -6136,63 +6211,22 @@ textarea.office-journal {
   text-transform: capitalize;
 }
 
-.goal-edit {
-  padding-top: 8px;
-  border-top: 1px solid var(--line-soft);
-}
-.goal-row-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* ---------- savings_target plan (Goals) ---------- */
-.savings-plan {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px 0 4px;
-  border-top: 1px solid var(--line-soft);
-}
-.sp-note {
-  font-size: 12.5px;
-  color: var(--text-dim);
-  margin: 0;
-}
-.sp-headline {
-  border-left: 3px solid var(--text-faint);
-  padding: 2px 0 2px 12px;
-}
-.sp-headline[data-tone='ok'] { border-left-color: var(--pos); }
-.sp-headline[data-tone='warn'] { border-left-color: var(--c-ochre); }
-.sp-headline[data-tone='bad'] { border-left-color: var(--neg); }
-.sp-headline-main {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-.sp-headline-sub {
-  margin: 4px 0 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--text-dim);
-}
+/* ---------- savings_target plan (Goals): zone 2 detail ---------- */
 .sp-options {
-  margin: 0;
+  margin: 8px 0 0;
   padding: 0 0 0 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   font-size: 12.5px;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--text-dim);
 }
 .sp-options strong { color: var(--text); }
 .sp-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 .sp-h {
   margin: 0;
@@ -6203,29 +6237,34 @@ textarea.office-journal {
   text-transform: uppercase;
   color: var(--text-faint);
 }
+.sp-h-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
 .sp-cuts {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   counter-reset: sp-cut;
 }
+/* dense rows, not cards: a name line, the behaviour, one line of evidence */
 .sp-cut {
   counter-increment: sp-cut;
-  padding: 8px 10px 8px 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: var(--surface-2);
+  padding: 6px 0 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 2px solid transparent;
 }
-/* a floor built on a month of ₹0 is the weakest evidence: dashed, so it doesn't look as solid */
-.sp-cut[data-evidence='zero-floor'] { border-style: dashed; }
+.sp-cut:last-child { border-bottom: none; }
+/* a floor built on a month of ₹0 is the weakest evidence: a dashed rule, so it doesn't look as solid */
+.sp-cut[data-evidence='zero-floor'] { border-left: 2px dashed var(--neg); }
+.sp-cut[data-evidence='thin'] { border-left-color: var(--line); }
 .sp-cut-top {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
+  gap: 8px;
 }
 .sp-cut-name {
   font-size: 13px;
@@ -6238,50 +6277,66 @@ textarea.office-journal {
   color: var(--text-faint);
 }
 .sp-cut-amt {
+  margin-left: auto;
   font-family: var(--mono);
   font-size: 11px;
   color: var(--text-dim);
   white-space: nowrap;
 }
 .sp-cut-behaviour {
-  margin: 4px 0 0;
-  font-size: 13px;
-  line-height: 1.45;
+  margin: 1px 0 0;
+  font-size: 12.5px;
+  line-height: 1.35;
   color: var(--text);
 }
 .sp-cut-meta {
-  margin: 4px 0 0;
-  font-size: 11.5px;
-  line-height: 1.45;
+  margin: 1px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
   color: var(--text-faint);
 }
 .sp-badge {
   display: inline-block;
   padding: 0 6px;
-  margin-right: 4px;
   border: 1px solid var(--line);
   border-radius: 999px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9.5px;
   letter-spacing: 0.03em;
   color: var(--text-dim);
+  cursor: help;
 }
 .sp-badge-thin { color: var(--c-ochre); border-color: var(--c-ochre); }
 .sp-badge-zero-floor { color: var(--neg); border-color: var(--neg); border-style: dashed; }
-.sp-held,
+.sp-showmore {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 2px 0 0 10px;
+  cursor: pointer;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.sp-showmore:hover { color: var(--text); }
 .sp-fine {
   margin: 0;
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: 11px;
+  line-height: 1.45;
   color: var(--text-faint);
 }
+.sp-more summary {
+  font-size: 11px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.sp-more .sp-fine { margin-top: 3px; }
 .sp-subs {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .sp-subs li {
   display: grid;

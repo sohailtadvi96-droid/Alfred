@@ -1,6 +1,13 @@
 import { FALLBACK_CATEGORIES } from '@/features/expenses/categories';
-import { formatRupees } from './format';
-import type { PlanLine, PlanSubscription, SavingsPlan } from './types';
+import { formatRupeesCompact, formatRupees } from './format';
+import {
+  isSavingsPlanError,
+  type PaceStatus,
+  type PlanLine,
+  type PlanSubscription,
+  type SavingsPlan,
+  type SavingsPlanResult,
+} from './types';
 
 /** Everything here is presentation logic over the savings_plan jsonb -- no
  *  I/O, no React -- so SavingsPlan.tsx stays a layout and the wording rules
@@ -40,6 +47,33 @@ export function headlineOf(plan: SavingsPlan): PlanHeadline {
     };
   }
   return { kind: 'closable', projectedGap, projectedMonthEnd, target: plan.target };
+}
+
+// ---------- the row-level read: one status + one short "why" ----------
+
+/** A savings goal's status, taken from the plan's own projection -- NOT from
+ *  goal_pace, whose linear "expected by today" is wrong for a lump-sum salary
+ *  (it read "On track" over a plan that said ₹27,615 short). Mirrors the
+ *  verdict the body shows:
+ *    already on track          -> on-track
+ *    short, but cuts can cover -> behind
+ *    short, cuts cannot cover  -> at-risk
+ *    no complete month yet, or no readable plan -> no-data */
+export function statusFromPlan(r: SavingsPlanResult | undefined): PaceStatus {
+  if (!r || isSavingsPlanError(r)) return 'no-data';
+  if (r.feasibility === 'insufficient_history') return 'no-data';
+  if (r.already_on_track) return 'on-track';
+  return r.feasibility === 'infeasible' ? 'at-risk' : 'behind';
+}
+
+/** The one short line a collapsed savings row may add under its title --
+ *  only where it changes the read, so nothing for on-track / loading / error. */
+export function savingsWhy(r: SavingsPlanResult | undefined): string | null {
+  if (!r || isSavingsPlanError(r)) return null;
+  if (r.feasibility === 'insufficient_history') return 'needs one full month of history';
+  if (r.already_on_track) return null;
+  const short = `${formatRupeesCompact(r.projection.projected_gap)} short at this pace`;
+  return r.feasibility === 'infeasible' ? `${short} — cuts alone can't cover it` : short;
 }
 
 // ---------- lines ----------
@@ -188,8 +222,10 @@ export interface Evidence {
   tier: EvidenceTier;
   /** short badge text */
   badge: string;
-  /** the one-sentence honest reading */
+  /** the compact reading shown on the row */
   note: string;
+  /** the fuller honest reading, for a tooltip */
+  hint: string;
 }
 
 export function evidenceOf(line: PlanLine): Evidence {
@@ -198,20 +234,23 @@ export function evidenceOf(line: PlanLine): Evidence {
     return {
       tier: 'zero-floor',
       badge: 'weakest evidence',
-      note: `Floor ₹0 — built on a month you spent nothing here, out of ${months}. Cutting to zero once doesn't mean it's easy every month.`,
+      note: `floor ₹0 — one month of nothing, of ${months}`,
+      hint: `Built on a month you spent nothing here, out of ${months}. Cutting to zero once doesn't mean it's easy every month.`,
     };
   }
   if (line.data_points < SOLID_DATA_POINTS) {
     return {
       tier: 'thin',
       badge: 'thin',
-      note: `Floor ${formatRupees(line.floor)} is your lowest of only ${months}.`,
+      note: `floor ${formatRupees(line.floor)} — lowest of only ${months}`,
+      hint: `Your lowest month here is ${formatRupees(line.floor)}, but that is out of only ${months} — one unusual month moves it.`,
     };
   }
   return {
     tier: 'solid',
     badge: months,
-    note: `Floor ${formatRupees(line.floor)} is your lowest of ${months}.`,
+    note: `floor ${formatRupees(line.floor)} — lowest of ${months}`,
+    hint: `Your lowest month here is ${formatRupees(line.floor)}, out of ${months}.`,
   };
 }
 
