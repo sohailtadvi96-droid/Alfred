@@ -204,7 +204,7 @@ export async function recategorizeAllClient(lists: Lists): Promise<number> {
 
 /** Everything recategoriseStored compares against the engine's answer. */
 const STORED_TXN_COLUMNS =
-  'id,direction,amount_cents,raw_snippet,category,confidence,matched_by,counterparty,vpa_prefix,remark';
+  'id,direction,amount_cents,raw_snippet,category,confidence,matched_by,channel,counterparty,vpa_prefix,remark';
 
 /** Patch a batch of re-categorise updates back to `transactions`, in chunks. */
 async function applyRecategoriseUpdates(updates: RecategoriseUpdate[]): Promise<number> {

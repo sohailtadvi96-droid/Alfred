@@ -104,6 +104,7 @@ export interface StoredTxn {
   counterparty: string | null;
   vpa_prefix: string | null;
   remark: string | null;
+  channel: string | null;
 }
 export interface RecategoriseUpdate {
   id: string;
@@ -178,6 +179,7 @@ export function recategoriseStored(rows: StoredTxn[], lists: Lists): Recategoris
       same(r.category, u.category) &&
       same(r.confidence, u.confidence) &&
       same(r.matched_by, u.matched_by) &&
+      same(r.channel, u.channel) &&
       same(r.counterparty, u.counterparty) &&
       same(r.vpa_prefix, u.vpa_prefix) &&
       same(r.remark, u.remark)
