@@ -627,9 +627,17 @@ async function selectAll<T>(page: PageFn): Promise<T[]> {
   return all;
 }
 
+export interface ReviewQueueData {
+  /** The display list: the `limit` most pressing rows. */
+  rows: ReviewTxn[];
+  /** How many rows are in the queue in total — `rows.length` is capped at `limit`. */
+  total: number;
+}
+
 /** Engine-classified rows that want a human look: low/medium confidence,
- *  confidence ascending then amount descending (04a-BUILD-BRIEF Task 4). */
-export async function listReviewQueue(limit = 300): Promise<ReviewTxn[]> {
+ *  confidence ascending then amount descending (04a-BUILD-BRIEF Task 4).
+ *  Every row is loaded and sorted; only the returned list is capped. */
+export async function listReviewQueue(limit = 300): Promise<ReviewQueueData> {
   const rows = await selectAll<ReviewTxn>((from, to) =>
     supabase
       .from('transactions')
@@ -645,7 +653,7 @@ export async function listReviewQueue(limit = 300): Promise<ReviewTxn[]> {
       (CONFIDENCE_RANK[a.confidence ?? 'medium'] ?? 1) -
         (CONFIDENCE_RANK[b.confidence ?? 'medium'] ?? 1) || b.amount_cents - a.amount_cents,
   );
-  return rows.slice(0, limit);
+  return { rows: rows.slice(0, limit), total: rows.length };
 }
 
 /** Pin a merchant to a category (engine Tier 0) and re-categorise every

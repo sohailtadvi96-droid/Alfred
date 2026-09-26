@@ -28,7 +28,8 @@ interface Group {
 }
 
 export function ReviewQueue() {
-  const { data: rows, isLoading } = useReviewQueue();
+  const { data: queue, isLoading } = useReviewQueue();
+  const rows = queue?.rows;
   const [scope, setScope] = useState<Scope>('all');
   const { data: aiCandidates } = useAiCandidates(scope);
   const ai = useAiFallback(scope);
@@ -83,7 +84,8 @@ export function ReviewQueue() {
     return [...map.values()].sort((a, b) => b.totalCents - a.totalCents);
   }, [filtered]);
 
-  const totalToReview = rows?.length ?? 0;
+  const totalToReview = queue?.total ?? 0;
+  const shown = rows?.length ?? 0;
 
   return (
     <div className="txn-panel">
@@ -103,6 +105,7 @@ export function ReviewQueue() {
         </label>
         <span className="tlabel" style={{ marginLeft: 'auto' }}>
           {totalToReview} low/medium-confidence rows
+          {totalToReview > shown && ` · showing the ${shown} biggest`}
         </span>
       </div>
 
