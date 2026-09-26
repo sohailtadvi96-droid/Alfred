@@ -54,6 +54,13 @@ Guidance:
 - Decide from the merchant / counterparty / remark. VPA shape hints at a shop.
 - Debit to a shop under ~₹300 with no clear brand → daily_spends; larger → local_merchant.
 - Debit to a personal name that isn't a shop → person_transactions. Credit from one → money_received.
+- The bank truncates: merchant / counterparty names are cut to 10 characters and
+  VPAs to 14, so the last word is often a cut-off fragment. Consider the likely
+  completion before deciding — a clipped business word is a shop, not a person —
+  and use the completed name for "merchant":
+    "Dimple Win" → "Dimple Wine" (alcohol, not a person named Dimple)
+    "Baba Resta" → "Baba Restaurant", "Restauran" → "Restaurant" (dineout_stays)
+    "Shri Medic" → "Shri Medical" (health_personal)
 - Only use "uncategorised" when there is genuinely no signal.
 - "merchant" is a tidy display name (e.g. "Baba Restaurant"), not the raw narration.`;
 
