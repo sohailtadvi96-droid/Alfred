@@ -243,11 +243,13 @@ export function useAiCandidates(scope: string) {
   });
 }
 
-/** Run one AI batch (api.AI_BATCH_SIZE merchants) over the queue in `scope`. */
+/** Sweep the queue in `scope` through the model in batches; `onProgress` fires
+ *  after each batch so the UI can show where it is. */
 export function useAiFallback(scope: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.runAiFallback(api.AI_BATCH_SIZE, scope),
+    mutationFn: (opts?: { onProgress?: (p: api.AiProgress) => void }) =>
+      api.runAiFallback({ scope, onProgress: opts?.onProgress }),
     // Settled, not success: a sweep that fails partway has still written and
     // re-categorised its earlier pins, and the queue must show that.
     onSettled: () => invalidateAll(qc),

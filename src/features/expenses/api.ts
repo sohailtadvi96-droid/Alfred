@@ -716,9 +716,15 @@ export interface AiCandidate {
   direction: Direction;
 }
 
-/** Merchants one "Ask AI" click sends to categorise-ai. The candidate count
- *  shown above the button can be far larger; each click takes the next batch. */
-export const AI_BATCH_SIZE = 30;
+/** Merchants per categorise-ai call — the edge function's own MAX_ITEMS; it
+ *  silently drops anything beyond it, so never send more per call. */
+export const AI_CALL_SIZE = 40;
+/** Most merchants one "Ask AI" click will send (10 calls). Bounds a single
+ *  click's spend and running time; the payees pinned drop out of the candidate
+ *  list, so clicking again carries on where it stopped. */
+export const AI_SWEEP_CAP = 400;
+/** ReviewQueue asks for confirmation before a run over this many merchants. */
+export const AI_CONFIRM_ABOVE = 100;
 
 interface AiTxnRow {
   direction: Direction;
@@ -737,7 +743,7 @@ interface AiTxnRow {
  *  to one per merchant key, highest total value first (low confidence breaks
  *  ties), so each AI batch takes the payees that move the numbers most.
  *  Pass `limit = Infinity` to count them all. */
-export async function listAiCandidates(limit = AI_BATCH_SIZE, scope?: string): Promise<AiCandidate[]> {
+export async function listAiCandidates(limit = Infinity, scope?: string): Promise<AiCandidate[]> {
   const [txns, rules] = await Promise.all([
     selectAll<AiTxnRow>((from, to) => {
       let q = supabase
@@ -798,36 +804,37 @@ export async function listAiCandidates(limit = AI_BATCH_SIZE, scope?: string): P
 }
 
 export interface AiRunResult {
+  /** Merchants selected for this run (at most the sweep cap). */
   candidates: number;
+  /** Merchants the model returned a usable answer for. */
   answered: number;
   pinned: number;
   moved: number;
   refreshed: number;
   unwritten: number;
+  /** Model calls planned, and how many completed. */
+  batches: number;
+  batchesDone: number;
   notConfigured?: boolean;
+  /** Set when a batch failed part-way: everything pinned before it is kept and
+   *  counted above; the rest was not attempted. */
+  error?: string;
 }
 
-/** One batched Claude call for the next `limit` queue candidates; write each
- *  answer as a merchant_rules pin so the same merchant is never sent again. */
-export async function runAiFallback(limit = AI_BATCH_SIZE, scope?: string): Promise<AiRunResult> {
-  const cands = await listAiCandidates(limit, scope);
-  if (!cands.length) return { candidates: 0, answered: 0, pinned: 0, moved: 0, refreshed: 0, unwritten: 0 };
+/** Sent to `onProgress` after each batch completes. */
+export interface AiProgress {
+  batch: number; // batches completed
+  batches: number; // batches planned
+  pinned: number;
+  moved: number;
+  refreshed: number;
+}
 
-  // Once per batch, and before the paid call: if the rules can't be read there
-  // is no point asking the model, and every pin below reuses these lists.
-  const lists = await loadEngineLists();
-
-  const items = cands.map((c) => ({
-    key: c.key,
-    merchant: c.merchant ?? '',
-    counterparty: c.counterparty ?? '',
-    vpa: c.vpa ?? '',
-    remark: c.remark ?? '',
-    channel: c.channel ?? '',
-    amount: c.amount,
-    direction: c.direction,
-  }));
-
+/** One call to categorise-ai. Returns null when the function isn't configured
+ *  (503 "not configured"); throws on anything else with the status and body. */
+async function askCategoriseAi(
+  items: Record<string, unknown>[],
+): Promise<{ key: string; category: string; merchant: string }[] | null> {
   const { data, error } = await supabase.functions.invoke<{
     answers?: { key: string; category: string; merchant: string }[];
   }>('categorise-ai', { body: { items } });
@@ -844,36 +851,96 @@ export async function runAiFallback(limit = AI_BATCH_SIZE, scope?: string): Prom
     } catch {
       /* not JSON — surface the raw text below */
     }
-    if (ctx.status === 503 && body?.error === 'not configured') {
-      return { candidates: cands.length, answered: 0, pinned: 0, moved: 0, refreshed: 0, unwritten: 0, notConfigured: true };
-    }
+    if (ctx.status === 503 && body?.error === 'not configured') return null;
     throw new Error(`categorise-ai returned ${ctx.status}: ${describeFunctionError(body, text)}`);
   }
+  return data?.answers ?? [];
+}
 
-  const answers = data?.answers ?? [];
-  const byKey = new Map(cands.map((c) => [c.key, c]));
-  let pinned = 0;
-  let moved = 0;
-  let refreshed = 0;
-  let unwritten = 0;
-  for (const a of answers) {
-    const c = byKey.get(a.key);
-    if (!c) continue;
-    const res = await pinMerchant(
-      {
-        matchType: c.matchType,
-        matchValue: c.matchValue,
-        categorySlug: a.category,
-        merchant: a.merchant || c.merchant,
-      },
-      lists,
-    );
-    pinned += 1;
-    moved += res.moved;
-    refreshed += res.refreshed;
-    unwritten += res.unwritten;
+/** Sweep the queue's most valuable unpinned merchants through the model, in
+ *  calls of AI_CALL_SIZE, until the candidates run out or `cap` is reached.
+ *  Each answer is written as a merchant_rules pin the moment it arrives, so a
+ *  batch that fails part-way keeps everything pinned before it — the run then
+ *  returns what it did, with `error` set, instead of throwing it away.
+ *  A failure before anything was pinned still throws. */
+export async function runAiFallback(
+  opts: { scope?: string; cap?: number; onProgress?: (p: AiProgress) => void } = {},
+): Promise<AiRunResult> {
+  const { scope, cap = AI_SWEEP_CAP, onProgress } = opts;
+  const cands = await listAiCandidates(cap, scope);
+  const chunks: AiCandidate[][] = [];
+  for (let i = 0; i < cands.length; i += AI_CALL_SIZE) chunks.push(cands.slice(i, i + AI_CALL_SIZE));
+
+  const total: AiRunResult = {
+    candidates: cands.length,
+    answered: 0,
+    pinned: 0,
+    moved: 0,
+    refreshed: 0,
+    unwritten: 0,
+    batches: chunks.length,
+    batchesDone: 0,
+  };
+  if (!chunks.length) return total;
+
+  // Once per run, and before the first paid call: if the rules can't be read
+  // there is no point asking the model, and every pin reuses these lists.
+  const lists = await loadEngineLists();
+
+  for (const chunk of chunks) {
+    try {
+      const answers = await askCategoriseAi(
+        chunk.map((c) => ({
+          key: c.key,
+          merchant: c.merchant ?? '',
+          counterparty: c.counterparty ?? '',
+          vpa: c.vpa ?? '',
+          remark: c.remark ?? '',
+          channel: c.channel ?? '',
+          amount: c.amount,
+          direction: c.direction,
+        })),
+      );
+      if (answers === null) {
+        total.notConfigured = true;
+        break;
+      }
+      total.answered += answers.length;
+      const byKey = new Map(chunk.map((c) => [c.key, c]));
+      for (const a of answers) {
+        const c = byKey.get(a.key);
+        if (!c) continue;
+        const res = await pinMerchant(
+          {
+            matchType: c.matchType,
+            matchValue: c.matchValue,
+            categorySlug: a.category,
+            merchant: a.merchant || c.merchant,
+          },
+          lists,
+        );
+        // Counted per pin, not per batch, so a failure in the middle of a batch
+        // still reports the pins it did write.
+        total.pinned += 1;
+        total.moved += res.moved;
+        total.refreshed += res.refreshed;
+        total.unwritten += res.unwritten;
+      }
+    } catch (e) {
+      if (total.pinned === 0 && total.batchesDone === 0) throw e; // nothing to keep
+      total.error = errMessage(e, 'A batch failed.');
+      break;
+    }
+    total.batchesDone += 1;
+    onProgress?.({
+      batch: total.batchesDone,
+      batches: chunks.length,
+      pinned: total.pinned,
+      moved: total.moved,
+      refreshed: total.refreshed,
+    });
   }
-  return { candidates: cands.length, answered: answers.length, pinned, moved, refreshed, unwritten };
+  return total;
 }
 
 /** Human-readable body of a failed categorise-ai call. The function returns

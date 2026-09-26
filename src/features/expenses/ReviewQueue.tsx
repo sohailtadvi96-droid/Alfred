@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { shortDate, signedMoney } from '@/lib/format';
 import { errMessage } from '@/lib/errors';
-import { AI_BATCH_SIZE } from './api';
+import { AI_CALL_SIZE, AI_CONFIRM_ABOVE, AI_SWEEP_CAP, type AiProgress } from './api';
 import { useAiCandidates, useAiFallback, useReviewQueue } from './hooks';
 import { PinCategoryMenu } from './PinCategoryMenu';
 import { notSaved, outcomeText } from './recategoriseSummary';
@@ -35,26 +35,43 @@ export function ReviewQueue() {
   const ai = useAiFallback(scope);
   const [grouped, setGrouped] = useState(true);
   const [aiMsg, setAiMsg] = useState<string | null>(null);
+  const [aiProgress, setAiProgress] = useState<AiProgress | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const aiCount = aiCandidates?.length ?? 0;
-  const aiBatch = Math.min(AI_BATCH_SIZE, aiCount);
+  // What one click will actually send: the most valuable merchants, up to the cap.
+  const aiKeys = Math.min(aiCount, AI_SWEEP_CAP);
+  const aiCalls = Math.ceil(aiKeys / AI_CALL_SIZE);
 
   async function runAi() {
     setAiMsg(null);
+    setConfirming(false);
+    setAiProgress(null);
     try {
-      const r = await ai.mutateAsync();
+      const r = await ai.mutateAsync({ onProgress: setAiProgress });
       if (r.notConfigured) {
         setAiMsg('AI fallback isn’t set up — deploy the categorise-ai function and set ANTHROPIC_API_KEY.');
       } else if (r.candidates === 0) {
         setAiMsg('Nothing left for the AI — every low-confidence row is already pinned.');
       } else {
+        const result = `pinned ${r.pinned} of ${r.candidates} — ${outcomeText(r)}.${notSaved(r.unwritten)}`;
         setAiMsg(
-          `Asked about ${r.candidates}, pinned ${r.pinned} — ${outcomeText(r)}.${notSaved(r.unwritten)}`,
+          r.error
+            ? `Stopped after ${r.batchesDone} of ${r.batches} calls: ${r.error} Kept what was pinned: ${result}`
+            : `Asked about ${r.candidates}, ${result}`,
         );
       }
     } catch (e) {
       setAiMsg(errMessage(e, 'AI fallback failed.'));
+    } finally {
+      setAiProgress(null);
     }
+  }
+
+  /** A big sweep costs real money and minutes — say so before starting it. */
+  function askAi() {
+    if (aiKeys > AI_CONFIRM_ABOVE) setConfirming(true);
+    else void runAi();
   }
 
   const filtered = useMemo(
@@ -116,13 +133,29 @@ export function ReviewQueue() {
               ? `${aiCount} unpinned merchant${aiCount === 1 ? '' : 's'} in this queue`
               : 'AI fallback'}
           </span>
-          <button className="btn sec sm" onClick={runAi} disabled={ai.isPending || aiCount === 0}>
-            {ai.isPending
-              ? `Asking Claude about ${aiBatch}…`
-              : aiCount > aiBatch
-                ? `Ask AI to sort ${aiBatch} of ${aiCount}`
-                : `Ask AI to sort ${aiCount || ''}`.trim()}
-          </button>
+          {confirming && !ai.isPending ? (
+            <>
+              <span className="tlabel">
+                Send {aiKeys} merchants to Claude in {aiCalls} model calls?
+              </span>
+              <button className="btn primary sm" onClick={() => void runAi()}>
+                Yes, run
+              </button>
+              <button className="btn ghost sm" onClick={() => setConfirming(false)}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button className="btn sec sm" onClick={askAi} disabled={ai.isPending || aiCount === 0}>
+              {ai.isPending
+                ? aiProgress
+                  ? `Asking Claude — ${aiProgress.batch} of ${aiProgress.batches} calls done · ${aiProgress.pinned} pinned`
+                  : `Asking Claude (${aiCalls} call${aiCalls === 1 ? '' : 's'})…`
+                : aiCount > aiKeys
+                  ? `Ask AI to sort ${aiKeys} of ${aiCount}`
+                  : `Ask AI to sort ${aiCount || ''}`.trim()}
+            </button>
+          )}
           {aiMsg && <span className="tlabel">{aiMsg}</span>}
         </div>
       )}
