@@ -286,15 +286,14 @@ export async function recategoriseMatching(
   lists: Lists,
   dryRun = false,
 ): Promise<{ scanned: number; moved: number }> {
-  let q = supabase.from('transactions').select(STORED_TXN_COLUMNS);
-  if (match.vpa) q = q.eq('vpa_prefix', match.vpa);
-  else if (match.counterparty) q = q.ilike('counterparty', match.counterparty);
-  else return { scanned: 0, moved: 0 };
+  const { vpa, counterparty } = match;
+  if (!vpa && !counterparty) return { scanned: 0, moved: 0 };
 
-  const { data, error } = await q;
-  if (error) throw error;
-
-  const rows = (data ?? []) as StoredTxn[];
+  const rows = await selectAll<StoredTxn>((from, to) => {
+    let q = supabase.from('transactions').select(STORED_TXN_COLUMNS);
+    q = vpa ? q.eq('vpa_prefix', vpa) : q.ilike('counterparty', counterparty!);
+    return q.order('id').range(from, to);
+  });
   const updates = recategoriseStored(rows, lists);
   if (!dryRun) await applyRecategoriseUpdates(updates);
   return { scanned: rows.length, moved: updates.length };
@@ -519,18 +518,37 @@ export async function resolveAmbiguousSeparated(
 
 const CONFIDENCE_RANK: Record<string, number> = { low: 0, medium: 1, high: 2 };
 
+/** Every row of a select, not just the first page — PostgREST caps a response
+ *  at max_rows (1,000). `page` must build a fresh query each call (builders
+ *  aren't reusable) with a stable order, so pages don't overlap or skip rows.
+ *  Advances by what actually came back and stops on an empty page, so it stays
+ *  correct even if the server cap is lower than the page size asked for. */
+async function selectAll<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>,
+): Promise<T[]> {
+  const PAGE = 1000;
+  const all: T[] = [];
+  for (;;) {
+    const { data, error } = await page(all.length, all.length + PAGE - 1);
+    if (error) throw error;
+    if (!data?.length) return all;
+    all.push(...(data as T[]));
+  }
+}
+
 /** Engine-classified rows that want a human look: low/medium confidence,
  *  confidence ascending then amount descending (04a-BUILD-BRIEF Task 4). */
 export async function listReviewQueue(limit = 300): Promise<ReviewTxn[]> {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select(
-      'id,occurred_at,direction,amount_cents,category,merchant_display,counterparty,vpa_prefix,confidence,matched_by',
-    )
-    .in('confidence', ['low', 'medium']);
-  if (error) throw error;
-
-  const rows = (data ?? []) as ReviewTxn[];
+  const rows = await selectAll<ReviewTxn>((from, to) =>
+    supabase
+      .from('transactions')
+      .select(
+        'id,occurred_at,direction,amount_cents,category,merchant_display,counterparty,vpa_prefix,confidence,matched_by',
+      )
+      .in('confidence', ['low', 'medium'])
+      .order('id')
+      .range(from, to),
+  );
   rows.sort(
     (a, b) =>
       (CONFIDENCE_RANK[a.confidence ?? 'medium'] ?? 1) -
@@ -591,40 +609,44 @@ export interface AiCandidate {
  *  shown above the button can be far larger; each click takes the next batch. */
 export const AI_BATCH_SIZE = 30;
 
+interface AiTxnRow {
+  direction: Direction;
+  amount_cents: number;
+  merchant_display: string | null;
+  counterparty: string | null;
+  vpa_prefix: string | null;
+  remark: string | null;
+  channel: string | null;
+  category: string;
+  confidence: string | null;
+}
+
 /** The review queue's rows (low/medium confidence, optionally narrowed to one
  *  category scope), minus anything already pinned in merchant_rules — deduped
  *  to one per merchant key, highest total value first (low confidence breaks
  *  ties), so each AI batch takes the payees that move the numbers most.
  *  Pass `limit = Infinity` to count them all. */
 export async function listAiCandidates(limit = AI_BATCH_SIZE, scope?: string): Promise<AiCandidate[]> {
-  let txnQuery = supabase
-    .from('transactions')
-    .select('direction,amount_cents,merchant_display,counterparty,vpa_prefix,remark,channel,category,confidence')
-    .in('confidence', ['low', 'medium']);
-  if (scope && scope !== 'all') txnQuery = txnQuery.eq('category', scope);
-  const [txnRes, ruleRes] = await Promise.all([
-    txnQuery,
-    supabase.from('merchant_rules').select('match_value'),
+  const [txns, rules] = await Promise.all([
+    selectAll<AiTxnRow>((from, to) => {
+      let q = supabase
+        .from('transactions')
+        .select('id,direction,amount_cents,merchant_display,counterparty,vpa_prefix,remark,channel,category,confidence')
+        .in('confidence', ['low', 'medium']);
+      if (scope && scope !== 'all') q = q.eq('category', scope);
+      return q.order('id').range(from, to);
+    }),
+    selectAll<{ match_value: string }>((from, to) =>
+      supabase.from('merchant_rules').select('id,match_value').order('id').range(from, to),
+    ),
   ]);
-  if (txnRes.error) throw txnRes.error;
-  if (ruleRes.error) throw ruleRes.error;
 
-  const pinned = new Set((ruleRes.data ?? []).map((r) => String(r.match_value)));
+  const pinned = new Set(rules.map((r) => String(r.match_value)));
   // Per key: the first row seen stands in for the merchant in the AI payload;
   // totalCents and rank aggregate over every matching row.
   const byKey = new Map<string, { cand: AiCandidate; totalCents: number; rank: number }>();
 
-  for (const t of (txnRes.data ?? []) as Array<{
-    direction: Direction;
-    amount_cents: number;
-    merchant_display: string | null;
-    counterparty: string | null;
-    vpa_prefix: string | null;
-    remark: string | null;
-    channel: string | null;
-    category: string;
-    confidence: string | null;
-  }>) {
+  for (const t of txns) {
     if (t.category === 'bank_charges') continue; // needsAI() excludes it
     const vpa = (t.vpa_prefix ?? '').trim();
     const cp = (t.counterparty ?? '').trim();
