@@ -127,8 +127,9 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   pins in tier 0 still win): `loadEngineLists` builds `entityCategoryByVpa` /
   `entityCategoryByName` from keys of entities that have one, skipping keys whose
   `ambiguity_state` is `needs_review` or `separated` (`buildEntityCategoryMaps`). It
-  applies at any amount and either direction, so a `my_ferrari` default bypasses the
-  ferrari amount pattern that the `is_ferrari` flag enforces. `entity_keys`: `entity_id`,
+  applies at any amount, so a `my_ferrari` default would bypass the ferrari amount pattern
+  that the `is_ferrari` flag enforces — the resolve and separate dialogs therefore don't
+  offer it (`entityCategories.ts`); tag the payee as a Ferrari shop instead. `entity_keys`: `entity_id`,
   `key_type` (vpa_prefix/merchant_name/counterparty), `key_value`, `confidence`
   (exact/prefix) — unique on `(user_id, key_type, key_value)`, so a key is claimed by at
   most one entity. `confidence = 'exact'` means "not a truncated prefix, cannot silently

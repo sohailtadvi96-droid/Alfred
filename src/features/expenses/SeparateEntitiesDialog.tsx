@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { money } from '@/lib/format';
+import { isEntityDefaultCategory } from './entityCategories';
 import { useCategories } from './hooks';
 import type { QueueNameBreakdown, ResolveEntityInput } from './api';
 
@@ -26,7 +27,7 @@ export function SeparateEntitiesDialog({
   onConfirm: (perName: (ResolveEntityInput & { name: string })[]) => void;
 }) {
   const cats = useCategories();
-  const shopCategories = cats.forDirection('debit').filter((c) => c.kind !== 'transfer');
+  const shopCategories = cats.forDirection('debit').filter(isEntityDefaultCategory);
 
   const [rows, setRows] = useState<Row[]>(() =>
     names.map((n) => ({ name: n.name, entityType: 'person', displayName: title(n.name), categorySlug: '' })),

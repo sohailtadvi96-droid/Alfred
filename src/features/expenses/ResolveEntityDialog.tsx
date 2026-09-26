@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { money } from '@/lib/format';
+import { isEntityDefaultCategory } from './entityCategories';
 import { useCategories } from './hooks';
 import type { ResolveEntityInput } from './api';
 
@@ -34,7 +35,7 @@ export function ResolveEntityDialog({
   const [displayName, setDisplayName] = useState(sampleName);
   const [categorySlug, setCategorySlug] = useState('');
 
-  const shopCategories = cats.forDirection('debit').filter((c) => c.kind !== 'transfer');
+  const shopCategories = cats.forDirection('debit').filter(isEntityDefaultCategory);
 
   function reset() {
     setEntityType(initialType);
