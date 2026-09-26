@@ -126,11 +126,9 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   as tier 3b in `classify()` (after family/ferrari, before the brand RULES; `merchant_rules`
   pins in tier 0 still win): `loadEngineLists` builds `entityCategoryByVpa` /
   `entityCategoryByName` from keys of entities that have one, skipping keys whose
-  `ambiguity_state` is `needs_review` or `separated` (`buildEntityCategoryMaps`). It
-  is never applied to a credit when the default is an expense-kind category
-  (`Lists.expenseCategories`, from `categories.kind`) — `transaction_flows` reads
-  `flow_kind` from the category, so that credit would be summed into spend; it falls
-  through to the later tiers instead. It applies at any amount, so a `my_ferrari` default would bypass the ferrari amount pattern
+  `ambiguity_state` is `needs_review` or `separated` (`buildEntityCategoryMaps`). (A
+  credit is never left in an expense category by any tier — see the credit guard under
+  Conventions.) It applies at any amount, so a `my_ferrari` default would bypass the ferrari amount pattern
   that the `is_ferrari` flag enforces — the resolve and separate dialogs therefore don't
   offer it (`entityCategories.ts`); tag the payee as a Ferrari shop instead. `entity_keys`: `entity_id`,
   `key_type` (vpa_prefix/merchant_name/counterparty), `key_value`, `confidence`
@@ -281,6 +279,17 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 - **`design_item_boards` has no `user_id`** — a deliberate exception to the owner-all
   pattern: ownership is the item's (`exists` on `design_items`), and a write also requires
   the *board* to be the caller's so a row can never link into someone else's board.
+- **Credit guard** (`classify()` in `categorize.ts`, wrapping the tiers): a credit whose
+  chosen category is in `Lists.expenseCategories` becomes `Money Received`, with the
+  original tier kept as a `matched_by` suffix (`override:credit`, `brand:credit`,
+  `qr:credit`, `entity:credit`…) and `confidence = 'medium'`. The set is loaded by
+  `loadEngineLists` from `categories` and mirrors how `transaction_flows` derives
+  `flow_kind` for a credit: the `(slug, 'credit')` row's kind, user row else system row,
+  so a slug with no credit-side row (`grocery`, `alcohol`…) is not in it — the view already
+  counts those as income. Reason: `getMonthSummary` adds `flow_kind = 'expense'` amounts
+  into spend unsigned, so a credit in an expense category inflates spend. Because it is
+  `medium`, guarded rows stay in the review queue, and pinning their payee cannot clear
+  them (the pin also governs the payee's debits and is guarded again for credits).
 - **Design module UI** uses the app's ground/theme like every other module — no ground
   override. The `--design-*` tokens in `tokens.css` are *aliases* onto the active preset's
   own tokens (`--surface`, `--text`, `--base`…; muted text and borders are `color-mix`es of

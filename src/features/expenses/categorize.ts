@@ -1,7 +1,11 @@
 /**
  * ICICI statement → categorised transactions.
  * Taxonomy per CATEGORIES.md. 1,804 real txns tested; 1 falls through.
+ *
+ * Pure: no I/O. Its one import is taxonomy.ts (a static name → slug table),
+ * needed to compare an engine category name with the slugs in Lists.
  */
+import { slugForCategory } from "./taxonomy";
 
 export type Direction = "DR" | "CR";
 export interface RawTxn { date: string; amount: number; balance: number; direction: Direction; narration: string; }
@@ -40,10 +44,9 @@ export interface Lists {
   /** entity_keys(merchant_name | counterparty).key_value UPPERCASED ->
    *  entities.default_category — matches how classify() looks up the payee. */
   entityCategoryByName: Map<string, string>;
-  /** Slugs of expense-kind categories (categories.kind, debit side). An entity
-   *  default in one of these is never applied to a CREDIT: transaction_flows
-   *  reads flow_kind from the category, so a credit landing in an expense
-   *  category is summed into spend. */
+  /** Slugs a CREDIT must not land in: those whose credit-side categories row has
+   *  kind 'expense' — the same lookup transaction_flows makes for flow_kind, and
+   *  getMonthSummary adds flow_kind = 'expense' amounts into spend unsigned. */
   expenseCategories: Set<string>;
 }
 
@@ -103,10 +106,11 @@ const title = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase
 
 export interface Result { category: string; merchant: string; matchedBy: string; confidence: "high"|"medium"|"low"; }
 
-export function classify(
-  f: Fields, direction: Direction, amount: number, lists: Lists = EMPTY_LISTS
+/** The tiers, first match wins. Use classify(), which also applies the credit guard. */
+function pickCategory(
+  f: Fields, direction: Direction, amount: number, lists: Lists
 ): Result {
-  const { familyVpas, ferrariShops, overrides, entityCategoryByVpa, entityCategoryByName, expenseCategories } = lists;
+  const { familyVpas, ferrariShops, overrides, entityCategoryByVpa, entityCategoryByName } = lists;
   const hay = `${f.vpa} ${f.counterparty}`.toLowerCase();
   const cr = direction === "CR";
   const hit = (category: string, merchant: string, matchedBy: string,
@@ -136,11 +140,9 @@ export function classify(
   // 3b — a resolved entity's default category, reached through any of its keys
   // (one shop, several VPAs → one answer). Below ferrari/family, so flagged
   // entities keep their exact behaviour; below tier 0, so an explicit pin wins.
-  // A default describes what you SPEND there: a credit from the payee (a refund,
-  // a transfer back) must not inherit an expense category, so it falls through.
   const entityCat =
     (f.vpa && entityCategoryByVpa.get(f.vpa)) || entityCategoryByName.get(f.counterparty.toUpperCase());
-  if (entityCat && !(cr && expenseCategories.has(entityCat))) return hit(entityCat, title(f.counterparty), "entity");
+  if (entityCat) return hit(entityCat, title(f.counterparty), "entity");
 
   // 4 — brands
   for (const [cat, re] of RULES) if (re.test(hay)) return hit(cat, title(f.counterparty), "brand");
@@ -158,6 +160,29 @@ export function classify(
   if (f.vpa) return hit(cr ? "Money Received" : "Person Transactions", title(f.counterparty), "p2p", "medium");
 
   return hit("Uncategorised", title(f.counterparty), "none", "low");
+}
+
+/** Suffix on matchedBy when the credit guard rewrote a result ("override:credit"). */
+export const CREDIT_GUARD_SUFFIX = ":credit";
+
+/**
+ * Classify one transaction: pickCategory()'s tiers, then the credit guard.
+ *
+ * A credit whose chosen category is an expense category (Lists.expenseCategories)
+ * would be summed into SPEND by transaction_flows — a refund from a resolved shop
+ * inflating what you spent there. Whatever tier chose it (a pin, an entity
+ * default, a brand rule, a QR shape…), it becomes Money Received instead: the
+ * original tier stays visible as a matchedBy suffix, and confidence drops to
+ * medium so the row lands in the review queue rather than being silently
+ * rewritten. Fields the tiers computed (merchant) are kept.
+ */
+export function classify(
+  f: Fields, direction: Direction, amount: number, lists: Lists = EMPTY_LISTS
+): Result {
+  const r = pickCategory(f, direction, amount, lists);
+  if (direction === "CR" && lists.expenseCategories.has(slugForCategory(r.category)))
+    return { category: "Money Received", merchant: r.merchant, matchedBy: r.matchedBy + CREDIT_GUARD_SUFFIX, confidence: "medium" };
+  return r;
 }
 
 export function categorise(txn: RawTxn, lists: Lists = EMPTY_LISTS) {

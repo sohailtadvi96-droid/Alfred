@@ -11,7 +11,7 @@
 import { categorise, type Lists } from './categorize';
 import type { IciciTxn } from './icici';
 import { djb2, normDesc, parseDate, type NormalizedRow, type ParseResult } from './statement';
-import { resolveCategories, type RawCategoryRow } from './categories';
+import type { RawCategoryRow } from './categories';
 import { fromDR, slugForCategory } from './taxonomy';
 
 /** NormalizedRow plus the engine's parsed + classified fields, which
@@ -135,16 +135,23 @@ export interface EntityKeyCategoryRow {
  *  is excluded until someone decides it belongs here. */
 const CATEGORISING_STATES = new Set(['unknown', 'same_entity']);
 
-/** categories rows → the slugs of expense-kind categories (debit side, resolved
- *  the way the client shows them: a user row shadows the system row, and a null
- *  kind defaults from the direction). Used to keep an entity's expense default
- *  off a credit — see Lists.expenseCategories. */
+/** categories rows → the slugs a credit must not land in (Lists.expenseCategories).
+ *
+ *  Mirrors how transaction_flows derives flow_kind for a CREDIT: it joins the
+ *  category on (slug, direction = 'credit') and takes `user row kind, else
+ *  system row kind` (a null user kind falls back to the system row, not to a
+ *  direction default). A slug with no credit-side row falls back to 'income'
+ *  in the view, so it is not in the set. */
 export function buildExpenseCategories(rows: RawCategoryRow[]): Set<string> {
-  return new Set(
-    resolveCategories(rows)
-      .filter((c) => c.direction === 'debit' && c.kind === 'expense')
-      .map((c) => c.slug),
-  );
+  const kinds = new Map<string, { user: string | null; system: string | null }>();
+  for (const r of rows) {
+    if (r.direction !== 'credit') continue;
+    const k = kinds.get(r.slug) ?? { user: null, system: null };
+    if (r.user_id != null) k.user = r.kind;
+    else k.system = r.kind;
+    kinds.set(r.slug, k);
+  }
+  return new Set([...kinds].filter(([, k]) => (k.user ?? k.system) === 'expense').map(([slug]) => slug));
 }
 
 /** entity_keys → the two lookup maps classify() reads (see Lists). */
