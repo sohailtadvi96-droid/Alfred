@@ -18,9 +18,19 @@ supabase functions deploy categorise-ai
 supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   # console.anthropic.com → API Keys
 ```
 
-Until it's deployed / keyed, the function returns `{ error: 'not configured' }`
-(503) and the review-queue AI panel shows a setup hint. Nothing else in Expenses
-depends on it.
+What the review-queue "Ask AI to sort" button shows when a call fails:
+
+| Status | Cause | UI |
+|---|---|---|
+| 404 | Function never deployed (gateway, not this code) | `categorise-ai returned 404: …` |
+| 401 | JWT rejected by the gateway | `categorise-ai returned 401: …` |
+| 503 | Deployed, `ANTHROPIC_API_KEY` not set — `{ error: 'not configured' }` | Friendly "isn't set up" hint |
+| 502 | Anthropic call failed — `{ error: 'anthropic <status>', detail }` | `categorise-ai returned 502: anthropic 400 — <Anthropic's message>` |
+
+Only the 503 case gets the setup hint; everything else shows the HTTP status
+and response body. A 502 with `anthropic 401` is a bad key, and `anthropic 400`
+reading "credit balance is too low" means the key is fine but the Anthropic
+account needs credits. Nothing else in Expenses depends on this function.
 
 ## Request / response
 

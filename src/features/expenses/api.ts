@@ -668,16 +668,21 @@ export async function runAiFallback(limit = 30): Promise<AiRunResult> {
   }>('categorise-ai', { body: { items } });
 
   if (error) {
-    let notConfigured = false;
+    // A non-2xx from the function arrives as FunctionsHttpError with the raw
+    // Response on `context`; network/relay failures have no Response at all.
+    const ctx = (error as { context?: unknown }).context;
+    if (!(ctx instanceof Response)) throw error;
+    const text = await ctx.text().catch(() => '');
+    let body: { error?: unknown; detail?: unknown } | null = null;
     try {
-      const ctx = (error as { context?: Response }).context;
-      const b = ctx && (await ctx.json());
-      if (b?.error === 'not configured') notConfigured = true;
+      body = JSON.parse(text);
     } catch {
-      /* fall through */
+      /* not JSON — surface the raw text below */
     }
-    if (notConfigured) return { candidates: cands.length, answered: 0, pinned: 0, moved: 0, notConfigured: true };
-    throw error;
+    if (ctx.status === 503 && body?.error === 'not configured') {
+      return { candidates: cands.length, answered: 0, pinned: 0, moved: 0, notConfigured: true };
+    }
+    throw new Error(`categorise-ai returned ${ctx.status}: ${describeFunctionError(body, text)}`);
   }
 
   const answers = data?.answers ?? [];
@@ -697,6 +702,22 @@ export async function runAiFallback(limit = 30): Promise<AiRunResult> {
     moved += res.moved;
   }
   return { candidates: cands.length, answered: answers.length, pinned, moved };
+}
+
+/** Human-readable body of a failed categorise-ai call. The function returns
+ *  { error, detail? }; for upstream failures `detail` is Anthropic's own error
+ *  JSON, whose inner message is the useful part (e.g. "credit balance is too low"). */
+function describeFunctionError(body: { error?: unknown; detail?: unknown } | null, text: string): string {
+  if (!body || typeof body.error !== 'string') return text.slice(0, 300) || '(empty body)';
+  if (typeof body.detail !== 'string' || !body.detail) return body.error;
+  let inner: string = body.detail;
+  try {
+    const d = JSON.parse(body.detail) as { error?: { message?: unknown } };
+    if (typeof d?.error?.message === 'string') inner = d.error.message;
+  } catch {
+    /* detail wasn't JSON — show it as-is */
+  }
+  return `${body.error} — ${inner.slice(0, 300)}`;
 }
 
 /** When a bank-statement CSV was last imported (ISO), or null. */
