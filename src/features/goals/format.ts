@@ -7,7 +7,15 @@ function isCurrencyUnit(unit: string | null): boolean {
 }
 
 function formatCurrency(n: number): string {
-  return `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: Number.isInteger(n) ? 0 : 2 }).format(n)}`;
+  // sign goes in front of the symbol ("−₹3,372", not "₹-3,372") -- a
+  // savings_target's net can be negative
+  const abs = new Intl.NumberFormat('en-IN', { maximumFractionDigits: Number.isInteger(n) ? 0 : 2 }).format(Math.abs(n));
+  return `${n < 0 ? '−' : ''}₹${abs}`;
+}
+
+/** Whole rupees, sign-aware -- for prose ("₹2,140", "−₹3,372"), where paise are noise. */
+export function formatRupees(n: number): string {
+  return formatCurrency(Math.round(n));
 }
 
 function formatPlain(n: number): string {

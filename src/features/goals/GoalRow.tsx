@@ -6,6 +6,7 @@ import { dateKey, sparklineSeries } from './progress';
 import { fractionLabel, formatAmount, paceStatusLabel } from './format';
 import { PaceDot } from './PaceDot';
 import { ProgressBar } from './ProgressBar';
+import { SavingsPlan } from './SavingsPlan';
 import { Sparkline } from './Sparkline';
 import {
   useAddMilestone,
@@ -23,6 +24,7 @@ const SOURCE_LABEL: Record<GoalSourceKind, string> = {
   manual: 'Manual',
   journal_streak: 'Journal streak',
   tasks_completed: 'Tasks completed',
+  savings_target: 'Savings target (income − spend, from Expenses)',
 };
 
 export function GoalRow({
@@ -59,6 +61,7 @@ export function GoalRow({
   const isMilestone = goal.type === 'milestone';
   const isStreak = goal.type === 'streak';
   const isManualSource = goal.source.kind === 'manual';
+  const isSavings = goal.source.kind === 'savings_target';
   const doneCount = isMilestone ? (goal.milestones ?? []).filter((m) => m.done).length : 0;
   const actual = isMilestone ? doneCount : (pace?.actual ?? 0);
   const target_ = isMilestone ? (goal.milestones?.length ?? goal.target) : goal.target;
@@ -140,7 +143,15 @@ export function GoalRow({
             <Sparkline series={sparklineSeries(goal, progress)} />
           </div>
 
-          {pace && (
+          {/* goal_pace's linear "expected by today" is knowingly wrong for a lump-sum
+              salary, so a savings goal shows the plain net and leaves the projection
+              to the plan below. */}
+          {pace && isSavings && (
+            <p className="goal-row-required">
+              Net so far this month: {formatAmount(pace.actual, goal.unit)} of {formatAmount(goal.target, goal.unit)}
+            </p>
+          )}
+          {pace && !isSavings && (
             <p className="goal-row-required">
               Expected by today: {pace.expectedByToday != null ? formatAmount(pace.expectedByToday, goal.unit) : '—'}
               {' · '}Actual: {formatAmount(pace.actual, goal.unit)}
@@ -151,6 +162,8 @@ export function GoalRow({
             <p className="goal-row-required">Tracked automatically — no manual logging needed.</p>
           )}
           <p className="goal-row-source">Source: {SOURCE_LABEL[goal.source.kind]}</p>
+
+          {isSavings && goal.status === 'active' && <SavingsPlan goal={goal} />}
 
           {goal.type === 'milestone' && (
             <>
@@ -271,16 +284,19 @@ export function GoalRow({
               <label htmlFor={`unit-${goal.id}`}>Unit</label>
               <input id={`unit-${goal.id}`} className="input" value={unit} onChange={(e) => setUnit(e.target.value)} />
             </div>
-            <div className="field">
-              <label htmlFor={`due-${goal.id}`}>Target date</label>
-              <input
-                id={`due-${goal.id}`}
-                className="input"
-                type="date"
-                value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-              />
-            </div>
+            {/* a monthly savings goal renews itself -- a deadline would do nothing */}
+            {!isSavings && (
+              <div className="field">
+                <label htmlFor={`due-${goal.id}`}>Target date</label>
+                <input
+                  id={`due-${goal.id}`}
+                  className="input"
+                  type="date"
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                />
+              </div>
+            )}
           </div>
           {error && <p className="field err">{error}</p>}
           {dirty && (

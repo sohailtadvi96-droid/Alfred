@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Goal, GoalPace, GoalProgress, GoalStatus, Milestone, NewGoal } from './types';
+import type { Goal, GoalPace, GoalProgress, GoalStatus, Milestone, NewGoal, SavingsPlanResult } from './types';
 
 export async function listGoals(): Promise<Goal[]> {
   const { data, error } = await supabase.from('goals').select('*').order('created_at', { ascending: false });
@@ -29,13 +29,13 @@ export async function saveGoal(input: NewGoal): Promise<void> {
     module_id: input.module_id,
   };
 
-  // source is set only at creation -- this is the only path that ever
-  // creates a goal today, and it's always manual. On edit, `source` is
-  // deliberately left out of `row` so a journal_streak/tasks_completed
-  // goal (created elsewhere) never gets silently reset back to manual by
-  // GoalRow's "Save changes".
+  // source (and cadence) are set only at creation -- manual unless the
+  // caller says otherwise (savings_target, from NewGoalDialog). On edit
+  // they are deliberately left out of `row` so a computed goal never gets
+  // silently reset back to manual/none by GoalRow's "Save changes".
   if (!input.id) {
-    row.source = { kind: 'manual' };
+    row.source = { kind: input.source_kind ?? 'manual' };
+    if (input.cadence) row.cadence = input.cadence;
   }
 
   // Milestone checklists are owned by setMilestones (toggle/add/remove),
@@ -151,4 +151,14 @@ export async function fetchGoalPace(goalId: string): Promise<GoalPace | null> {
     projectedEnd: row.projected_end,
     status: row.status,
   };
+}
+
+/** savings_plan (0039) -- the honest month-end projection plus the ranked
+ *  cut list for a savings_target goal. Callers must only ask for
+ *  source.kind === 'savings_target' goals; any other kind comes back as
+ *  {error:'not_a_savings_target'}, a missing/foreign goal as null. */
+export async function fetchSavingsPlan(goalId: string): Promise<SavingsPlanResult> {
+  const { data, error } = await supabase.rpc('savings_plan', { p_goal_id: goalId });
+  if (error) throw error;
+  return (data as SavingsPlanResult) ?? null;
 }

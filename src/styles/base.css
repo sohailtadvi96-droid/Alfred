@@ -6145,3 +6145,160 @@ textarea.office-journal {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ---------- savings_target plan (Goals) ---------- */
+.savings-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--line-soft);
+}
+.sp-note {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin: 0;
+}
+.sp-headline {
+  border-left: 3px solid var(--text-faint);
+  padding: 2px 0 2px 12px;
+}
+.sp-headline[data-tone='ok'] { border-left-color: var(--pos); }
+.sp-headline[data-tone='warn'] { border-left-color: var(--c-ochre); }
+.sp-headline[data-tone='bad'] { border-left-color: var(--neg); }
+.sp-headline-main {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sp-headline-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.sp-options {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.sp-options strong { color: var(--text); }
+.sp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sp-h {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.sp-cuts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  counter-reset: sp-cut;
+}
+.sp-cut {
+  counter-increment: sp-cut;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+/* a floor built on a month of ₹0 is the weakest evidence: dashed, so it doesn't look as solid */
+.sp-cut[data-evidence='zero-floor'] { border-style: dashed; }
+.sp-cut-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.sp-cut-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.sp-cut-name::before {
+  content: counter(sp-cut) '. ';
+  font-family: var(--mono);
+  font-weight: 400;
+  color: var(--text-faint);
+}
+.sp-cut-amt {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.sp-cut-behaviour {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.sp-cut-meta {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+.sp-badge {
+  display: inline-block;
+  padding: 0 6px;
+  margin-right: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+.sp-badge-thin { color: var(--c-ochre); border-color: var(--c-ochre); }
+.sp-badge-zero-floor { color: var(--neg); border-color: var(--neg); border-style: dashed; }
+.sp-held,
+.sp-fine {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+.sp-subs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sp-subs li {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) auto auto;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+.sp-sub-amt,
+.sp-sub-last {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.sp-sub-last { color: var(--text-faint); }
+@media (max-width: 560px) {
+  .sp-subs li { grid-template-columns: 1fr auto; }
+  .sp-sub-last { grid-column: 1 / -1; }
+}

@@ -49,7 +49,7 @@ src/
   lib/         supabase client, TanStack queryClient, color/format/error helpers
   styles/      tokens.css (grounds/design tokens), base.css (shell + components)
 supabase/
-  migrations/  0001 … 0037, sequential, immutable once pushed
+  migrations/  0001 … 0039, sequential, immutable once pushed
   functions/   categorise-ai, design-search, design-capture, design-ingest, design-retry,
                design-backfill-dimensions (+ _shared/: cors.ts, imageDimensions.ts)
 docs/          MVP.md (spec), DEPLOY.md
@@ -69,7 +69,7 @@ components, not business logic.
 | **Work** (freelance: clients/projects/invoices) | `WorkPage`, `ProjectDetailPage`, `InvoicesPage`, `InvoiceViewPage` | 0004, 0008 | Shipped |
 | **Office** (tasks/calendar/journal) | `OfficeDayPage` | 0009, 0010 | Shipped |
 | **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011, 0029–0032, 0036, 0037 | Shipped; Discover is parked (route and `DiscoverView` kept, no nav link to it) |
-| **Goals** | `GoalsPage` | 0016, 0033–0035 | Shipped. The UI creates manual goals only; computed progress exists server-side (`goal_current_value`, `goal_pace`, cadence periods) for `journal_streak` / `tasks_completed` sources fed from Office, but nothing creates those from the UI and no goal reads Expenses / Work / Design data yet |
+| **Goals** | `GoalsPage` | 0016, 0033–0035, 0038, 0039 | Shipped. `NewGoalDialog` creates `manual` and `savings_target` goals (a "Tracking" control; savings is fixed to type `value`, cadence `monthly`, direction `up`, unit ₹, no deadline). Computed progress exists server-side (`goal_current_value`, `goal_pace`, cadence periods) for `journal_streak` / `tasks_completed` sources fed from Office — still seeded, nothing creates them from the UI — and `savings_target`, income minus spend from `transaction_flows` (0038), whose expanded `GoalRow` renders the `savings_plan` coach RPC (0039) via `SavingsPlan.tsx` / `savingsPlanView.ts`. No goal reads Work / Design data yet |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped |
 
 ## Expenses engine (client-side categorisation)
@@ -192,7 +192,7 @@ the gate.
 - The month views (`listTransactions`, `getMonthSummary`) aren't paged — fine until a single month
   passes 1,000 rows.
 
-## Database schema (as of migration 0037)
+## Database schema (as of migration 0039)
 
 All tables live in `public`, have RLS enabled, and (unless noted) use the same
 per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`.
@@ -399,8 +399,9 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 **Goals**
 - `goals` — type (`count`/`value`/`milestone`/`streak`), target, unit, direction
   (up/down), `source` jsonb whose `kind` is whitelisted by `goals_source_kind_check` (0033):
-  `manual` | `journal_streak` | `tasks_completed` — the UI only ever writes `manual`; the other
-  two are computed from `office_journal` / `office_tasks`. Optional `module_id` tag, `milestones`
+  `manual` | `journal_streak` | `tasks_completed` | `savings_target` (0038) — the UI only ever
+  writes `manual`; `journal_streak` / `tasks_completed` are computed from `office_journal` /
+  `office_tasks`, `savings_target` from `transaction_flows` (see `goal_current_value` below). Optional `module_id` tag, `milestones`
   jsonb checklist (milestone-type goals only). 0033 added `cadence`
   (`none`/`weekly`/`monthly`/`quarterly`), `parent_goal_id` (hierarchy; not self) and
   `next_task_id` (→ `office_tasks`).
@@ -410,9 +411,27 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   closes, never recomputed), `reminders` (general-purpose; `goal_id` nullable) and `goal_reviews`
   (continue/adjust/drop check-ins, one per goal per day). All owner-all RLS.
 - RPCs (plain SQL, invoker — RLS applies as the caller): `goal_current_value(goal, from, to)`
-  (0034, dispatches on `source.kind`) and `goal_pace(goal)` (0035 — streak: trailing 28 days;
+  (0034, dispatches on `source.kind`; 0038 added `savings_target` = income − spend in **rupees**
+  over the range, `flow_kind = 'income'` credits whose category is in `source.income_categories`
+  (default `salary` + `income`, so `money_received` never counts) minus `flow_kind = 'expense'`
+  debits, `excluded_from_spend` rows dropped; an explicit `[]` counts no income, only an absent or
+  non-array key takes the default) and `goal_pace(goal)` (0035 — streak: trailing 28 days;
   count/value with `cadence = 'none'`: linear over the goal's lifetime; with a cadence: per-period
   target; milestone goals are rejected).
+- `savings_plan(goal)` (0039, `stable`, invoker, jsonb; `null` = no such goal, `{error}` = not a
+  `savings_target` or cadence other than `monthly`) — the honest month-end projection (`goal_pace`'s
+  linear expectation is wrong for a lump-sum salary): meter to `as_of` (the last transaction day
+  of the month, never today) + the average meter over the same day-span of the last 3 complete
+  months. Ranking pool = want-bucket debits (bucket read `coalesce(uc.bucket, sc.bucket)`, same
+  shadow-row joins as `transaction_flows`) + `person_transactions` rows under ₹1,000 as ONE pooled
+  line (≥ ₹1,000 is lending-shaped and never enters). Per category over complete months, empty
+  months zero-filled: `avg_last3`, `floor` (lowest complete month; `data_points` shows how thin),
+  `recoverable = max(0, avg_last3 − floor)`, trend (last 2 vs earlier), lever (`frequency` under
+  ₹300 avg ticket); packed greedily against `projected_gap`, never below a floor. `feasible` when
+  total recoverable covers it, else `infeasible` + `shortfall`; `insufficient_history` with no
+  complete month. Also lists active `subscriptions` `recurring_series` rows — a list to eyeball,
+  no "dead" flag exists, and `recurring_series` is only as fresh as the last manual
+  `detect_recurring_series()`.
 
 ## Conventions worth knowing
 

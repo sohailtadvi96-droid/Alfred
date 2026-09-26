@@ -7,6 +7,7 @@ const keys = {
   goals: ['goals', 'list'] as const,
   progress: ['goals', 'progress'] as const,
   pace: (goalId: string) => ['goals', 'pace', goalId] as const,
+  savingsPlan: (goalId: string) => ['goals', 'savings-plan', goalId] as const,
 };
 
 /** single-user app — after any write just refresh the whole Goals subtree */
@@ -29,6 +30,17 @@ export function useGoalPace(goal: Pick<Goal, 'id' | 'type'> | undefined) {
     queryKey: goal ? keys.pace(goal.id) : keys.pace('none'),
     queryFn: () => api.fetchGoalPace((goal as Goal).id),
     enabled: !!goal && goal.type !== 'milestone',
+  });
+}
+
+/** savings_plan for one goal. Only ever enabled for source.kind ===
+ *  'savings_target' -- never fanned out across the goal list, and the
+ *  caller mounts it only while the row is expanded. */
+export function useSavingsPlan(goal: Pick<Goal, 'id' | 'source'> | undefined) {
+  return useQuery({
+    queryKey: goal ? keys.savingsPlan(goal.id) : keys.savingsPlan('none'),
+    queryFn: () => api.fetchSavingsPlan((goal as Goal).id),
+    enabled: !!goal && goal.source.kind === 'savings_target',
   });
 }
 

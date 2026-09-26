@@ -3,7 +3,7 @@ import { Dialog } from '@/components/Dialog';
 import { errMessage } from '@/lib/errors';
 import type { ModuleId } from '@/features/home/types';
 import { useGoals, useSaveGoal } from './hooks';
-import type { GoalDirection, GoalType } from './types';
+import type { GoalDirection, GoalSourceKind, GoalType } from './types';
 
 /** Per-type field behaviour and copy. The tab label is display-only — the
  *  stored `type` enum stays count/value/milestone/streak either way (this
@@ -84,6 +84,36 @@ const TYPE_CONFIG: Record<
   },
 };
 
+/** A savings_target goal (0038) is fixed by the DB and the meter: type 'value',
+ *  cadence 'monthly', direction 'up', target in rupees, no deadline (it renews
+ *  itself each month) -- so it borrows TYPE_CONFIG's shape with those fields
+ *  switched off instead of adding a fifth goal type. */
+const SAVINGS_CONFIG: (typeof TYPE_CONFIG)['value'] = {
+  tabLabel: 'Savings',
+  tagline: 'Counted automatically as income minus spend from your statements, every month.',
+  titlePlaceholder: 'e.g. Save ₹20,000 a month',
+  targetLabel: 'Save how much each month? (₹)',
+  targetPlaceholder: '20000',
+  unitLabel: '',
+  unitPlaceholder: '',
+  showUnit: false,
+  showDirection: false,
+  showTargetDate: false,
+  showSteps: false,
+};
+
+/** How progress gets tracked -- the source.kind the goal is created with.
+ *  Only the two kinds the UI can create; journal_streak/tasks_completed goals
+ *  are still seeded elsewhere. */
+const TRACKING_OPTIONS: { kind: Extract<GoalSourceKind, 'manual' | 'savings_target'>; label: string; hint: string }[] = [
+  { kind: 'manual', label: 'I log it myself', hint: 'You add progress by hand.' },
+  {
+    kind: 'savings_target',
+    label: 'Savings, from Expenses',
+    hint: 'Income minus spend, computed from your imported statements — nothing to log.',
+  },
+];
+
 // The real 7-id ModuleId union, matching goals.module_id's DB check
 // constraint exactly -- not the reference's invented 'office' area.
 const MODULE_OPTIONS: { id: ModuleId; label: string }[] = [
@@ -106,6 +136,7 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const { data: goals } = useGoals();
   const activeCount = (goals ?? []).filter((g) => g.status === 'active').length;
 
+  const [sourceKind, setSourceKind] = useState<'manual' | 'savings_target'>('manual');
   const [type, setType] = useState<GoalType>('count');
   const [title, setTitle] = useState('');
   const [target, setTarget] = useState('1');
@@ -117,17 +148,27 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const [milestoneLabels, setMilestoneLabels] = useState(['', '']);
   const [error, setError] = useState<string | null>(null);
 
-  const cfg = TYPE_CONFIG[type];
+  const isSavings = sourceKind === 'savings_target';
+  // a savings goal is always an 'value' goal, whatever the type tabs last said
+  const effType: GoalType = isSavings ? 'value' : type;
+  const cfg = isSavings ? SAVINGS_CONFIG : TYPE_CONFIG[type];
   const atCap = activeCount >= 7;
   const isValid =
     title.trim().length > 0 &&
     (cfg.showSteps
       ? milestoneLabels.some((l) => l.trim())
-      : type === 'streak'
+      : effType === 'streak'
         ? true // optional to type -- Number(target) || 1 below always sends a valid positive number
         : Number(target) > 0);
 
+  function pickTracking(kind: 'manual' | 'savings_target') {
+    setSourceKind(kind);
+    // savings is a Money goal; don't override an area the user already chose
+    if (kind === 'savings_target' && !moduleId) setModuleId('expenses');
+  }
+
   function reset() {
+    setSourceKind('manual');
     setType('count');
     setTitle('');
     setTarget('1');
@@ -151,9 +192,9 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     try {
       await save.mutateAsync({
         title,
-        type,
+        type: effType,
         target: Number(target) || 1,
-        unit: unit || null,
+        unit: isSavings ? '₹' : unit || null,
         direction: cfg.showDirection ? direction : 'up',
         start_date: startDate,
         target_date: cfg.showTargetDate ? targetDate || null : null,
@@ -161,6 +202,9 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         milestones: cfg.showSteps
           ? milestoneLabels.filter((l) => l.trim()).map((label, i) => ({ label: label.trim(), order: i }))
           : undefined,
+        // only savings goals name a source/cadence; everything else keeps
+        // saveGoal's defaults (manual, cadence 'none')
+        ...(isSavings ? { source_kind: 'savings_target' as const, cadence: 'monthly' as const } : {}),
       });
       reset();
       onOpenChange(false);
@@ -191,16 +235,34 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     >
       <form id="new-goal-form" onSubmit={onSubmit}>
         <div className="field">
-          <label>Type</label>
-          <div className="seg goal-type-seg">
-            {(Object.keys(TYPE_CONFIG) as GoalType[]).map((t) => (
-              <button key={t} type="button" className={type === t ? 'on' : ''} onClick={() => setType(t)}>
-                {TYPE_CONFIG[t].tabLabel}
+          <label>Tracking</label>
+          <div className="seg">
+            {TRACKING_OPTIONS.map((o) => (
+              <button key={o.kind} type="button" className={sourceKind === o.kind ? 'on' : ''} onClick={() => pickTracking(o.kind)}>
+                {o.label}
               </button>
             ))}
           </div>
-          <span className="hint">{cfg.tagline}</span>
+          <span className="hint">{TRACKING_OPTIONS.find((o) => o.kind === sourceKind)?.hint}</span>
         </div>
+
+        {isSavings ? (
+          <div className="field">
+            <span className="hint">{cfg.tagline}</span>
+          </div>
+        ) : (
+          <div className="field">
+            <label>Type</label>
+            <div className="seg goal-type-seg">
+              {(Object.keys(TYPE_CONFIG) as GoalType[]).map((t) => (
+                <button key={t} type="button" className={type === t ? 'on' : ''} onClick={() => setType(t)}>
+                  {TYPE_CONFIG[t].tabLabel}
+                </button>
+              ))}
+            </div>
+            <span className="hint">{cfg.tagline}</span>
+          </div>
+        )}
 
         <div className={`field${error ? ' bad' : ''}`}>
           <label htmlFor="goal-title">What's the goal?</label>
