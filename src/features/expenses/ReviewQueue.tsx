@@ -4,7 +4,7 @@ import { errMessage } from '@/lib/errors';
 import { AI_BATCH_SIZE } from './api';
 import { useAiCandidates, useAiFallback, useReviewQueue } from './hooks';
 import { PinCategoryMenu } from './PinCategoryMenu';
-import { notSaved } from './recategoriseSummary';
+import { notSaved, outcomeText } from './recategoriseSummary';
 import type { ReviewTxn } from './types';
 
 type Scope = 'all' | 'local_merchant' | 'person_transactions';
@@ -48,7 +48,7 @@ export function ReviewQueue() {
         setAiMsg('Nothing left for the AI — every low-confidence row is already pinned.');
       } else {
         setAiMsg(
-          `Asked about ${r.candidates}, pinned ${r.pinned}, moved ${r.moved} transaction${r.moved === 1 ? '' : 's'}.${notSaved(r.unwritten)}`,
+          `Asked about ${r.candidates}, pinned ${r.pinned} — ${outcomeText(r)}.${notSaved(r.unwritten)}`,
         );
       }
     } catch (e) {

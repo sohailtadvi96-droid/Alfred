@@ -186,8 +186,7 @@ export async function loadEngineLists(): Promise<Lists> {
  *  patched back. Paged by id (unique): ordering by occurred_at, which ties, let
  *  rows skip or repeat across page boundaries. */
 export async function recategorizeAllClient(lists: Lists): Promise<RecategoriseOutcome> {
-  let moved = 0;
-  let unwritten = 0;
+  let total: RecategoriseOutcome = { moved: 0, refreshed: 0, unwritten: 0 };
   await eachPage<StoredTxn>(
     (from, to) =>
       supabase
@@ -198,26 +197,48 @@ export async function recategorizeAllClient(lists: Lists): Promise<RecategoriseO
         .range(from, to),
     async (rows) => {
       const updates = recategoriseStored(rows, lists);
-      const written = await applyRecategoriseUpdates(updates);
-      moved += written.size;
-      unwritten += updates.length - written.size;
+      total = add(total, tally(updates, await applyRecategoriseUpdates(updates)));
     },
   );
-  return { moved, unwritten };
+  return total;
 }
 
 /** Everything recategoriseStored compares against the engine's answer. */
 const STORED_TXN_COLUMNS =
   'id,direction,amount_cents,raw_snippet,category,confidence,matched_by,channel,counterparty,vpa_prefix,remark';
 
-/** What a re-categorise actually did. `moved` is rows the database accepted;
- *  `unwritten` is rows the engine meant to write that it did not — an update
- *  that matches no row (RLS, a row deleted mid-run) succeeds with zero rows
- *  affected and no error, so the two can differ silently. */
+/** What a re-categorise actually did, in three disjoint counts:
+ *  - `moved`     rows written whose category CHANGED;
+ *  - `refreshed` rows written with the same category, whose confidence /
+ *                matched_by / counterparty / … had drifted from the engine
+ *                (still worth writing — a stale 'medium' keeps a row in the
+ *                review queue — but nothing the user would call a move);
+ *  - `unwritten` rows the engine meant to write that the database did not
+ *                accept. An update matching no row (RLS, a row deleted mid-run)
+ *                succeeds with zero rows affected and no error. */
 export interface RecategoriseOutcome {
   moved: number;
+  refreshed: number;
   unwritten: number;
 }
+
+/** Split intended updates by what the database accepted. */
+function tally(updates: RecategoriseUpdate[], written: Set<string>): RecategoriseOutcome {
+  let moved = 0;
+  let refreshed = 0;
+  for (const u of updates) {
+    if (!written.has(u.id)) continue;
+    if (u.categoryChanged) moved += 1;
+    else refreshed += 1;
+  }
+  return { moved, refreshed, unwritten: updates.length - moved - refreshed };
+}
+
+const add = (a: RecategoriseOutcome, b: RecategoriseOutcome): RecategoriseOutcome => ({
+  moved: a.moved + b.moved,
+  refreshed: a.refreshed + b.refreshed,
+  unwritten: a.unwritten + b.unwritten,
+});
 export type RecategoriseResult = RecategoriseOutcome & { scanned: number };
 
 /** Patch a batch of re-categorise updates back to `transactions`, in chunks.
@@ -338,15 +359,15 @@ export async function setFerrariShop(
 }
 
 /** Re-classify the transactions matching a VPA or counterparty against the
- *  given Lists. `dryRun` writes nothing and reports what WOULD be written as
- *  `moved`; otherwise `moved` is what the database accepted. */
+ *  given Lists. `dryRun` writes nothing and reports what WOULD be written;
+ *  otherwise the counts are what the database accepted. */
 export async function recategoriseMatching(
   match: { vpa?: string; counterparty?: string },
   lists: Lists,
   dryRun = false,
 ): Promise<RecategoriseResult> {
   const { vpa, counterparty } = match;
-  if (!vpa && !counterparty) return { scanned: 0, moved: 0, unwritten: 0 };
+  if (!vpa && !counterparty) return { scanned: 0, moved: 0, refreshed: 0, unwritten: 0 };
 
   const rows = await selectAll<StoredTxn>((from, to) => {
     let q = supabase.from('transactions').select(STORED_TXN_COLUMNS);
@@ -354,9 +375,8 @@ export async function recategoriseMatching(
     return q.order('id').range(from, to);
   });
   const updates = recategoriseStored(rows, lists);
-  if (dryRun) return { scanned: rows.length, moved: updates.length, unwritten: 0 };
-  const written = await applyRecategoriseUpdates(updates);
-  return { scanned: rows.length, moved: written.size, unwritten: updates.length - written.size };
+  const written = dryRun ? new Set(updates.map((u) => u.id)) : await applyRecategoriseUpdates(updates);
+  return { scanned: rows.length, ...tally(updates, written) };
 }
 
 
@@ -502,7 +522,7 @@ export async function resolveCounterparty(
 
   const lists = await loadEngineLists();
   const res = await recategoriseMatching({ vpa: keyValue }, lists, false);
-  return { moved: res.moved, unwritten: res.unwritten };
+  return { moved: res.moved, refreshed: res.refreshed, unwritten: res.unwritten };
 }
 
 /** Ambiguous card, "Same entity, name varies" — the key stays attached;
@@ -670,7 +690,7 @@ export async function pinMerchant(
     engineLists,
     false,
   );
-  return { moved: res.moved, unwritten: res.unwritten };
+  return { moved: res.moved, refreshed: res.refreshed, unwritten: res.unwritten };
 }
 
 // ---------- AI fallback (last resort, ~0.1% of rows) ----------
@@ -774,6 +794,7 @@ export interface AiRunResult {
   answered: number;
   pinned: number;
   moved: number;
+  refreshed: number;
   unwritten: number;
   notConfigured?: boolean;
 }
@@ -782,7 +803,7 @@ export interface AiRunResult {
  *  answer as a merchant_rules pin so the same merchant is never sent again. */
 export async function runAiFallback(limit = AI_BATCH_SIZE, scope?: string): Promise<AiRunResult> {
   const cands = await listAiCandidates(limit, scope);
-  if (!cands.length) return { candidates: 0, answered: 0, pinned: 0, moved: 0, unwritten: 0 };
+  if (!cands.length) return { candidates: 0, answered: 0, pinned: 0, moved: 0, refreshed: 0, unwritten: 0 };
 
   // Once per batch, and before the paid call: if the rules can't be read there
   // is no point asking the model, and every pin below reuses these lists.
@@ -816,7 +837,7 @@ export async function runAiFallback(limit = AI_BATCH_SIZE, scope?: string): Prom
       /* not JSON — surface the raw text below */
     }
     if (ctx.status === 503 && body?.error === 'not configured') {
-      return { candidates: cands.length, answered: 0, pinned: 0, moved: 0, unwritten: 0, notConfigured: true };
+      return { candidates: cands.length, answered: 0, pinned: 0, moved: 0, refreshed: 0, unwritten: 0, notConfigured: true };
     }
     throw new Error(`categorise-ai returned ${ctx.status}: ${describeFunctionError(body, text)}`);
   }
@@ -825,6 +846,7 @@ export async function runAiFallback(limit = AI_BATCH_SIZE, scope?: string): Prom
   const byKey = new Map(cands.map((c) => [c.key, c]));
   let pinned = 0;
   let moved = 0;
+  let refreshed = 0;
   let unwritten = 0;
   for (const a of answers) {
     const c = byKey.get(a.key);
@@ -840,9 +862,10 @@ export async function runAiFallback(limit = AI_BATCH_SIZE, scope?: string): Prom
     );
     pinned += 1;
     moved += res.moved;
+    refreshed += res.refreshed;
     unwritten += res.unwritten;
   }
-  return { candidates: cands.length, answered: answers.length, pinned, moved, unwritten };
+  return { candidates: cands.length, answered: answers.length, pinned, moved, refreshed, unwritten };
 }
 
 /** Human-readable body of a failed categorise-ai call. The function returns

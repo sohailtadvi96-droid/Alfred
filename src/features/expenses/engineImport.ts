@@ -115,6 +115,9 @@ export interface RecategoriseUpdate {
   remark: string;
   matched_by: string;
   confidence: string;
+  /** The category differs from the stored one. False = a refresh: category kept,
+   *  but confidence / matched_by / counterparty / … had drifted from the engine. */
+  categoryChanged: boolean;
 }
 
 /** An entity_keys row joined to its entity's default_category. */
@@ -168,6 +171,7 @@ export function recategoriseStored(rows: StoredTxn[], lists: Lists): Recategoris
       remark: c.remark,
       matched_by: c.matchedBy,
       confidence: c.confidence,
+      categoryChanged: false,
     };
     // Skip only a row already holding the engine's full current answer. Comparing
     // category alone left a pin that confirmed a row's existing category as a
@@ -175,6 +179,7 @@ export function recategoriseStored(rows: StoredTxn[], lists: Lists): Recategoris
     // queue forever while its key (now pinned) was excluded from AI candidates.
     // DB null and the engine's '' both mean "none".
     const same = (a: string | null, b: string) => (a ?? '') === b;
+    u.categoryChanged = !same(r.category, u.category);
     if (
       same(r.category, u.category) &&
       same(r.confidence, u.confidence) &&

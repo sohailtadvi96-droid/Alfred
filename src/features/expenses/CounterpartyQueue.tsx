@@ -8,7 +8,7 @@ import {
   useResolveAmbiguousSeparated,
   useResolveCounterparty,
 } from './hooks';
-import { notSaved } from './recategoriseSummary';
+import { notSaved, outcomeText } from './recategoriseSummary';
 import { ResolveEntityDialog } from './ResolveEntityDialog';
 import { SeparateEntitiesDialog } from './SeparateEntitiesDialog';
 import type { QueueRow, ResolveEntityInput } from './api';
@@ -44,9 +44,7 @@ export function CounterpartyQueue() {
     if (!activeResolve) return;
     try {
       const res = await resolve.mutateAsync({ keyValue: activeResolve.keyValue, input });
-      setMsg(
-        `Resolved “${activeResolve.title}” — ${res.moved} transaction${res.moved === 1 ? '' : 's'} moved.${notSaved(res.unwritten)}`,
-      );
+      setMsg(`Resolved “${activeResolve.title}” — ${outcomeText(res)}.${notSaved(res.unwritten)}`);
       setActiveResolve(null);
     } catch (e) {
       setMsg(errMessage(e, 'Could not resolve this counterparty.'));
@@ -66,9 +64,7 @@ export function CounterpartyQueue() {
     if (!separatingKey) return;
     try {
       const res = await separated.mutateAsync({ keyValue: separatingKey.keyValue, perName });
-      setMsg(
-        `Separated into ${perName.length} entities — ${res.moved} transaction${res.moved === 1 ? '' : 's'} moved.${notSaved(res.unwritten)}`,
-      );
+      setMsg(`Separated into ${perName.length} entities — ${outcomeText(res)}.${notSaved(res.unwritten)}`);
       setSeparatingKey(null);
     } catch (e) {
       setMsg(errMessage(e, 'Could not separate these entities.'));

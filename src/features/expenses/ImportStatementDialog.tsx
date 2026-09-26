@@ -11,7 +11,7 @@ import {
   type ParsedCsv,
 } from './csv';
 import { loadEngineLists, type RecategoriseOutcome } from './api';
-import { notSaved } from './recategoriseSummary';
+import { notSaved, outcomeText } from './recategoriseSummary';
 import type { DateFormat, ParseResult } from './statement';
 // pdf.ts pulls in pdfjs-dist (~1 MB) — load it only when a PDF is actually picked
 const loadPdf = () => import('./pdf');
@@ -297,8 +297,7 @@ export function ImportStatementDialog({
               </button>
             ) : (
               <span className="tlabel">
-                {recatDone.moved} transaction{recatDone.moved === 1 ? '' : 's'} recategorised.
-                {notSaved(recatDone.unwritten)}
+                Re-run finished — {outcomeText(recatDone)}.{notSaved(recatDone.unwritten)}
               </span>
             )}
           </div>

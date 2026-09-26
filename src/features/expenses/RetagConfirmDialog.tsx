@@ -101,9 +101,11 @@ export function RetagConfirmDialog({
                 ? 'Saving…'
                 : preview && preview.moved > 0
                   ? `${target.next ? 'Add' : 'Remove'} & move ${preview.moved}`
-                  : target.next
-                    ? 'Add'
-                    : 'Remove'}
+                  : preview && preview.refreshed > 0
+                    ? `${target.next ? 'Add' : 'Remove'} & refresh ${preview.refreshed}`
+                    : target.next
+                      ? 'Add'
+                      : 'Remove'}
             </button>
           </>
         )
@@ -111,12 +113,19 @@ export function RetagConfirmDialog({
     >
       {done ? (
         <p>
-          {done.moved === 0 ? (
+          {done.moved === 0 && done.refreshed === 0 ? (
             <>Saved. No existing transactions needed re-categorising.{notSaved(done.unwritten)}</>
           ) : (
             <>
-              Saved. <b>{done.moved}</b> of {done.scanned} existing transaction
-              {done.scanned === 1 ? '' : 's'} for this VPA moved.{notSaved(done.unwritten)}
+              Saved. Of {done.scanned} existing transaction{done.scanned === 1 ? '' : 's'} for this VPA,{' '}
+              <b>{done.moved}</b> changed category
+              {done.refreshed > 0 && (
+                <>
+                  {' '}
+                  and <b>{done.refreshed}</b> {done.refreshed === 1 ? 'was' : 'were'} refreshed
+                </>
+              )}
+              .{notSaved(done.unwritten)}
             </>
           )}
         </p>
@@ -126,7 +135,7 @@ export function RetagConfirmDialog({
         <p>
           {preview.scanned === 0 ? (
             <>No existing transactions for this VPA — this only affects future imports.</>
-          ) : preview.moved === 0 ? (
+          ) : preview.moved === 0 && preview.refreshed === 0 ? (
             <>
               {preview.scanned} existing transaction{preview.scanned === 1 ? '' : 's'} for this VPA —
               none change category.
@@ -134,7 +143,14 @@ export function RetagConfirmDialog({
           ) : (
             <>
               <b>{preview.moved}</b> of {preview.scanned} existing transaction
-              {preview.scanned === 1 ? '' : 's'} will move ({dest}).
+              {preview.scanned === 1 ? '' : 's'} will change category ({dest})
+              {preview.refreshed > 0 && (
+                <>
+                  , <b>{preview.refreshed}</b> more will be refreshed (same category; confidence and match
+                  details brought up to date)
+                </>
+              )}
+              .
             </>
           )}
         </p>
