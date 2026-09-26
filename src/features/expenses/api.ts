@@ -741,12 +741,17 @@ interface AiTxnRow {
 }
 
 /** The review queue's rows (low/medium confidence, optionally narrowed to one
- *  category scope), minus anything already pinned in merchant_rules — deduped
- *  to one per merchant key, highest total value first (low confidence breaks
- *  ties), so each AI batch takes the payees that move the numbers most.
- *  Pass `limit = Infinity` to count them all. */
+ *  category scope), minus anything already decided — pinned in merchant_rules,
+ *  or belonging to a payee resolved as an entity — deduped to one per merchant
+ *  key, highest total value first (low confidence breaks ties), so each AI batch
+ *  takes the payees that move the numbers most.
+ *  Pass `limit = Infinity` to count them all.
+ *
+ *  An explicitly resolved payee is never handed to the model. Without the entity
+ *  exclusion, unpinning one (say, to let the Ferrari rule answer it) made its
+ *  still-medium rows candidates again, and the model re-pinned it. */
 export async function listAiCandidates(limit = Infinity, scope?: string): Promise<AiCandidate[]> {
-  const [txns, rules] = await Promise.all([
+  const [txns, rules, entityKeys] = await Promise.all([
     selectAll<AiTxnRow>((from, to) => {
       let q = supabase
         .from('transactions')
@@ -758,9 +763,30 @@ export async function listAiCandidates(limit = Infinity, scope?: string): Promis
     selectAll<{ match_value: string }>((from, to) =>
       supabase.from('merchant_rules').select('id,match_value').order('id').range(from, to),
     ),
+    // Every key attached to an entity, whatever its ambiguity state: a
+    // needs_review key belongs to the resolution queue, not to the model, and a
+    // separated key has no entity (entity_id is null) so it drops out here.
+    selectAll<{ key_type: string; key_value: string }>((from, to) =>
+      supabase
+        .from('entity_keys')
+        .select('id,key_type,key_value')
+        .in('key_type', ['vpa_prefix', 'merchant_name', 'counterparty'])
+        .not('entity_id', 'is', null)
+        .order('id')
+        .range(from, to),
+    ),
   ]);
 
   const pinned = new Set(rules.map((r) => String(r.match_value)));
+  // The engine's own lookups (see classify): a VPA against vpa_prefix keys, the
+  // upper-cased payee name against merchant_name / counterparty keys. VPAs are
+  // compared case-insensitively — over-excluding is the safe direction here.
+  const entityVpas = new Set<string>();
+  const entityNames = new Set<string>();
+  for (const k of entityKeys) {
+    if (k.key_type === 'vpa_prefix') entityVpas.add(k.key_value.toLowerCase());
+    else entityNames.add(k.key_value.toUpperCase());
+  }
   // Per key: the first row seen stands in for the merchant in the AI payload;
   // totalCents and rank aggregate over every matching row.
   const byKey = new Map<string, { cand: AiCandidate; totalCents: number; rank: number }>();
@@ -772,6 +798,9 @@ export async function listAiCandidates(limit = Infinity, scope?: string): Promis
     const matchType: 'vpa' | 'counterparty' = vpa ? 'vpa' : 'counterparty';
     const matchValue = vpa || cp;
     if (!matchValue) continue;
+    // Checked per row and by either lookup, so a resolved payee's rows stay out
+    // even when the candidate key would have been a different VPA of theirs.
+    if ((vpa && entityVpas.has(vpa.toLowerCase())) || (cp && entityNames.has(cp.toUpperCase()))) continue;
     const key = matchType === 'counterparty' ? matchValue.toUpperCase() : matchValue;
     if (pinned.has(key)) continue;
     const rank = CONFIDENCE_RANK[t.confidence ?? 'medium'] ?? 1;
