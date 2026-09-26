@@ -234,19 +234,20 @@ export function usePinMerchant() {
   });
 }
 
-export function useAiCandidates() {
+/** Every unpinned queue merchant in `scope` — the full count, not one batch. */
+export function useAiCandidates(scope: string) {
   return useQuery({
-    queryKey: ['expenses', 'aiCandidates'] as const,
-    queryFn: () => api.listAiCandidates(),
+    queryKey: ['expenses', 'aiCandidates', scope] as const,
+    queryFn: () => api.listAiCandidates(Infinity, scope),
     staleTime: 60_000,
   });
 }
 
-/** Run the batched AI fallback over the leftover low-confidence rows. */
-export function useAiFallback() {
+/** Run one AI batch (api.AI_BATCH_SIZE merchants) over the queue in `scope`. */
+export function useAiFallback(scope: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.runAiFallback(),
+    mutationFn: () => api.runAiFallback(api.AI_BATCH_SIZE, scope),
     onSuccess: () => invalidateAll(qc),
   });
 }

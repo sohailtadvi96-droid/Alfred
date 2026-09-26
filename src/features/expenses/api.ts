@@ -583,16 +583,21 @@ export interface AiCandidate {
   direction: Direction;
 }
 
-/** Low-confidence rows the engine couldn't place, minus anything already pinned
- *  in merchant_rules — deduped to one per merchant key. */
-export async function listAiCandidates(limit = 30): Promise<AiCandidate[]> {
+/** Merchants one "Ask AI" click sends to categorise-ai. The candidate count
+ *  shown above the button can be far larger; each click takes the next batch. */
+export const AI_BATCH_SIZE = 30;
+
+/** The review queue's rows (low/medium confidence, optionally narrowed to one
+ *  category scope), minus anything already pinned in merchant_rules — deduped
+ *  to one per merchant key. Pass `limit = Infinity` to count them all. */
+export async function listAiCandidates(limit = AI_BATCH_SIZE, scope?: string): Promise<AiCandidate[]> {
+  let txnQuery = supabase
+    .from('transactions')
+    .select('direction,amount_cents,merchant_display,counterparty,vpa_prefix,remark,channel,category')
+    .in('confidence', ['low', 'medium']);
+  if (scope && scope !== 'all') txnQuery = txnQuery.eq('category', scope);
   const [txnRes, ruleRes] = await Promise.all([
-    supabase
-      .from('transactions')
-      .select(
-        'direction,amount_cents,merchant_display,counterparty,vpa_prefix,remark,channel,category',
-      )
-      .eq('confidence', 'low'),
+    txnQuery,
     supabase.from('merchant_rules').select('match_value'),
   ]);
   if (txnRes.error) throw txnRes.error;
@@ -646,10 +651,10 @@ export interface AiRunResult {
   notConfigured?: boolean;
 }
 
-/** One batched Claude call for the leftover rows; write each answer as a
- *  merchant_rules pin so the same merchant is never sent again. */
-export async function runAiFallback(limit = 30): Promise<AiRunResult> {
-  const cands = await listAiCandidates(limit);
+/** One batched Claude call for the next `limit` queue candidates; write each
+ *  answer as a merchant_rules pin so the same merchant is never sent again. */
+export async function runAiFallback(limit = AI_BATCH_SIZE, scope?: string): Promise<AiRunResult> {
+  const cands = await listAiCandidates(limit, scope);
   if (!cands.length) return { candidates: 0, answered: 0, pinned: 0, moved: 0 };
 
   const items = cands.map((c) => ({

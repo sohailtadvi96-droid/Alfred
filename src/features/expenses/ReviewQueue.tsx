@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { shortDate, signedMoney } from '@/lib/format';
 import { errMessage } from '@/lib/errors';
+import { AI_BATCH_SIZE } from './api';
 import { useAiCandidates, useAiFallback, useReviewQueue } from './hooks';
 import { PinCategoryMenu } from './PinCategoryMenu';
 import type { ReviewTxn } from './types';
@@ -27,13 +28,14 @@ interface Group {
 
 export function ReviewQueue() {
   const { data: rows, isLoading } = useReviewQueue();
-  const { data: aiCandidates } = useAiCandidates();
-  const ai = useAiFallback();
   const [scope, setScope] = useState<Scope>('all');
+  const { data: aiCandidates } = useAiCandidates(scope);
+  const ai = useAiFallback(scope);
   const [grouped, setGrouped] = useState(true);
   const [aiMsg, setAiMsg] = useState<string | null>(null);
 
   const aiCount = aiCandidates?.length ?? 0;
+  const aiBatch = Math.min(AI_BATCH_SIZE, aiCount);
 
   async function runAi() {
     setAiMsg(null);
@@ -107,11 +109,15 @@ export function ReviewQueue() {
         <div className="ai-fallback">
           <span className="tlabel">
             {aiCount > 0
-              ? `${aiCount} row${aiCount === 1 ? '' : 's'} the engine couldn’t place`
+              ? `${aiCount} unpinned merchant${aiCount === 1 ? '' : 's'} in this queue`
               : 'AI fallback'}
           </span>
           <button className="btn sec sm" onClick={runAi} disabled={ai.isPending || aiCount === 0}>
-            {ai.isPending ? 'Asking Claude…' : `Ask AI to sort ${aiCount || ''}`.trim()}
+            {ai.isPending
+              ? `Asking Claude about ${aiBatch}…`
+              : aiCount > aiBatch
+                ? `Ask AI to sort ${aiBatch} of ${aiCount}`
+                : `Ask AI to sort ${aiCount || ''}`.trim()}
           </button>
           {aiMsg && <span className="tlabel">{aiMsg}</span>}
         </div>
