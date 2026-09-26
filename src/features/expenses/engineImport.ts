@@ -99,6 +99,11 @@ export interface StoredTxn {
   amount_cents: number;
   raw_snippet: string | null;
   category: string | null;
+  confidence: string | null;
+  matched_by: string | null;
+  counterparty: string | null;
+  vpa_prefix: string | null;
+  remark: string | null;
 }
 export interface RecategoriseUpdate {
   id: string;
@@ -126,18 +131,32 @@ export function recategoriseStored(rows: StoredTxn[], lists: Lists): Recategoris
       },
       lists,
     );
-    const slug = slugForCategory(c.category);
-    if (slug === r.category) continue;
-    out.push({
+    const u: RecategoriseUpdate = {
       id: r.id,
-      category: slug,
+      category: slugForCategory(c.category),
       channel: c.channel,
       counterparty: c.counterparty,
       vpa_prefix: c.vpa,
       remark: c.remark,
       matched_by: c.matchedBy,
       confidence: c.confidence,
-    });
+    };
+    // Skip only a row already holding the engine's full current answer. Comparing
+    // category alone left a pin that confirmed a row's existing category as a
+    // no-op: confidence/matched_by never updated, so the row stayed in the review
+    // queue forever while its key (now pinned) was excluded from AI candidates.
+    // DB null and the engine's '' both mean "none".
+    const same = (a: string | null, b: string) => (a ?? '') === b;
+    if (
+      same(r.category, u.category) &&
+      same(r.confidence, u.confidence) &&
+      same(r.matched_by, u.matched_by) &&
+      same(r.counterparty, u.counterparty) &&
+      same(r.vpa_prefix, u.vpa_prefix) &&
+      same(r.remark, u.remark)
+    )
+      continue;
+    out.push(u);
   }
   return out;
 }

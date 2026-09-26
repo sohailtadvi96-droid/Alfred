@@ -146,7 +146,7 @@ export async function recategorizeAllClient(lists: Lists): Promise<number> {
   for (;;) {
     const { data, error } = await supabase
       .from('transactions')
-      .select('id,direction,amount_cents,raw_snippet,category')
+      .select(STORED_TXN_COLUMNS)
       .eq('source_type', 'statement')
       .order('occurred_at', { ascending: true })
       .range(from, from + PAGE - 1);
@@ -162,6 +162,10 @@ export async function recategorizeAllClient(lists: Lists): Promise<number> {
   }
   return moved;
 }
+
+/** Everything recategoriseStored compares against the engine's answer. */
+const STORED_TXN_COLUMNS =
+  'id,direction,amount_cents,raw_snippet,category,confidence,matched_by,counterparty,vpa_prefix,remark';
 
 /** Patch a batch of re-categorise updates back to `transactions`, in chunks. */
 async function applyRecategoriseUpdates(updates: RecategoriseUpdate[]): Promise<number> {
@@ -282,7 +286,7 @@ export async function recategoriseMatching(
   lists: Lists,
   dryRun = false,
 ): Promise<{ scanned: number; moved: number }> {
-  let q = supabase.from('transactions').select('id,direction,amount_cents,raw_snippet,category');
+  let q = supabase.from('transactions').select(STORED_TXN_COLUMNS);
   if (match.vpa) q = q.eq('vpa_prefix', match.vpa);
   else if (match.counterparty) q = q.ilike('counterparty', match.counterparty);
   else return { scanned: 0, moved: 0 };
