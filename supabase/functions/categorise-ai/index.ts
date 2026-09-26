@@ -16,10 +16,13 @@ const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_ITEMS = 40;
 
 /** Categories the model may choose. Structural ones (salary, bank charges,
- *  cash withdrawal, card-unclassified) are the engine's job, not the model's. */
+ *  cash withdrawal, card-unclassified) are the engine's job, not the model's —
+ *  and so is my_ferrari: it is gated by the is_ferrari flag and an amount rule
+ *  (<= 220, multiple of 20) the model is never given, and a pin written from its
+ *  answer would override that gate permanently. */
 const CATEGORIES = [
   'rent_household', 'dineout_stays', 'food_delivery', 'grocery', 'alcohol',
-  'my_ferrari', 'daily_spends', 'local_merchant', 'cab_transport', 'ticket_booking',
+  'daily_spends', 'local_merchant', 'cab_transport', 'ticket_booking',
   'online_shopping', 'subscriptions', 'work_software', 'bills_recharge',
   'health_personal', 'entertainment', 'fuel', 'person_transactions',
   'money_received', 'family', 'uncategorised',

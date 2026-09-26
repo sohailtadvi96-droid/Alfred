@@ -52,7 +52,10 @@ account needs credits. Nothing else in Expenses depends on this function.
 `category` is validated against the engine's non-structural slug allow-list
 (`CATEGORIES` in `index.ts`); anything else is dropped. Structural categories
 (salary, bank charges, cash withdrawal, card-unclassified) are the engine's job,
-not the model's.
+not the model's — and so is `my_ferrari`: it is gated by the `is_ferrari` flag and
+the ≤ ₹220 / multiple-of-20 amount rule, which the model is never given, and a pin
+written from its answer would override that gate permanently. Tag a payee as a
+Ferrari shop instead.
 
 ## Model
 
