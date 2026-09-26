@@ -15,8 +15,12 @@ concept of teams/orgs/sharing.
   Supabase CLI. **Migrations are immutable once pushed** — never edit a shipped file;
   always add a new `NNNN_name.sql`. Filenames are zero-padded sequence numbers, applied
   in order.
-- **Edge Functions** (`supabase/functions/`): `categorise-ai` (LLM-assisted expense
-  categorisation); for the Design module, `design-search` (image search proxy),
+- **Edge Functions** (`supabase/functions/`): `categorise-ai` (Claude Haiku 4.5
+  second opinion on payees the rule engine can't place — see "Expenses engine" → AI sweep; at most
+  40 items per call, and its answer allow-list excludes the structural categories and `my_ferrari`;
+  the system prompt tells the model the bank truncates names and VPAs; answers are validated
+  against the allow-list server-side; `503 {error:'not configured'}` when the key is missing,
+  `502 {error:'anthropic <status>', detail}` when the upstream call fails); for the Design module, `design-search` (image search proxy),
   `design-capture` (creates a `design_items` row and hands off to `design-ingest`; home
   board = explicit `board_id`, else the inbox. An explicit `medium` with no `board_id`
   additionally *cross-lists* the item into the existing board of that name
@@ -45,8 +49,9 @@ src/
   lib/         supabase client, TanStack queryClient, color/format/error helpers
   styles/      tokens.css (grounds/design tokens), base.css (shell + components)
 supabase/
-  migrations/  0001 … 0028, sequential, immutable once pushed
-  functions/   categorise-ai, design-search (+ _shared/cors.ts)
+  migrations/  0001 … 0037, sequential, immutable once pushed
+  functions/   categorise-ai, design-search, design-capture, design-ingest, design-retry,
+               design-backfill-dimensions (+ _shared/: cors.ts, imageDimensions.ts)
 docs/          MVP.md (spec), DEPLOY.md
 ```
 
@@ -59,15 +64,135 @@ components, not business logic.
 
 | Module | Route(s) | Migration(s) | Status |
 |---|---|---|---|
-| **Expenses** | `ExpensesPage`, `TransactionsPage`, `ReviewPage`, `PeoplePage`, `InsightsPage` | 0002, 0006, 0007, 0012–0015, 0017–0028 | Shipped, actively evolving |
+| **Expenses** | `ExpensesPage`, `TransactionsPage`, `ReviewPage`, `PeoplePage`, `InsightsPage` | 0002, 0005–0007, 0012–0015, 0017–0028 | Shipped, actively evolving |
 | **Secrets** (password/vault) | `SecretsPage` | 0003 | Shipped |
 | **Work** (freelance: clients/projects/invoices) | `WorkPage`, `ProjectDetailPage`, `InvoicesPage`, `InvoiceViewPage` | 0004, 0008 | Shipped |
 | **Office** (tasks/calendar/journal) | `OfficeDayPage` | 0009, 0010 | Shipped |
 | **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011, 0029–0032, 0036, 0037 | Shipped; Discover is parked (route and `DiscoverView` kept, no nav link to it) |
-| **Goals** | `GoalsPage` | 0016 | Shipped, Phase 1 (manual goals only — no auto-progress from other modules yet) |
+| **Goals** | `GoalsPage` | 0016, 0033–0035 | Shipped. The UI creates manual goals only; computed progress exists server-side (`goal_current_value`, `goal_pace`, cadence periods) for `journal_streak` / `tasks_completed` sources fed from Office, but nothing creates those from the UI and no goal reads Expenses / Work / Design data yet |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped |
 
-## Database schema (as of migration 0028)
+## Expenses engine (client-side categorisation)
+
+Statements are categorised **in the browser**, not by SQL: the PDF/CSV is parsed on-device,
+`categorize.ts` classifies each row, and only the result goes to Supabase (statement rows
+arrive pre-categorised). Re-runs page rows down, re-classify, and patch them back. Files, all
+under `src/features/expenses/`:
+
+- `categorize.ts` — the pure engine (`normalize` → `classify`). No I/O; its one import is
+  `taxonomy.ts`, a static engine-name → slug table (the engine speaks category *names*, the
+  database stores *slugs*).
+- `engineImport.ts` — parser ⇄ engine bridge: `buildEngineRows` (import), `recategoriseStored`
+  (re-runs), `buildEntityCategoryMaps`, `buildExpenseCategories`.
+- `api.ts` — `loadEngineLists` and everything that reads or writes on the engine's behalf.
+- `recategoriseSummary.ts` (status-line wording), `entityCategories.ts` (which categories may be
+  an entity's default).
+
+**Tier order — first match wins** (`matched_by` in brackets; confidence is high unless noted):
+
+0. **pin** (`override`) — a `merchant_rules` row for the VPA or the upper-cased counterparty; applies at any amount and in either direction.
+1. **structural** (`channel`) — ATM, fees, interest, the salary credit.
+2. **Ferrari** (`ferrari`) — VPA in `ferrariShops` **and** a debit of ≤ ₹220 that is a multiple of 20 (or 25 / 33 / 53).
+3. **family** (`family`) — VPA in `familyVpas`; a debit is Family, a credit is Income.
+3b. **entity default** (`entity`) — `entities.default_category`, found by VPA key, then by upper-cased name key.
+4. **brand** (`brand`) — the `RULES` regexes.
+5. **your UPI remark** (`remark`) — `REMARK_RULES`, on the remark alone.
+6. **merchant QR** (`qr`, medium) — VPA shapes matching `MERCHANT_QR`: ≤ ₹300 Daily Spends, else Local Merchant. Then a card row is `card` (low, Card — Unclassified).
+7. **person-to-person** (`p2p`, medium) — has a VPA: Person Transactions / Money Received. Anything left is `none` (low, Uncategorised).
+
+The **credit guard** (see Conventions) then runs over whatever tier won and may suffix it, so
+`matched_by` is one of `override channel ferrari family entity brand remark qr card p2p none`,
+optionally followed by `:credit`. The review queue is every row below high confidence.
+
+**Writing rules** (`RULES`, `REMARK_RULES`, `MERCHANT_QR`):
+
+- `RULES` are tested against `hay` = `` `${vpa} ${counterparty}` `` (lower-cased) — **two fields
+  joined**. `^` anchors to the start of the *VPA*, so it can never match a brand in the payee
+  field, and on card rows (empty VPA) `hay` starts with a space so it never matches at all. Use
+  `(^|\s)word`. `$` is safe: `hay` ends where the counterparty ends.
+- The bank cuts the **payee name to 10 characters, the VPA to 14 and the UPI remark to 10**, so a
+  brand at the end of a longer name arrives mid-word ("Dimple Win", "Delhi Metr"). Match a word
+  prefix (`namma ?yatr`, `prime ?vid`) or the cut form at the end (`\bwin$`), and make a
+  multi-word separator optional (`indian ?oil` — the payee has the space, the VPA doesn't).
+- `REMARK_RULES` run on the remark alone (one field, so `^` is valid there) and need the same
+  prefix discipline. `MERCHANT_QR` is tested against `f.vpa` directly; its anchors are correct.
+- The `categorise-ai` prompt teaches the model the same truncation rule.
+
+**`Lists`** is what `classify` is given: `familyVpas` and `ferrariShops` (the `vpa_prefix` keys of
+`is_family` / `is_ferrari` entities), `overrides` (`merchant_rules`), `entityCategoryByVpa` /
+`entityCategoryByName` (entity default categories; name keys upper-cased; keys in state
+`needs_review` or `separated` skipped), and `expenseCategories` (credit guard).
+`loadEngineLists` **throws** if any read fails — it never returns empty or partial lists. Callers
+write whatever the engine says, so empty lists (no pins, no family, no entity defaults) would
+silently re-categorise everything. Every read in it is paged. Callers load the lists *before*
+they write (`pinMerchant`, `commitVpaTag`, and `runAiFallback` once per run, before the first
+paid call), so a failure leaves nothing half-saved.
+
+**Re-runs.** `recategoriseStored` skips a row only when **all seven** fields the engine writes
+already match — `category`, `confidence`, `matched_by`, `channel`, `counterparty`, `vpa_prefix`,
+`remark` (DB null == engine ''). A re-run reports `{ moved, refreshed, unwritten }`: **moved** =
+written and the category changed; **refreshed** = written, same category, other fields had
+drifted (a stale `medium` keeps a row in the review queue); **unwritten** = the engine meant to
+write it and the database didn't accept it. An update that matches no row (RLS, a row deleted
+mid-run) succeeds with zero rows and no error, so the counts come from `.select('id')` on the
+update, never from `updates.length`. A dry run writes nothing and reports what would be written.
+**Where it runs:** recategorise-all is the "Re-run categorisation rules" button in the Import
+Statement dialog (`useRecategorizeAll`) — browser only, under your session, never scheduled.
+Per-payee re-runs happen on pin, resolve and retag. The SQL `recategorize_all()` /
+`categorize()` are the older server-side path: `api.recategorizeAll` wraps the RPC but nothing
+calls it.
+
+**AI sweep** (Review queue → "Ask AI to sort", `runAiFallback`). Candidates are the queue's rows
+grouped by payee key, **minus two exclusions**: keys already pinned in `merchant_rules`, and any
+key attached to an entity — a VPA that is a `vpa_prefix` key or a payee name that is a
+`merchant_name` / `counterparty` key, checked per row — so an explicitly resolved payee is never
+re-decided by the model (without this, un-pinning a payee re-exposed it and the model re-pinned
+it). Ordered by the key's total transaction value (low confidence breaks ties), read once, sent in
+calls of 40 (`AI_CALL_SIZE`, the function's `MAX_ITEMS`) up to 400 merchants per click
+(`AI_SWEEP_CAP`); above 100 the UI asks first ("N merchants in M calls") and shows progress. Each
+answer is pinned the moment it arrives (`source` is `'manual'` — AI and hand pins are
+indistinguishable), so a failed call keeps everything already pinned: the run returns what it did
+with `error` set, except a failure before anything was pinned, which throws. `my_ferrari` and the
+structural categories are not in the model's allow-list.
+
+**Review queue.** Every low/medium row, loaded (paged) and sorted low-confidence first, then by
+amount. `listReviewQueue` returns `{ rows, total }`: `rows` is capped at 300 for display, `total`
+is the true count. The scope chips and payee grouping work on the displayed rows only.
+
+**Transactions row menu** (`RecategoriseMenu`). *Durable:* "Pin … as…" — writes a `merchant_rules`
+pin through `pinMerchant` (replacing any existing pin for that key) and re-categorises the payee's
+rows. *Not durable:* "Set category" edits one row, and "Always “X” as…" writes `category_rules`,
+which the client engine doesn't read — the next recategorise-all puts the engine's answer back.
+
+**Family / Ferrari tags** are flags on the payee's **entity** (`setFamilyMember`,
+`setFerrariShop`), reached through its `vpa_prefix` key. The flag is per entity, so it covers all
+the payee's VPAs, and preview/commit re-run every VPA the payee owns. Tagging a VPA with no entity
+creates one (a person for Family, a merchant for a Ferrari shop); untagging clears the flag and
+keeps the entity; a `separated` key can't be tagged. The legacy `people` / `ferrari_shops` tables
+are not written.
+
+**`my_ferrari` is gated** — by the flagged shop plus the amount rule in tier 2. A category default
+or a pin ignores the gate, so `my_ferrari` isn't offered as an entity default
+(`entityCategories.ts`) or to the model; the pin menus still offer it, and a pin to it bypasses
+the gate.
+
+**Known limits** (deliberate, or not yet fixed):
+
+- Guarded credits (`…:credit`) are `medium`, so they stay in the review queue for good; pinning
+  their payee can't clear them.
+- A pin ignores direction: a pin to a credit category (e.g. `money_received`) also captures the
+  payee's debits.
+- Tier 0 outranks Ferrari, family and entity defaults, so tagging a VPA that is pinned changes
+  nothing until the pin is removed.
+- A masked VPA (`xx9526@axl` for `8169849526@axl`) is a distinct prefix that nothing links to the
+  real one. Attach the masked prefix as a `vpa_prefix` key on the payee's entity. A name key
+  (`merchant_name`) works too but is weaker: a 10-character name also matches longer names that
+  cut to the same 10 characters.
+- `separated` VPAs are tombstones and can't carry Family / Ferrari flags.
+- The month views (`listTransactions`, `getMonthSummary`) aren't paged — fine until a single month
+  passes 1,000 rows.
+
+## Database schema (as of migration 0037)
 
 All tables live in `public`, have RLS enabled, and (unless noted) use the same
 per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`.
@@ -75,7 +200,8 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 
 **Core / auth**
 - `profiles` (1:1 with `auth.users`) — `ground` (active background preset), `custom_ground`,
-  `sidebar_collapsed`. Auto-created on signup via `handle_new_user()` trigger.
+  `sidebar_collapsed`, `timezone` (0033 — the client's calendar day, so goal-pace period
+  boundaries agree between client and server). Auto-created on signup via `handle_new_user()` trigger.
 
 **Expenses**
 - `accounts` — name, type (bank/credit/cash/wallet), last4, `opening_balance_cents`.
@@ -84,15 +210,18 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 - `transactions` — the core ledger: `amount_cents`, `direction` (debit/credit),
   `merchant_display/normalized`, `category` (text slug, FK-less), `account_id`, `source_type`
   + `source_ref` (unique per user, used for de-dupe on ingest). Engine columns added in
-  0013: `channel`, `counterparty`, `vpa_prefix`, `remark`, `matched_by`, `confidence`.
+  0013: `channel`, `counterparty`, `vpa_prefix`, `remark`, `matched_by` (the engine tier that
+  decided — see "Expenses engine"), `confidence` (high/medium/low; below high = the review queue).
   Three-column merchant contract (0017): `raw_snippet` is the complete untransformed
   source narration (ground truth, never sliced or aliased); `counterparty` is the
   extracted payee segment pre-alias; `merchant_display` is the classified/display label
   after `merchant_rules` overrides — it's what the UI shows, not raw data. `vpa_prefix`
   is capped at 14 chars by ICICI in the statement PDF itself (a bank-side limit, not a
-  parser bug) — treat it as a prefix, not a resolvable full VPA; `people.vpa` /
-  `ferrari_shops.vpa` / `merchant_rules.match_value` still hold the same truncated
-  values under the old, unrenamed name.
+  parser bug) — treat it as a prefix, not a resolvable full VPA; `merchant_rules.match_value` (and
+  the legacy `people.vpa` / `ferrari_shops.vpa`) hold the same truncated values under the old,
+  unrenamed name. The bank also caps the payee name (`counterparty`) and the UPI `remark` at 10
+  characters, and some VPAs arrive masked as `xx` + the last 4 characters + `@handle` (e.g.
+  `xx9526@axl`) — a separate prefix from the real VPA (see "Known limits").
   `transfer_group_id` + `is_internal` (0018) pair the two legs of an internal transfer
   detected by `pair_internal_transfers()` — defined but not auto-invoked; run manually
   and check the result before trusting it (the same-amount/48h heuristic is prone to
@@ -106,50 +235,60 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   (income/transfer) or "not yet resolved" (a low-confidence catch-all, or
   `person_transactions` pending Phase 3 identity resolution), never "forgot to set".
 - `transaction_flows` (view, 0018) — the only place spend/income/transfer totals may be
-  computed from; joins `categories` (user row shadows system row) to derive `flow_kind`
-  (expense/income/transfer, falling back to direction when uncategorized) and
+  computed from; joins `categories` on `(slug, direction)` to derive `flow_kind` as `coalesce(user row kind,
+  system row kind, direction fallback)` (a slug with no row for that direction falls back to income
+  for a credit, expense for a debit) and
   `excluded_from_spend` (`is_internal` or `kind = 'transfer'`, wrapped in `is true` per
   0019 so a null-kind category can't leak a SQL-null through). `security_invoker = on`
   like `account_balances` — no RLS bypass. No query outside this view should read
-  `transactions.direction` for a total.
-- `people` — VPA → display name mapping, `is_family` flag (0013). **Superseded by
-  `entities`/`entity_keys` (0023) for identity resolution** — left in place and
-  populated, no longer read by the client. `people.vpa` still holds the old truncated
-  (and unrenamed) prefix.
-- `ferrari_shops` — pinned merchant QRs, "My Ferrari" tier (0013). Same status as
-  `people`: superseded by `entities` (`is_ferrari` flag), left in place, unread.
-- `entities` / `entity_keys` (0023) — counterparty identity, replacing the one-row-
-  per-vpa model above (the data is many-to-many: a truncated `vpa_prefix` can cover
-  more than one real payee, and one payee can appear under more than one prefix).
+  `transactions.direction` for a total. Amounts are unsigned: `getMonthSummary` adds every
+  `flow_kind = 'expense'` row into spend, credits included — which is why the engine has a credit
+  guard.
+- `people` — legacy VPA → display name / `is_family` list (0013). Superseded by `entities` /
+  `entity_keys` (0023), and now **neither read nor written by the client**: the engine and the
+  Family & shops screen both read entity flags. Rows are left in place as history and are stale —
+  they can disagree with the entity flags (family tags made after 0023 were saved here and never
+  applied). Do not resurrect.
+- `ferrari_shops` — legacy pinned merchant QRs for the "My Ferrari" tier (0013). Same status as
+  `people`. Some seed rows are VPAs that were later `separated` and so can't be tagged at all.
+- `entities` / `entity_keys` (0023) — counterparty identity, replacing the one-row-per-vpa model
+  above (the data is many-to-many: a truncated `vpa_prefix` can cover more than one real payee,
+  and one payee can appear under more than one prefix).
   `entities`: `display_name`, `entity_type` (person/merchant/self), `default_category`,
-  `is_family`, `is_ferrari`, `notes`, `resolved_at`. The engine reads `default_category`
-  as tier 3b in `classify()` (after family/ferrari, before the brand RULES; `merchant_rules`
-  pins in tier 0 still win): `loadEngineLists` builds `entityCategoryByVpa` /
-  `entityCategoryByName` from keys of entities that have one, skipping keys whose
-  `ambiguity_state` is `needs_review` or `separated` (`buildEntityCategoryMaps`). (A
-  credit is never left in an expense category by any tier — see the credit guard under
-  Conventions.) It applies at any amount, so a `my_ferrari` default would bypass the ferrari amount pattern
-  that the `is_ferrari` flag enforces — the resolve and separate dialogs therefore don't
-  offer it (`entityCategories.ts`); tag the payee as a Ferrari shop instead. `entity_keys`: `entity_id`,
-  `key_type` (vpa_prefix/merchant_name/counterparty), `key_value`, `confidence`
-  (exact/prefix) — unique on `(user_id, key_type, key_value)`, so a key is claimed by at
-  most one entity. `confidence = 'exact'` means "not a truncated prefix, cannot silently
-  collide" — it does **not** mean the key uniquely identifies the entity; one entity can
-  legitimately hold several exact keys. Migrated from `people`/`ferrari_shops` by
-  grouping on `display_name` (not row-per-row — the source tables already contained
-  duplicate rows for the same person/shop under different vpas), plus identities found
-  in `merchant_rules` with a category pin but no `people`/`ferrari_shops` row at all.
-  Deliberately does not yet cover the lending/receivable ledger (planned separately,
-  not before this queue has been used for a while). `entity_keys.ambiguity_state`
-  (0024: `unknown`/`same_entity`/`separated`/`needs_review`) is a stored decision, not
-  a recomputed inference — a key stays `needs_review` (surfaced in the resolution
-  queue's AMBIGUOUS section) until explicitly resolved, even if its entity is
-  otherwise pinned; `separated` nulls `entity_id` permanently (tombstoned, never
-  reattached) once the distinct payees under a colliding prefix are split into their
-  own entities via `merchant_name`-keyed keys.
-- `merchant_rules` — learned exact-match category pins (vpa/counterparty), distinct
-  from the regex `category_rules` (0013). Orthogonal to identity — unaffected by the
-  `entities` migration.
+  `is_family`, `is_ferrari`, `notes`, `resolved_at`. `entity_keys`: `entity_id` (null once
+  `separated`), `key_type` (vpa_prefix/merchant_name/counterparty), `key_value`, `confidence`
+  (exact/prefix) — unique on `(user_id, key_type, key_value)`, so a key is claimed by at most one
+  entity. `confidence = 'exact'` means "not a truncated prefix, cannot silently collide" — it does
+  **not** mean the key uniquely identifies the entity; one entity can legitimately hold several
+  exact keys.
+  **What reads them:** the engine — `is_family` / `is_ferrari` through the entity's `vpa_prefix`
+  keys (tiers 2–3), and `default_category` as tier 3b (after family/ferrari, before the brand
+  rules; `merchant_rules` pins in tier 0 still win; skips keys in state `needs_review` or
+  `separated` — `buildEntityCategoryMaps`). A default applies at any amount, so a `my_ferrari`
+  default would bypass the Ferrari amount rule; the resolve and separate dialogs don't offer it
+  (`entityCategories.ts`). The AI sweep never sends an entity-attached key. The flags are written
+  by the tag flow (see "Expenses engine").
+  **Key types:** `merchant_name` is what the app writes for a payee name (the separate flow,
+  api.ts); `counterparty` keys were seeded by the 0023 migration from upper-cased pins. The engine
+  treats both alike (name keys are compared upper-cased). Name keys on 10-character truncated
+  names can collide with unrelated payees. A masked VPA is attached as its own `vpa_prefix` key.
+  Migrated from `people`/`ferrari_shops` by grouping on `display_name` (not row-per-row — the source
+  tables already contained duplicate rows for the same person/shop under different vpas), plus
+  identities found in `merchant_rules` with a category pin but no `people`/`ferrari_shops` row at
+  all. Deliberately does not yet cover the lending/receivable ledger (planned separately, not
+  before this queue has been used for a while). `entity_keys.ambiguity_state`
+  (0024: `unknown`/`same_entity`/`separated`/`needs_review`) is a stored decision, not a
+  recomputed inference — a key stays `needs_review` (surfaced in the resolution queue's AMBIGUOUS
+  section) until explicitly resolved, even if its entity is otherwise pinned; `separated` nulls
+  `entity_id` permanently (tombstoned, never reattached) once the distinct payees under a colliding
+  prefix are split into their own entities via `merchant_name`-keyed keys.
+- `merchant_rules` — learned exact-match category pins by `vpa` or `counterparty` (`match_value`:
+  the VPA as-is, the counterparty upper-cased), distinct from the regex `category_rules` (0013).
+  `category` holds a **slug** (some early rows were seeded with display labels; the engine maps
+  either through `slugForCategory`). Tier 0 of the engine: applies at any amount and either
+  direction, and beats every other tier. Written by `pinMerchant` (an upsert — re-pinning replaces
+  the pin), the resolve flows and the AI sweep; `source` is `'manual'` for all of them. Excluded
+  from AI candidates. Orthogonal to identity — unaffected by the `entities` migration.
 - `recurring_series` (0026–0028) — detected recurring charges: `entity_id` (preferred)
   or `match_key` (merchant-name fallback), `category`, `median_cents`/`interval_days`
   (robust stats over a single-linkage amount-chain cluster, not a naive average),
@@ -161,9 +300,10 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   (`max(uuid)` has no default aggregate; `date - numeric` isn't a valid operator) —
   0028 is the live, correct version.
 - `gmail_sync_state` — one row per user, Gmail history-id checkpoint.
-- Key RPCs: `categorize(merchant, direction)` (SQL fallback categoriser),
-  `ingest_transactions(source_type, rows jsonb)` (dedupe + insert + categorise),
-  `recategorize_all()`, `upsert_category` (accepts `bucket` since 0021) /
+- Key RPCs: `categorize(merchant, direction)` (SQL categoriser — the older server-side path; statements are
+  categorised by the client engine), `ingest_transactions(source_type, rows jsonb)` (dedupe +
+  insert + categorise), `recategorize_all()` (server-side re-run; `api.recategorizeAll` wraps it,
+  nothing calls it — the live pass is `recategorizeAllClient`), `upsert_category` (accepts `bucket` since 0021) /
   `delete_category`, `period_summary(from, to)` (0020, reads `transaction_flows`,
   returns expense/income/transfer rows separately — caller decides what to exclude),
   `pair_internal_transfers()` (0018, manual-only, see above),
@@ -258,11 +398,21 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 
 **Goals**
 - `goals` — type (`count`/`value`/`milestone`/`streak`), target, unit, direction
-  (up/down), `source` jsonb (`{"kind":"manual"}` for now — designed to later hold
-  auto-tracked sources from other modules), optional `module_id` tag, `milestones` jsonb
-  checklist (for milestone-type goals only).
-- `goal_progress` — append-only ledger: count/value goals log incremental rows (summed),
-  streak goals log at most one row per day (enforced in `api.ts`, not a DB constraint).
+  (up/down), `source` jsonb whose `kind` is whitelisted by `goals_source_kind_check` (0033):
+  `manual` | `journal_streak` | `tasks_completed` — the UI only ever writes `manual`; the other
+  two are computed from `office_journal` / `office_tasks`. Optional `module_id` tag, `milestones`
+  jsonb checklist (milestone-type goals only). 0033 added `cadence`
+  (`none`/`weekly`/`monthly`/`quarterly`), `parent_goal_id` (hierarchy; not self) and
+  `next_task_id` (→ `office_tasks`).
+- `goal_progress` — append-only ledger for `manual` goals: count/value goals log incremental rows
+  (summed), streak goals log at most one row per day (enforced in `api.ts`, not a DB constraint).
+- `goal_periods` (0033) — frozen per-cadence snapshots (target/actual/status fixed once a period
+  closes, never recomputed), `reminders` (general-purpose; `goal_id` nullable) and `goal_reviews`
+  (continue/adjust/drop check-ins, one per goal per day). All owner-all RLS.
+- RPCs (plain SQL, invoker — RLS applies as the caller): `goal_current_value(goal, from, to)`
+  (0034, dispatches on `source.kind`) and `goal_pace(goal)` (0035 — streak: trailing 28 days;
+  count/value with `cadence = 'none'`: linear over the goal's lifetime; with a cadence: per-period
+  target; milestone goals are rejected).
 
 ## Conventions worth knowing
 
@@ -279,17 +429,26 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 - **`design_item_boards` has no `user_id`** — a deliberate exception to the owner-all
   pattern: ownership is the item's (`exists` on `design_items`), and a write also requires
   the *board* to be the caller's so a row can never link into someone else's board.
-- **Credit guard** (`classify()` in `categorize.ts`, wrapping the tiers): a credit whose
-  chosen category is in `Lists.expenseCategories` becomes `Money Received`, with the
-  original tier kept as a `matched_by` suffix (`override:credit`, `brand:credit`,
-  `qr:credit`, `entity:credit`…) and `confidence = 'medium'`. The set is loaded by
-  `loadEngineLists` from `categories` and mirrors how `transaction_flows` derives
-  `flow_kind` for a credit: the `(slug, 'credit')` row's kind, user row else system row,
-  so a slug with no credit-side row (`grocery`, `alcohol`…) is not in it — the view already
-  counts those as income. Reason: `getMonthSummary` adds `flow_kind = 'expense'` amounts
-  into spend unsigned, so a credit in an expense category inflates spend. Because it is
-  `medium`, guarded rows stay in the review queue, and pinning their payee cannot clear
-  them (the pin also governs the payee's debits and is guarded again for credits).
+- **Credit guard** (`classify()` in `categorize.ts`, wrapping the tiers via `pickCategory()`): a
+  credit whose chosen category is in `Lists.expenseCategories` becomes `Money Received`, with the
+  original tier kept as a `matched_by` suffix (`override:credit`, `brand:credit`, `qr:credit`,
+  `entity:credit`…) and `confidence = 'medium'`. The set is loaded by `loadEngineLists` from
+  `categories` and mirrors how `transaction_flows` derives `flow_kind` for a credit: the
+  `(slug, 'credit')` row's kind, user row else system row — so a slug with no credit-side row
+  (`grocery`, `alcohol`…) is not in it; the view already counts those as income. Reason:
+  `getMonthSummary` adds `flow_kind = 'expense'` amounts into spend unsigned, so a credit in an
+  expense category inflates spend. Because it is `medium`, guarded rows stay in the review queue,
+  and pinning their payee cannot clear them (the pin also governs the payee's debits and is
+  guarded again for credits).
+- **Paging past the 1,000-row cap.** PostgREST returns at most `max_rows` (1,000, `config.toml`)
+  per response and **truncates silently** — no error. Any read that can exceed that pages with
+  `selectAll` / `eachPage` (`api.ts`): a **unique** stable order (`order('id')`, never a
+  timestamp that can tie), advance by the rows actually returned, and stop on an *empty* page
+  (not a short one — the server cap can be below the page size). Each page needs a fresh query
+  builder.
+- **Zero-row writes look like success.** A Supabase `update` / `delete` that matches no row (RLS,
+  a row gone) returns no error. When the count matters, add `.select('id')` and count what came
+  back.
 - **Design module UI** uses the app's ground/theme like every other module — no ground
   override. The `--design-*` tokens in `tokens.css` are *aliases* onto the active preset's
   own tokens (`--surface`, `--text`, `--base`…; muted text and borders are `color-mix`es of
@@ -332,3 +491,7 @@ update that section in the same piece of work:
 - New env var, edge function, or convention → update the relevant section.
 - A pattern gets violated on purpose (e.g. a table without the standard RLS policy) →
   note it under Conventions so it doesn't look like an oversight later.
+- Calling a table or path "superseded" or "unread" means **no client code reads or writes it** —
+  grep for `.from('<table>')` before writing that sentence. `people` / `ferrari_shops` were
+  documented as unread while the tag flow still wrote them, which hid a bug where tags were saved
+  but never applied.
