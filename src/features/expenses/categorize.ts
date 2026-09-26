@@ -42,23 +42,40 @@ export const EMPTY_LISTS: Lists = {
 };
 
 /* ---------------- ORDER MATTERS: first match wins ---------------- */
+/*
+ * RULES are tested against `hay` = `${vpa} ${counterparty}` (lower-cased) — a
+ * TWO-field concatenation, so `^` anchors to the start of the VPA, not to the
+ * payee, and is almost never what you want: a brand in the payee field can't
+ * match it, and on card rows (empty VPA) hay starts with a space, so it never
+ * matches at all. Use `(^|\s)word` to anchor to "start of either field".
+ * `$` is safe — hay ends where the counterparty ends.
+ *
+ * The bank also truncates: the payee name to 10 chars, the VPA to 14. A brand
+ * that ends a longer name is cut mid-word ("Dimple Wine" → "Dimple Win",
+ * "Delhi Metro" → "Delhi Metr"), so patterns must match a prefix of the word
+ * (`namma ?yatr`, `prime ?vid`) or the cut form at the end (`\bwin$`), and a
+ * multi-word brand's separator must be optional (`indian ?oil` — the payee has
+ * the space, the VPA doesn't).
+ */
 const RULES: [string, RegExp][] = [
-  ["Alcohol",           /wine|beer|liquor|\bdaru\b|permit ?room|madhushala|bevco/],
+  ["Alcohol",           /wine|\bwin$|beer|liquor|\bdaru\b|permit ?room|madhushala|bevco/],
   ["Ticket Booking",    /bookmyshow|districtevents|district\.movie|paytminsider|irctc|makemytrip|goibibo|cleartrip|ixigo|redbus|abhibus|indigo|akasa|vistara|airasia|spicejet/],
-  ["Cab & Transport",   /uberindia|^uber|olacabs|^ola\b|rapido|blusmart|namma ?yatri|mml3|mumbai ?met|\bmetro\b/],
+  ["Cab & Transport",   /uberindia|(^|\s)uber|olacabs|(^|\s)ola\b|rapido|blusmart|namma ?yatr|mml3|mumbai ?met|\bmetro\b|\bmetr$/],
   ["Grocery",           /swiggyinstamar|instamart|swiggystores|blinkit|grofers|zepto|bigbasket|dmart|amazonpaygroce|jiomart|licious/],
   ["Food Delivery",     /swiggyupi|upiswiggy|swiggy1online|\bswiggy\b|zomato|eatsure|faasos|behrouz/],
-  ["Dineout & Stays",   /swiggydinein|swiggydineout|bundltech|district\.dinin|dineout|eazydiner|hotel|restaurant|resort|villa|oyo|treebo|fabhotel|airbnb|poptates|chimichurri|irish ?h|jaihind|dhaba|cafe|biryani|pizza|kitchen|barbeque|social|smokehouse|brewer|\bpub\b/],
-  ["Online Shopping",   /amazon|myntra|flipkart|ajio|uniqlo|westside|\bzara\b|h ?& ?m|hnm|nykaa|meesho|tatacliq|decathlon|snapdeal|shoppersstop/],
-  ["Entertainment",     /\bpvr\b|inox|cinepolis|netflix|spotify|hotstar|sonyliv|zee5|prime ?video/],
+  ["Dineout & Stays",   /swiggydinein|swiggydineout|bundltech|district\.dinin|dineout|eazydiner|hotel|restaur|\bresta$|resort|villa|oyo|treebo|fabhotel|airbnb|poptates|chimichurr|irish ?h|jaihind|dhaba|cafe|biryani|pizza|kitchen|barbeque|social|smokehouse|brewer|\bpub\b/],
+  ["Online Shopping",   /amazon|myntra|flipkart|ajio|uniqlo|westside|\bzara\b|h ?& ?m|hnm|nykaa|meesho|tatacliq|decathlon|snapdeal|shoppers ?st/],
+  ["Entertainment",     /\bpvr\b|inox|cinepolis|netflix|spotify|hotstar|sonyliv|zee5|prime ?vid/],
   ["Work & Software",   /anthropic|openai|claude|chatgpt|cursor|midjourney|figma|adobe|canva|envato|freepik|notion|github|vercel/],
   ["Subscriptions",     /appleservices|apple ?medi|apple ?serv|playstore|googleplay|google ?pla/],
   ["Bills & Recharge",  /\bjio\b|airtel|vodafone|adani|msedcl|mahadiscom|tatapower|bses|billdesk/],
-  ["Fuel",              /hpcl|bpcl|iocl|indianoil|petrol|petroleum|fuel/],
-  ["Health & Personal", /chemist|pharma|medical|apollo|hospital|clinic|diagnost|salon|\bspa\b|barber/],
+  ["Fuel",              /hpcl|bpcl|iocl|indian ?oil|petrol|petroleum|fuel/],
+  ["Health & Personal", /chemist|pharma|medic|apollo|hospital|clinic|diagnost|salon|\bspa\b|barber/],
 ];
 
-/** The remark is text YOU typed into the UPI app. High signal, low volume. */
+/** The remark is text YOU typed into the UPI app. High signal, low volume.
+ *  Tested against f.remark alone (one field, so `^` would be valid here), but
+ *  the bank cuts the remark to 10 chars too — match word prefixes. */
 const REMARK_RULES: [string, RegExp][] = [
   ["Rent & Household", /rent|vasu ?kamal|flat|maid|\bbai\b|cook|househelp|expens/i],
   ["Alcohol",          /beer|wine|daru|drinks/i],
