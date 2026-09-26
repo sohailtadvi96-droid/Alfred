@@ -248,7 +248,9 @@ export function useAiFallback(scope: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.runAiFallback(api.AI_BATCH_SIZE, scope),
-    onSuccess: () => invalidateAll(qc),
+    // Settled, not success: a sweep that fails partway has still written and
+    // re-categorised its earlier pins, and the queue must show that.
+    onSettled: () => invalidateAll(qc),
   });
 }
 

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { errMessage } from '@/lib/errors';
 import { addMonths, monthRange } from '@/lib/format';
 import { dayMatchedWindow, lastDayOfMonthFrom, summarizeComparison } from '@/lib/periodComparison';
 import type { Direction, RawCategoryRow } from './categories';
@@ -95,33 +96,49 @@ export async function recategorizeAll(): Promise<number> {
 
 // ---------- engine (client-side categorisation) ----------
 
-/** Load the engine's Lists (family VPAs, Ferrari shops, merchant overrides)
- *  from Supabase. Falls back to empty if the engine tables aren't there yet. */
+/** Load the engine's Lists (family VPAs, Ferrari shops, merchant overrides,
+ *  entity default categories) from Supabase.
+ *
+ *  Throws if any read fails — it never returns empty or partial lists. Every
+ *  caller feeds the result to the engine and writes what comes out, so an empty
+ *  set (no pins, no family, no ferrari, no entity defaults) would silently
+ *  rewrite categories instead of surfacing the failure. Nothing has been
+ *  written by the time this throws. */
 export async function loadEngineLists(): Promise<Lists> {
-  const empty: Lists = {
-    familyVpas: new Set(),
-    ferrariShops: new Set(),
-    overrides: new Map(),
-    entityCategoryByVpa: new Map(),
-    entityCategoryByName: new Map(),
-  };
   try {
     // Sourced from entities/entity_keys (0023), not people/ferrari_shops
     // directly — those tables are left in place but unread. Only
     // key_type = 'vpa_prefix' keys are meaningful here since these sets
     // are checked against a transaction's own vpa in classify().
+    // Every read is paged (selectAll): a response cut off at max_rows would be
+    // as silent — and as wrong — as an empty one.
     const [familyKeys, ferrariKeys, rules, categoryKeys] = await Promise.all([
-      supabase
-        .from('entity_keys')
-        .select('key_value, entities!inner(is_family)')
-        .eq('key_type', 'vpa_prefix')
-        .eq('entities.is_family', true),
-      supabase
-        .from('entity_keys')
-        .select('key_value, entities!inner(is_ferrari)')
-        .eq('key_type', 'vpa_prefix')
-        .eq('entities.is_ferrari', true),
-      supabase.from('merchant_rules').select('match_type,match_value,category,merchant'),
+      selectAll<{ key_value: string }>((from, to) =>
+        supabase
+          .from('entity_keys')
+          .select('id,key_value,entities!inner(is_family)')
+          .eq('key_type', 'vpa_prefix')
+          .eq('entities.is_family', true)
+          .order('id')
+          .range(from, to),
+      ),
+      selectAll<{ key_value: string }>((from, to) =>
+        supabase
+          .from('entity_keys')
+          .select('id,key_value,entities!inner(is_ferrari)')
+          .eq('key_type', 'vpa_prefix')
+          .eq('entities.is_ferrari', true)
+          .order('id')
+          .range(from, to),
+      ),
+      selectAll<{ match_type: string; match_value: string; category: string; merchant: string | null }>(
+        (from, to) =>
+          supabase
+            .from('merchant_rules')
+            .select('id,match_type,match_value,category,merchant')
+            .order('id')
+            .range(from, to),
+      ),
       // Resolved entities that carry a default category — see buildEntityCategoryMaps
       // for which key states may drive categorisation.
       selectAll<{ key_type: string; key_value: string; ambiguity_state: string; entities: unknown }>((from, to) =>
@@ -132,15 +149,11 @@ export async function loadEngineLists(): Promise<Lists> {
           .not('entities.default_category', 'is', null)
           .order('id')
           .range(from, to),
-      ).then(
-        (data) => ({ data, error: null }),
-        (error: unknown) => ({ data: null, error }),
       ),
     ]);
-    if (familyKeys.error || ferrariKeys.error || rules.error || categoryKeys.error) return empty;
     return {
       ...buildEntityCategoryMaps(
-        (categoryKeys.data ?? []).map((r) => {
+        categoryKeys.map((r) => {
           const e = Array.isArray(r.entities) ? r.entities[0] : r.entities;
           return {
             key_type: r.key_type,
@@ -150,19 +163,20 @@ export async function loadEngineLists(): Promise<Lists> {
           };
         }),
       ),
-      familyVpas: new Set((familyKeys.data ?? []).map((r) => r.key_value as string)),
-      ferrariShops: new Set((ferrariKeys.data ?? []).map((r) => r.key_value as string)),
+      familyVpas: new Set(familyKeys.map((r) => r.key_value)),
+      ferrariShops: new Set(ferrariKeys.map((r) => r.key_value)),
       overrides: new Map(
-        (rules.data ?? []).map((r) => [
-          r.match_type === 'counterparty'
-            ? String(r.match_value).toUpperCase()
-            : String(r.match_value),
-          { category: r.category as string, merchant: (r.merchant as string | null) ?? undefined },
+        rules.map((r) => [
+          r.match_type === 'counterparty' ? String(r.match_value).toUpperCase() : String(r.match_value),
+          { category: r.category, merchant: r.merchant ?? undefined },
         ]),
       ),
     };
-  } catch {
-    return empty;
+  } catch (e) {
+    throw new Error(
+      `Couldn’t load the categorisation rules (${errMessage(e, 'unknown error')}) — no transactions were re-categorised.`,
+      { cause: e },
+    );
   }
 }
 
@@ -351,6 +365,7 @@ export async function commitVpaTag(
   kind: 'family' | 'ferrari',
   next: boolean,
 ): Promise<{ scanned: number; moved: number }> {
+  await loadEngineLists(); // preflight: fail before saving a tag we couldn't then apply
   if (kind === 'family') await setFamilyMember(vpa, displayName, next);
   else await setFerrariShop(vpa, displayName, next);
   const lists = await loadEngineLists(); // re-read: now reflects the change
@@ -591,14 +606,24 @@ export async function listReviewQueue(limit = 300): Promise<ReviewTxn[]> {
 /** Pin a merchant to a category (engine Tier 0) and re-categorise every
  *  matching transaction, so the correction compounds. Keyed on VPA when the
  *  row has one, else the counterparty name. */
-export async function pinMerchant(input: {
-  matchType: 'vpa' | 'counterparty';
-  matchValue: string;
-  categorySlug: string;
-  merchant: string | null;
-}): Promise<{ moved: number }> {
+export async function pinMerchant(
+  input: {
+    matchType: 'vpa' | 'counterparty';
+    matchValue: string;
+    categorySlug: string;
+    merchant: string | null;
+  },
+  /** Preloaded engine lists, so a batch of pins reads them once. The new pin is
+   *  added to this object in place — pass a set you're happy to have mutated. */
+  lists?: Lists,
+): Promise<{ moved: number }> {
   const stored =
     input.matchType === 'counterparty' ? input.matchValue.toUpperCase() : input.matchValue;
+
+  // Load before writing: if the rules can't be read, fail with nothing saved. A
+  // pin written first and then not applied would leave its rows unmoved in the
+  // review queue while its key is excluded from every future AI candidate list.
+  const engineLists = lists ?? (await loadEngineLists());
 
   const { error } = await supabase.from('merchant_rules').upsert(
     {
@@ -612,10 +637,12 @@ export async function pinMerchant(input: {
   );
   if (error) throw error;
 
-  const lists = await loadEngineLists(); // now includes the new override
+  // The lists were read before the upsert, so add the new override by hand —
+  // same key and shape loadEngineLists builds from a merchant_rules row.
+  engineLists.overrides.set(stored, { category: input.categorySlug, merchant: input.merchant ?? undefined });
   const res = await recategoriseMatching(
     input.matchType === 'vpa' ? { vpa: input.matchValue } : { counterparty: input.matchValue },
-    lists,
+    engineLists,
     false,
   );
   return { moved: res.moved };
@@ -731,6 +758,10 @@ export async function runAiFallback(limit = AI_BATCH_SIZE, scope?: string): Prom
   const cands = await listAiCandidates(limit, scope);
   if (!cands.length) return { candidates: 0, answered: 0, pinned: 0, moved: 0 };
 
+  // Once per batch, and before the paid call: if the rules can't be read there
+  // is no point asking the model, and every pin below reuses these lists.
+  const lists = await loadEngineLists();
+
   const items = cands.map((c) => ({
     key: c.key,
     merchant: c.merchant ?? '',
@@ -771,12 +802,15 @@ export async function runAiFallback(limit = AI_BATCH_SIZE, scope?: string): Prom
   for (const a of answers) {
     const c = byKey.get(a.key);
     if (!c) continue;
-    const res = await pinMerchant({
-      matchType: c.matchType,
-      matchValue: c.matchValue,
-      categorySlug: a.category,
-      merchant: a.merchant || c.merchant,
-    });
+    const res = await pinMerchant(
+      {
+        matchType: c.matchType,
+        matchValue: c.matchValue,
+        categorySlug: a.category,
+        merchant: a.merchant || c.merchant,
+      },
+      lists,
+    );
     pinned += 1;
     moved += res.moved;
   }

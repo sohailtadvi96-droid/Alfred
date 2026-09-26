@@ -1,4 +1,5 @@
 import * as DM from '@radix-ui/react-dropdown-menu';
+import { errMessage } from '@/lib/errors';
 import type { Direction } from './categories';
 import { useCategories, usePinMerchant } from './hooks';
 
@@ -33,12 +34,16 @@ export function PinCategoryMenu({
       <DM.Trigger asChild>
         <button
           className="tag as-button"
-          data-tip={`Pin ${matchType === 'vpa' ? matchValue : 'this payee'}`}
+          data-tip={
+            pin.isError
+              ? errMessage(pin.error, 'Could not pin.')
+              : `Pin ${matchType === 'vpa' ? matchValue : 'this payee'}`
+          }
           style={current ? { borderColor: current.color, color: current.color } : undefined}
           disabled={pin.isPending}
         >
           <i style={current ? { background: current.color } : undefined} />
-          {pin.isPending ? 'Pinning…' : label}
+          {pin.isPending ? 'Pinning…' : pin.isError ? 'Pin failed — retry' : label}
         </button>
       </DM.Trigger>
       <DM.Portal>

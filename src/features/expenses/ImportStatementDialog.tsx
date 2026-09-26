@@ -10,7 +10,7 @@ import {
   type CsvColumnMap,
   type ParsedCsv,
 } from './csv';
-import { EMPTY_LISTS } from './categorize';
+import { loadEngineLists } from './api';
 import type { DateFormat, ParseResult } from './statement';
 // pdf.ts pulls in pdfjs-dist (~1 MB) — load it only when a PDF is actually picked
 const loadPdf = () => import('./pdf');
@@ -176,7 +176,11 @@ export function ImportStatementDialog({
       if (isIciciStatement(ex.lines)) {
         const { parseIciciStatement } = await loadIcici();
         const parsed = parseIciciStatement(ex.lines);
-        res = buildEngineRows(parsed.txns, engineLists ?? EMPTY_LISTS);
+        // Never fall back to empty lists (no pins/family/entities) — that would
+        // import every row categorised as if none of your corrections existed.
+        // Still loading, or the query failed: read them now; a failure lands in
+        // the catch below.
+        res = buildEngineRows(parsed.txns, engineLists ?? (await loadEngineLists()));
         setEngineInfo({ warnings: parsed.warnings });
       } else {
         res = parseStatementLines(ex.lines);
