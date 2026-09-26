@@ -593,11 +593,13 @@ export const AI_BATCH_SIZE = 30;
 
 /** The review queue's rows (low/medium confidence, optionally narrowed to one
  *  category scope), minus anything already pinned in merchant_rules — deduped
- *  to one per merchant key. Pass `limit = Infinity` to count them all. */
+ *  to one per merchant key, highest total value first (low confidence breaks
+ *  ties), so each AI batch takes the payees that move the numbers most.
+ *  Pass `limit = Infinity` to count them all. */
 export async function listAiCandidates(limit = AI_BATCH_SIZE, scope?: string): Promise<AiCandidate[]> {
   let txnQuery = supabase
     .from('transactions')
-    .select('direction,amount_cents,merchant_display,counterparty,vpa_prefix,remark,channel,category')
+    .select('direction,amount_cents,merchant_display,counterparty,vpa_prefix,remark,channel,category,confidence')
     .in('confidence', ['low', 'medium']);
   if (scope && scope !== 'all') txnQuery = txnQuery.eq('category', scope);
   const [txnRes, ruleRes] = await Promise.all([
@@ -608,8 +610,9 @@ export async function listAiCandidates(limit = AI_BATCH_SIZE, scope?: string): P
   if (ruleRes.error) throw ruleRes.error;
 
   const pinned = new Set((ruleRes.data ?? []).map((r) => String(r.match_value)));
-  const seen = new Set<string>();
-  const out: AiCandidate[] = [];
+  // Per key: the first row seen stands in for the merchant in the AI payload;
+  // totalCents and rank aggregate over every matching row.
+  const byKey = new Map<string, { cand: AiCandidate; totalCents: number; rank: number }>();
 
   for (const t of (txnRes.data ?? []) as Array<{
     direction: Direction;
@@ -620,6 +623,7 @@ export async function listAiCandidates(limit = AI_BATCH_SIZE, scope?: string): P
     remark: string | null;
     channel: string | null;
     category: string;
+    confidence: string | null;
   }>) {
     if (t.category === 'bank_charges') continue; // needsAI() excludes it
     const vpa = (t.vpa_prefix ?? '').trim();
@@ -628,23 +632,36 @@ export async function listAiCandidates(limit = AI_BATCH_SIZE, scope?: string): P
     const matchValue = vpa || cp;
     if (!matchValue) continue;
     const key = matchType === 'counterparty' ? matchValue.toUpperCase() : matchValue;
-    if (pinned.has(key) || seen.has(key)) continue;
-    seen.add(key);
-    out.push({
-      key,
-      matchType,
-      matchValue,
-      merchant: t.merchant_display,
-      counterparty: t.counterparty,
-      vpa: t.vpa_prefix,
-      remark: t.remark,
-      channel: t.channel,
-      amount: t.amount_cents / 100,
-      direction: t.direction,
+    if (pinned.has(key)) continue;
+    const rank = CONFIDENCE_RANK[t.confidence ?? 'medium'] ?? 1;
+    const agg = byKey.get(key);
+    if (agg) {
+      agg.totalCents += t.amount_cents;
+      agg.rank = Math.min(agg.rank, rank);
+      continue;
+    }
+    byKey.set(key, {
+      totalCents: t.amount_cents,
+      rank,
+      cand: {
+        key,
+        matchType,
+        matchValue,
+        merchant: t.merchant_display,
+        counterparty: t.counterparty,
+        vpa: t.vpa_prefix,
+        remark: t.remark,
+        channel: t.channel,
+        amount: t.amount_cents / 100,
+        direction: t.direction,
+      },
     });
-    if (out.length >= limit) break;
   }
-  return out;
+
+  return [...byKey.values()]
+    .sort((a, b) => b.totalCents - a.totalCents || a.rank - b.rank)
+    .slice(0, limit)
+    .map((a) => a.cand);
 }
 
 export interface AiRunResult {
