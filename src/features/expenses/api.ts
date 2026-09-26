@@ -181,30 +181,24 @@ export async function loadEngineLists(): Promise<Lists> {
 }
 
 /** Re-categorise every statement transaction in the browser with the current
- *  Lists, and write back only the ones whose slug changed. The engine module
- *  never touches the network — rows are paged out, classified, patched back. */
+ *  Lists, and write back only the ones that differ from the engine's answer.
+ *  The engine module never touches the network — rows are paged out, classified,
+ *  patched back. Paged by id (unique): ordering by occurred_at, which ties, let
+ *  rows skip or repeat across page boundaries. */
 export async function recategorizeAllClient(lists: Lists): Promise<number> {
-  const PAGE = 1000;
-  let from = 0;
   let moved = 0;
-
-  for (;;) {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select(STORED_TXN_COLUMNS)
-      .eq('source_type', 'statement')
-      .order('occurred_at', { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) throw error;
-
-    const rows = (data ?? []) as StoredTxn[];
-    if (!rows.length) break;
-
-    moved += await applyRecategoriseUpdates(recategoriseStored(rows, lists));
-
-    if (rows.length < PAGE) break;
-    from += PAGE;
-  }
+  await eachPage<StoredTxn>(
+    (from, to) =>
+      supabase
+        .from('transactions')
+        .select(STORED_TXN_COLUMNS)
+        .eq('source_type', 'statement')
+        .order('id')
+        .range(from, to),
+    async (rows) => {
+      moved += await applyRecategoriseUpdates(recategoriseStored(rows, lists));
+    },
+  );
   return moved;
 }
 
@@ -564,22 +558,33 @@ export async function resolveAmbiguousSeparated(
 
 const CONFIDENCE_RANK: Record<string, number> = { low: 0, medium: 1, high: 2 };
 
-/** Every row of a select, not just the first page — PostgREST caps a response
- *  at max_rows (1,000). `page` must build a fresh query each call (builders
- *  aren't reusable) with a stable order, so pages don't overlap or skip rows.
- *  Advances by what actually came back and stops on an empty page, so it stays
- *  correct even if the server cap is lower than the page size asked for. */
-async function selectAll<T>(
-  page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>,
-): Promise<T[]> {
+type PageFn = (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>;
+
+/** Walk a select page by page — PostgREST caps a response at max_rows (1,000).
+ *  `page` must build a fresh query each call (builders aren't reusable) with a
+ *  UNIQUE, stable order (an `order by id`, never a timestamp that can tie), so
+ *  pages neither overlap nor skip rows. Advances by what actually came back and
+ *  stops on an empty page, so it stays correct even if the server cap is lower
+ *  than the page size asked for. `fn` runs on each page before the next is read. */
+async function eachPage<T>(page: PageFn, fn: (rows: T[]) => Promise<void>): Promise<void> {
   const PAGE = 1000;
-  const all: T[] = [];
+  let read = 0;
   for (;;) {
-    const { data, error } = await page(all.length, all.length + PAGE - 1);
+    const { data, error } = await page(read, read + PAGE - 1);
     if (error) throw error;
-    if (!data?.length) return all;
-    all.push(...(data as T[]));
+    if (!data?.length) return;
+    await fn(data as T[]);
+    read += data.length;
   }
+}
+
+/** Every row of a select, not just the first page. */
+async function selectAll<T>(page: PageFn): Promise<T[]> {
+  const all: T[] = [];
+  await eachPage<T>(page, async (rows) => {
+    all.push(...rows);
+  });
+  return all;
 }
 
 /** Engine-classified rows that want a human look: low/medium confidence,
