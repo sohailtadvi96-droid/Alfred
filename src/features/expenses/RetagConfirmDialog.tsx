@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { errMessage } from '@/lib/errors';
 import * as api from './api';
+import type { RecategoriseResult } from './api';
 import { useCommitVpaTag } from './hooks';
+import { notSaved } from './recategoriseSummary';
 
 export interface RetagTarget {
   vpa: string;
@@ -21,8 +23,8 @@ export function RetagConfirmDialog({
   onClose: () => void;
 }) {
   const commit = useCommitVpaTag();
-  const [preview, setPreview] = useState<{ scanned: number; moved: number } | null>(null);
-  const [done, setDone] = useState<{ scanned: number; moved: number } | null>(null);
+  const [preview, setPreview] = useState<RecategoriseResult | null>(null);
+  const [done, setDone] = useState<RecategoriseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -110,11 +112,11 @@ export function RetagConfirmDialog({
       {done ? (
         <p>
           {done.moved === 0 ? (
-            <>Saved. No existing transactions needed re-categorising.</>
+            <>Saved. No existing transactions needed re-categorising.{notSaved(done.unwritten)}</>
           ) : (
             <>
               Saved. <b>{done.moved}</b> of {done.scanned} existing transaction
-              {done.scanned === 1 ? '' : 's'} for this VPA moved.
+              {done.scanned === 1 ? '' : 's'} for this VPA moved.{notSaved(done.unwritten)}
             </>
           )}
         </p>

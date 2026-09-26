@@ -10,7 +10,8 @@ import {
   type CsvColumnMap,
   type ParsedCsv,
 } from './csv';
-import { loadEngineLists } from './api';
+import { loadEngineLists, type RecategoriseOutcome } from './api';
+import { notSaved } from './recategoriseSummary';
 import type { DateFormat, ParseResult } from './statement';
 // pdf.ts pulls in pdfjs-dist (~1 MB) — load it only when a PDF is actually picked
 const loadPdf = () => import('./pdf');
@@ -78,7 +79,7 @@ export function ImportStatementDialog({
   const recat = useRecategorizeAll();
   const fileRef = useRef<HTMLInputElement>(null);
   const [showSkipped, setShowSkipped] = useState(false);
-  const [recatDone, setRecatDone] = useState<number | null>(null);
+  const [recatDone, setRecatDone] = useState<RecategoriseOutcome | null>(null);
 
   const [kind, setKind] = useState<Kind | null>(null);
   const [fileName, setFileName] = useState('');
@@ -296,7 +297,8 @@ export function ImportStatementDialog({
               </button>
             ) : (
               <span className="tlabel">
-                {recatDone} transaction{recatDone === 1 ? '' : 's'} recategorised
+                {recatDone.moved} transaction{recatDone.moved === 1 ? '' : 's'} recategorised.
+                {notSaved(recatDone.unwritten)}
               </span>
             )}
           </div>
