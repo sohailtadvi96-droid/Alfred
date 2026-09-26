@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { errMessage } from '@/lib/errors';
 import * as api from './api';
-import type { RecategoriseResult } from './api';
+import type { RetagResult } from './api';
 import { useCommitVpaTag } from './hooks';
 import { notSaved } from './recategoriseSummary';
 
@@ -15,6 +15,9 @@ export interface RetagTarget {
 
 const KIND_LABEL = { family: 'family', ferrari: 'Ferrari shop' } as const;
 
+/** The flag is on the payee, so tagging one VPA also tags the payee's others. */
+const scopeText = (vpas: number) => (vpas > 1 ? `for this payee's ${vpas} VPAs` : 'for this VPA');
+
 export function RetagConfirmDialog({
   target,
   onClose,
@@ -23,8 +26,8 @@ export function RetagConfirmDialog({
   onClose: () => void;
 }) {
   const commit = useCommitVpaTag();
-  const [preview, setPreview] = useState<RecategoriseResult | null>(null);
-  const [done, setDone] = useState<RecategoriseResult | null>(null);
+  const [preview, setPreview] = useState<RetagResult | null>(null);
+  const [done, setDone] = useState<RetagResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -117,7 +120,7 @@ export function RetagConfirmDialog({
             <>Saved. No existing transactions needed re-categorising.{notSaved(done.unwritten)}</>
           ) : (
             <>
-              Saved. Of {done.scanned} existing transaction{done.scanned === 1 ? '' : 's'} for this VPA,{' '}
+              Saved. Of {done.scanned} existing transaction{done.scanned === 1 ? '' : 's'} {scopeText(done.vpas)},{' '}
               <b>{done.moved}</b> changed category
               {done.refreshed > 0 && (
                 <>
@@ -134,10 +137,10 @@ export function RetagConfirmDialog({
       ) : (
         <p>
           {preview.scanned === 0 ? (
-            <>No existing transactions for this VPA — this only affects future imports.</>
+            <>No existing transactions {scopeText(preview.vpas)} — this only affects future imports.</>
           ) : preview.moved === 0 && preview.refreshed === 0 ? (
             <>
-              {preview.scanned} existing transaction{preview.scanned === 1 ? '' : 's'} for this VPA —
+              {preview.scanned} existing transaction{preview.scanned === 1 ? '' : 's'} {scopeText(preview.vpas)} —
               none change category.
             </>
           ) : (

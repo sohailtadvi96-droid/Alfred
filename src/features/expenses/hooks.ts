@@ -143,12 +143,14 @@ export function useEngineLists() {
   });
 }
 
-export function usePeople() {
-  return useQuery({ queryKey: ['expenses', 'people'] as const, queryFn: api.listPeople });
+/** VPAs tagged Family — vpa_prefix keys of is_family entities. */
+export function useFamilyVpas() {
+  return useQuery({ queryKey: ['expenses', 'familyVpas'] as const, queryFn: api.listFamilyVpas });
 }
 
-export function useFerrariShops() {
-  return useQuery({ queryKey: ['expenses', 'ferrariShops'] as const, queryFn: api.listFerrariShops });
+/** VPAs tagged as Ferrari shops — vpa_prefix keys of is_ferrari entities. */
+export function useFerrariVpas() {
+  return useQuery({ queryKey: ['expenses', 'ferrariVpas'] as const, queryFn: api.listFerrariVpas });
 }
 
 export function useCounterparties() {

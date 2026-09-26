@@ -29,24 +29,17 @@ export interface Transaction {
   excluded_from_spend?: boolean;
 }
 
-/** people row — the user-managed family list, keyed on VPA (migration 0013). */
-export interface Person {
+/** A VPA tagged Family or Ferrari shop: a vpa_prefix key of an entity flagged
+ *  is_family / is_ferrari. (The legacy `people` / `ferrari_shops` rows this
+ *  replaced are no longer read — see api.ts.) */
+export interface TaggedVpa {
+  /** the entity_keys row id */
   id: string;
   vpa: string;
+  /** the owning entity's display name */
   display_name: string | null;
-  is_family: boolean;
-  note: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-/** ferrari_shops row — pinned merchant QRs for the "My Ferrari" tier. */
-export interface FerrariShop {
-  id: string;
-  vpa: string;
-  display_name: string | null;
-  added_by: 'seed' | 'manual' | 'detector';
-  created_at: string;
+  /** when the entity was created (ISO) */
+  added: string;
 }
 
 /** A counterparty seen in transactions, aggregated by VPA — feeds the

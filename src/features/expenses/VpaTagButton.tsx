@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import * as DM from '@radix-ui/react-dropdown-menu';
-import { useFerrariShops, usePeople } from './hooks';
+import { useFamilyVpas, useFerrariVpas } from './hooks';
 import { RetagConfirmDialog, type RetagTarget } from './RetagConfirmDialog';
 
 /** Row-level "tag this payer" control — family / Ferrari toggles, keyed on VPA. */
 export function VpaTagButton({ vpa, name }: { vpa: string; name: string | null }) {
-  const { data: people } = usePeople();
-  const { data: shops } = useFerrariShops();
+  const { data: family } = useFamilyVpas();
+  const { data: shops } = useFerrariVpas();
   const [target, setTarget] = useState<RetagTarget | null>(null);
 
-  const isFamily = (people ?? []).some((p) => p.vpa === vpa && p.is_family);
+  const isFamily = (family ?? []).some((p) => p.vpa === vpa);
   const isShop = (shops ?? []).some((s) => s.vpa === vpa);
 
   return (

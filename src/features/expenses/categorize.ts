@@ -36,8 +36,8 @@ const FERRARI_ODD = new Set([25, 33, 53]);
  * that made it impossible to remove a relative from the family list.)
  */
 export interface Lists {
-  familyVpas: Set<string>;    // people.vpa where is_family = true
-  ferrariShops: Set<string>;  // ferrari_shops.vpa
+  familyVpas: Set<string>;    // entity_keys(vpa_prefix).key_value of is_family entities
+  ferrariShops: Set<string>;  // entity_keys(vpa_prefix).key_value of is_ferrari entities
   overrides: Map<string, { category: string; merchant?: string }>; // merchant_rules
   /** entity_keys(vpa_prefix).key_value -> entities.default_category, as stored. */
   entityCategoryByVpa: Map<string, string>;

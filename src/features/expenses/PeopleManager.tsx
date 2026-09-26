@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { money } from '@/lib/format';
-import { useCounterparties, useFerrariShops, usePeople } from './hooks';
+import { money, shortDate } from '@/lib/format';
+import { useCounterparties, useFamilyVpas, useFerrariVpas } from './hooks';
 import { RetagConfirmDialog, type RetagTarget } from './RetagConfirmDialog';
 
 export function PeopleManager() {
-  const { data: people, isLoading: pl } = usePeople();
-  const { data: shops, isLoading: sl } = useFerrariShops();
+  const { data: family = [], isLoading: pl } = useFamilyVpas();
+  const { data: shops, isLoading: sl } = useFerrariVpas();
   const { data: counterparties } = useCounterparties();
   const [target, setTarget] = useState<RetagTarget | null>(null);
   const [q, setQ] = useState('');
@@ -15,7 +15,6 @@ export function PeopleManager() {
     [counterparties],
   );
 
-  const family = (people ?? []).filter((p) => p.is_family);
   const familyVpas = new Set(family.map((p) => p.vpa));
   const shopVpas = new Set((shops ?? []).map((s) => s.vpa));
 
@@ -104,7 +103,7 @@ export function PeopleManager() {
                 <th>Name</th>
                 <th>VPA</th>
                 <th style={{ textAlign: 'right' }}>Txns</th>
-                <th>Added</th>
+                <th>Payee added</th>
                 <th />
               </tr>
             </thead>
@@ -116,7 +115,7 @@ export function PeopleManager() {
                     <td>{s.display_name || <span className="tlabel">—</span>}</td>
                     <td className="mono">{s.vpa}</td>
                     <td style={{ textAlign: 'right' }}>{cp?.txnCount ?? 0}</td>
-                    <td className="tlabel">{s.added_by}</td>
+                    <td className="tlabel">{s.added ? shortDate(s.added) : '—'}</td>
                     <td style={{ textAlign: 'right' }}>
                       <button
                         className="btn ghost sm"

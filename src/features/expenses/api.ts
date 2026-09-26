@@ -10,11 +10,10 @@ import type {
   AccountBalance,
   CategoryRule,
   Counterparty,
-  FerrariShop,
   MonthSummary,
   NewTransaction,
-  Person,
   ReviewTxn,
+  TaggedVpa,
   Transaction,
 } from './types';
 
@@ -274,45 +273,60 @@ async function applyRecategoriseUpdates(updates: RecategoriseUpdate[]): Promise<
   return written;
 }
 
-// ---------- people / ferrari shops (family & pinned-shop lists) ----------
+// ---------- family & Ferrari tags (entities) ----------
+//
+// "Family" and "Ferrari shop" are flags on an ENTITY (entities.is_family /
+// is_ferrari), reached through its vpa_prefix keys — exactly what the engine
+// reads (loadEngineLists). The legacy `people` / `ferrari_shops` tables (0013)
+// are no longer read or written here: writing them while the engine read
+// entities is how a tag ended up saved but never applied.
 
-export async function listPeople(): Promise<Person[]> {
-  const { data, error } = await supabase
-    .from('people')
-    .select('id,vpa,display_name,is_family,note,created_at,updated_at')
-    .order('display_name', { nullsFirst: false });
-  if (error) throw error;
-  return (data ?? []) as Person[];
+type TagKind = 'family' | 'ferrari';
+const TAG_COLUMN = { family: 'is_family', ferrari: 'is_ferrari' } as const;
+
+/** Every VPA tagged `kind`: the vpa_prefix keys of the flagged entities. */
+async function listTaggedVpas(kind: TagKind): Promise<TaggedVpa[]> {
+  const col = TAG_COLUMN[kind];
+  const rows = await selectAll<{ id: string; key_value: string; entities: unknown }>((from, to) =>
+    supabase
+      .from('entity_keys')
+      .select(`id,key_value,entities!inner(display_name,created_at,${col})`)
+      .eq('key_type', 'vpa_prefix')
+      .eq(`entities.${col}`, true)
+      .order('id')
+      .range(from, to),
+  );
+  return rows
+    .map((r) => {
+      const e = (Array.isArray(r.entities) ? r.entities[0] : r.entities) as
+        | { display_name: string | null; created_at: string }
+        | undefined;
+      return { id: r.id, vpa: r.key_value, display_name: e?.display_name ?? null, added: e?.created_at ?? '' };
+    })
+    .sort((a, b) => (a.display_name ?? '\uffff').localeCompare(b.display_name ?? '\uffff'));
 }
 
-export async function listFerrariShops(): Promise<FerrariShop[]> {
-  const { data, error } = await supabase
-    .from('ferrari_shops')
-    .select('id,vpa,display_name,added_by,created_at')
-    .order('display_name', { nullsFirst: false });
-  if (error) throw error;
-  return (data ?? []) as FerrariShop[];
-}
+export const listFamilyVpas = () => listTaggedVpas('family');
+export const listFerrariVpas = () => listTaggedVpas('ferrari');
 
 /** Distinct counterparties seen in transactions, aggregated by VPA. Powers the
  *  "add someone not yet tagged" search on the manage screen. */
 export async function listCounterparties(): Promise<Counterparty[]> {
-  const rows: { vpa_prefix: string | null; counterparty: string | null; direction: Direction; amount_cents: number }[] =
-    [];
-  const PAGE = 1000;
-  let from = 0;
-  for (;;) {
-    const { data, error } = await supabase
+  // Paged by id: this used to page with no order at all, so rows could be
+  // skipped or repeated across a page boundary and the per-VPA counts drifted.
+  const rows = await selectAll<{
+    vpa_prefix: string | null;
+    counterparty: string | null;
+    direction: Direction;
+    amount_cents: number;
+  }>((from, to) =>
+    supabase
       .from('transactions')
-      .select('vpa_prefix,counterparty,direction,amount_cents')
+      .select('id,vpa_prefix,counterparty,direction,amount_cents')
       .not('vpa_prefix', 'is', null)
-      .range(from, from + PAGE - 1);
-    if (error) throw error;
-    const page = (data ?? []) as typeof rows;
-    rows.push(...page);
-    if (page.length < PAGE) break;
-    from += PAGE;
-  }
+      .order('id')
+      .range(from, to),
+  );
 
   const byVpa = new Map<string, Counterparty>();
   for (const r of rows) {
@@ -327,38 +341,75 @@ export async function listCounterparties(): Promise<Counterparty[]> {
   return [...byVpa.values()].sort((a, b) => b.txnCount - a.txnCount);
 }
 
-/** Upsert a `people` row's family flag. The row is kept on un-family so the
- *  display name and note survive; only an explicit un-set clears the flag. */
-export async function setFamilyMember(
-  vpa: string,
-  displayName: string | null,
-  isFamily: boolean,
-): Promise<void> {
-  const { error } = await supabase
-    .from('people')
-    .upsert(
-      { vpa, display_name: displayName, is_family: isFamily },
-      { onConflict: 'user_id,vpa' },
-    );
+/** The entity_keys row for a VPA. A `separated` key has entity_id = null: it is
+ *  a tombstone, deliberately never reattached (see migration 0024). */
+async function findVpaKey(vpa: string): Promise<{ id: string; entity_id: string | null } | null> {
+  const { data, error } = await supabase
+    .from('entity_keys')
+    .select('id,entity_id')
+    .eq('key_type', 'vpa_prefix')
+    .eq('key_value', vpa)
+    .maybeSingle();
   if (error) throw error;
+  return (data as { id: string; entity_id: string | null } | null) ?? null;
 }
 
-/** Pin or unpin a Ferrari shop. Unpinning removes the row (re-add to restore). */
-export async function setFerrariShop(
-  vpa: string,
-  displayName: string | null,
-  pinned: boolean,
-): Promise<void> {
-  if (pinned) {
-    const { error } = await supabase
-      .from('ferrari_shops')
-      .upsert({ vpa, display_name: displayName, added_by: 'manual' }, { onConflict: 'user_id,vpa' });
+const separatedError = (vpa: string) =>
+  new Error(
+    `${vpa} was split into separate payees on purpose, so it can't be tagged as a whole — Family / Ferrari flags live on a single payee.`,
+  );
+
+/** Set or clear a tag on the entity that owns `vpa`. If the VPA has no entity
+ *  yet, tagging creates one (a person for Family, a merchant for a Ferrari
+ *  shop) and attaches the key. Untagging clears the flag and keeps the entity —
+ *  it may hold pins, keys or a default category. */
+async function setEntityTag(kind: TagKind, vpa: string, displayName: string | null, on: boolean): Promise<void> {
+  const col = TAG_COLUMN[kind];
+  const key = await findVpaKey(vpa);
+
+  if (key?.entity_id) {
+    const { data, error } = await supabase.from('entities').update({ [col]: on }).eq('id', key.entity_id).select('id');
     if (error) throw error;
-  } else {
-    const { error } = await supabase.from('ferrari_shops').delete().eq('vpa', vpa);
-    if (error) throw error;
+    // An update that matches no row succeeds with zero rows and no error.
+    if (!data?.length) throw new Error(`Couldn't update the payee behind ${vpa}.`);
+    return;
+  }
+  if (key) {
+    if (on) throw separatedError(vpa);
+    return; // separated: no entity, so nothing to clear
+  }
+  if (!on) return; // never tagged, no entity: nothing to clear
+
+  const { data: entity, error: e1 } = await supabase
+    .from('entities')
+    .insert({
+      display_name: displayName?.trim() || vpa,
+      entity_type: kind === 'family' ? 'person' : 'merchant',
+      [col]: true,
+      resolved_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+  if (e1) throw e1;
+  const { error: e2 } = await supabase.from('entity_keys').insert({
+    entity_id: (entity as { id: string }).id,
+    key_type: 'vpa_prefix',
+    key_value: vpa,
+    confidence: vpa.length === 14 ? 'prefix' : 'exact', // 14 = the bank's cut-off
+  });
+  if (e2) {
+    await supabase.from('entities').delete().eq('id', (entity as { id: string }).id); // don't leave a keyless entity
+    throw e2;
   }
 }
+
+/** Tag or untag a VPA as family. */
+export const setFamilyMember = (vpa: string, displayName: string | null, isFamily: boolean) =>
+  setEntityTag('family', vpa, displayName, isFamily);
+
+/** Pin or unpin a VPA as a Ferrari shop. */
+export const setFerrariShop = (vpa: string, displayName: string | null, pinned: boolean) =>
+  setEntityTag('ferrari', vpa, displayName, pinned);
 
 /** Re-classify the transactions matching a VPA or counterparty against the
  *  given Lists. `dryRun` writes nothing and reports what WOULD be written;
@@ -382,31 +433,75 @@ export async function recategoriseMatching(
 }
 
 
-/** How many of a VPA's transactions would move if it were (un)tagged. */
-export async function previewVpaTag(
-  vpa: string,
-  kind: 'family' | 'ferrari',
-  next: boolean,
-): Promise<RecategoriseResult> {
-  const lists = await loadEngineLists();
-  const set = kind === 'family' ? lists.familyVpas : lists.ferrariShops;
-  if (next) set.add(vpa);
-  else set.delete(vpa);
-  return recategoriseMatching({ vpa }, lists, true);
+export type RetagResult = RecategoriseResult & {
+  /** How many VPAs the result covers: the flag is per entity, so tagging one VPA
+   *  of a payee that has two tags both. */
+  vpas: number;
+};
+
+/** Every vpa_prefix key of the entity that owns `vpa`, or just `[vpa]` when it
+ *  has no entity yet. Throws for a separated key when tagging (see setEntityTag). */
+async function entityVpas(vpa: string, tagging: boolean): Promise<string[]> {
+  const key = await findVpaKey(vpa);
+  if (key && !key.entity_id) {
+    if (tagging) throw separatedError(vpa);
+    return [vpa];
+  }
+  if (!key?.entity_id) return [vpa];
+  const entityId = key.entity_id;
+  const rows = await selectAll<{ key_value: string }>((from, to) =>
+    supabase
+      .from('entity_keys')
+      .select('id,key_value')
+      .eq('entity_id', entityId)
+      .eq('key_type', 'vpa_prefix')
+      .order('id')
+      .range(from, to),
+  );
+  const vpas = rows.map((r) => r.key_value);
+  return vpas.includes(vpa) ? vpas : [vpa, ...vpas];
 }
 
-/** Tag/untag a VPA and re-categorise its existing transactions. */
+async function recategoriseVpas(vpas: string[], lists: Lists, dryRun: boolean): Promise<RetagResult> {
+  const total: RetagResult = { scanned: 0, moved: 0, refreshed: 0, unwritten: 0, vpas: vpas.length };
+  for (const v of vpas) {
+    const r = await recategoriseMatching({ vpa: v }, lists, dryRun);
+    total.scanned += r.scanned;
+    total.moved += r.moved;
+    total.refreshed += r.refreshed;
+    total.unwritten += r.unwritten;
+  }
+  return total;
+}
+
+/** What would change if this VPA's payee were (un)tagged: the engine is re-run
+ *  in memory over the rows of every VPA the payee owns. Writes nothing. */
+export async function previewVpaTag(
+  vpa: string,
+  kind: TagKind,
+  next: boolean,
+): Promise<RetagResult> {
+  const [lists, vpas] = await Promise.all([loadEngineLists(), entityVpas(vpa, next)]);
+  const set = kind === 'family' ? lists.familyVpas : lists.ferrariShops;
+  for (const v of vpas) {
+    if (next) set.add(v);
+    else set.delete(v);
+  }
+  return recategoriseVpas(vpas, lists, true);
+}
+
+/** Tag/untag a VPA's payee and re-categorise the rows of all its VPAs. */
 export async function commitVpaTag(
   vpa: string,
   displayName: string | null,
-  kind: 'family' | 'ferrari',
+  kind: TagKind,
   next: boolean,
-): Promise<RecategoriseResult> {
+): Promise<RetagResult> {
   await loadEngineLists(); // preflight: fail before saving a tag we couldn't then apply
   if (kind === 'family') await setFamilyMember(vpa, displayName, next);
   else await setFerrariShop(vpa, displayName, next);
-  const lists = await loadEngineLists(); // re-read: now reflects the change
-  return recategoriseMatching({ vpa }, lists, false);
+  const [lists, vpas] = await Promise.all([loadEngineLists(), entityVpas(vpa, false)]); // re-read: reflects the change
+  return recategoriseVpas(vpas, lists, false);
 }
 
 // ---------- counterparty resolution queue (Phase 3a) ----------
