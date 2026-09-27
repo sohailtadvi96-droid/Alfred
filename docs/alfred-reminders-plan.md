@@ -1,7 +1,7 @@
 # Alfred — Reminders module plan
 
 > Drop this in `docs/` next to `alfred-goals-engine-plan.md`. Claude Code should read it
-> before any Reminders step. Status: **R1 applied locally (27 Sep). Not pushed, not committed.**
+> before any Reminders step. Status: **R2 applied locally (27 Sep). Not pushed, not committed.**
 
 ### R0 findings that shaped this plan
 - The 0033 `reminders` table has **zero readers and zero rows**. It was scaffolded for goal nudges (`kind` = checkin/pace/…, opaque `recurrence` jsonb, `next_fire_at`). We **alter it in 0040**: keep id/user_id/goal_id/title/channel/snoozed_until/RLS/trigger, and replace the rest.
@@ -135,13 +135,14 @@ Existing `goal_pace` / `savings_plan` keep their inline logic for now, with no r
 | Function | Returns | Purpose |
 |---|---|---|
 | `user_today()` | date | shipped in 0040 (see §5) |
-| `reminder_occurs_on(r reminders, d date)` | boolean | Pure schedule check covering freq, weekdays, month_day clamp, every-N from `start_date`, start/end, and status (paused/archived never occur) |
+| `reminder_occurs_on(r reminders, d date)` | boolean | Pure schedule check covering freq, weekdays, month_day clamp, every-N from `start_date`, and start/end — **ignores `status` entirely** (paused/archived filtering is `reminders_today`'s job, not this function's) |
 | `reminder_satisfied(r reminders, d date)` | boolean | CASE on `satisfied_by`. For example, `office_journal` → exists entry for `d` |
-| `reminders_today(d date default user_today())` | table | Every card for the page: recurring occurring on `d`, one-time with `due_date ≤ d` and no completion (overdue carried), and `snoozed_until` respected. Columns: reminder fields, `occurrence_date`, `is_done`, `done_via` (`tick`/`module`), `is_overdue`, `due_state` (`later`/`due_now`/`overdue`), `streak` |
+| `reminders_today(d date default user_today())` | table | Every card for the page: recurring occurring on `d`, one-time with `due_date ≤ d` and no completion (overdue carried), and `snoozed_until` respected. Columns: reminder fields, `occurrence_date`, `is_done`, `done_via` (`tick`/`module`), `is_overdue`, `due_state` (`later`/`due_now`/`overdue`/`done`), `streak` |
 | `reminders_upcoming(days int default 7)` | table | Next N days of one-time reminders plus recurring occurrences, for the Upcoming tab |
 | `reminder_complete(id, occurrence_date)` | void | plpgsql: insert a completion. If `goal_id` points to a manual streak goal, also insert that day's `goal_progress` row. Both are idempotent |
 | `reminder_uncomplete(id, occurrence_date)` | void | Removes both rows from the step above |
-| `reminder_streak(id)` | int | Consecutive **scheduled** occurrences done or satisfied, walking back from today. An unfinished today doesn't break it, skipped does, and excused days are stepped over. Uses `generate_series` over a bounded window (e.g. 400 days) |
+| `reminder_skip(id, occurrence_date default user_today())` | void | Recurring only — marks the occurrence `skipped` (a miss; breaks `reminder_streak`, unlike `excused`); also unlogs a linked manual streak goal's `goal_progress` row for the day, via the internal `_reminder_unlog_goal` helper shared with `reminder_uncomplete` |
+| `reminder_streak(id, p_today date default user_today())` | int | Consecutive **scheduled** occurrences done or satisfied, walking back from `p_today`. An unfinished `p_today` doesn't break it, skipped does, and excused days are stepped over. Bounded to 400 days back |
 | `reminder_pause(id)` / `reminder_resume(id)` | void | Resume writes `excused` rows for every scheduled day between `paused_at` and yesterday (bounded, so streaks survive a pause), then clears `paused_at` |
 | `done_today_feed(d date default user_today())` | table | Union of `office_tasks` completed on `d` and completions whose local `completed_at` date is `d`: `source`, `id`, `title`, `completed_at`, `counts_as_task` |
 
