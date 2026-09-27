@@ -311,6 +311,7 @@ button {
 .app[data-collapsed='true'] .side .logo b,
 .app[data-collapsed='true'] .side nav a .label,
 .app[data-collapsed='true'] .side nav a .n,
+.app[data-collapsed='true'] .side nav a .rem-nav-badge,
 .app[data-collapsed='true'] .side nav .grp,
 .app[data-collapsed='true'] .side .foot .who {
   display: none;
@@ -6356,4 +6357,335 @@ textarea.office-journal {
 @media (max-width: 560px) {
   .sp-subs li { grid-template-columns: 1fr auto; }
   .sp-sub-last { grid-column: 1 / -1; }
+}
+
+/* ===================== Reminders ===================== */
+.rem-view {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.rem-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+/* compact ~88px tiles -- .home-tile's own sizing is tuned for the taller
+   Home board grid, so override the pieces that assume that height. */
+.rem-stats .home-tile {
+  min-height: 0;
+  height: auto;
+  padding: 12px 16px;
+  gap: 4px;
+}
+.rem-stats .home-tile-stat-value {
+  font-size: 26px;
+  font-weight: 600;
+}
+@media (max-width: 720px) {
+  .rem-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rem-quickadd {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rem-quickadd-hint {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.rem-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line-soft);
+}
+.rem-tab {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px 4px;
+  margin-right: 22px;
+  border-bottom: 2px solid transparent;
+}
+.rem-tab:hover {
+  color: var(--text-dim);
+}
+.rem-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--base);
+}
+.rem-tab-placeholder {
+  padding: 28px 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.rem-section-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 18px 0 8px;
+}
+.rem-section-label.tone-neg {
+  color: var(--neg);
+}
+.rem-section-note {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text-faint);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rem-empty {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.rem-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.rem-skel-row {
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  background: linear-gradient(100deg, var(--surface) 35%, var(--surface-2) 50%, var(--surface) 65%);
+  background-size: 200% 100%;
+  animation: item-shimmer 1.4s ease-in-out infinite;
+}
+
+/* ---- row ---- */
+.rem-row {
+  border: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  border-radius: 12px;
+  background: var(--surface);
+  margin-bottom: 8px;
+}
+.rem-row.tone-neg {
+  border-left-color: var(--neg);
+}
+.rem-row-head {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+}
+.rem-tick {
+  width: 44px;
+  height: 44px;
+  margin: -14px -14px -14px -14px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex: none;
+}
+.rem-tick-shape {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--text-faint);
+  transition: border-color 0.12s ease;
+}
+.rem-tick-shape.square {
+  border-radius: 4px;
+}
+.rem-tick-shape.circle {
+  border-radius: 50%;
+}
+.rem-tick:hover .rem-tick-shape {
+  border-color: var(--base);
+}
+.rem-auto-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--base);
+  flex: none;
+  justify-self: center;
+}
+.rem-row-titleblock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.rem-row-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rem-row-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rem-row-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.rem-row-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rem-streak {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-ochre);
+}
+.rem-write-link {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--base);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.rem-write-link:hover {
+  text-decoration: underline;
+}
+.rem-row-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.rem-row-status.tone-neg {
+  color: var(--neg);
+  font-weight: 600;
+}
+.rem-row-status.tone-faint {
+  color: var(--text-faint);
+}
+.rem-due-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--base);
+  flex: none;
+}
+.rem-row-menu-btn {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+.rem-row-menu-btn:hover,
+.rem-row-menu-btn[aria-expanded='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ---- done today ---- */
+.rem-done-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.rem-done-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 4px;
+  border-top: 1px solid var(--line-soft);
+}
+.rem-done-row:first-child {
+  border-top: none;
+}
+.rem-done-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-decoration: line-through;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rem-done-meta {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.rem-undo {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--base);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.rem-undo:hover {
+  text-decoration: underline;
+}
+
+/* ---- sidebar nav due-count badge ---- */
+.rem-nav-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--base);
+  color: var(--base-ink);
+  border-radius: 999px;
+  padding: 1px 6px;
+  line-height: 1.4;
+  margin-left: 6px;
+}
+.side nav a.active .rem-nav-badge {
+  background: var(--base-ink);
+  color: var(--base);
 }

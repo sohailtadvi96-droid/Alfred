@@ -39,6 +39,20 @@ export function useRemindersToday() {
   });
 }
 
+/** The one client source for "today" in this module (user_today(), 0040).
+ *  staleTime: Infinity means it never goes stale on its own -- refetchOnWindowFocus:
+ *  'always' forces exactly one refresh the moment the window regains focus
+ *  (a plain `true` wouldn't refetch at all once staleTime is Infinity). So
+ *  it's fresh as of the last time this tab was focused, never older. */
+export function useUserToday() {
+  return useQuery({
+    queryKey: ['reminders', 'user-today'],
+    queryFn: api.getUserToday,
+    staleTime: Infinity,
+    refetchOnWindowFocus: 'always',
+  });
+}
+
 export function useUpcoming(days = 7) {
   return useQuery({ queryKey: keys.upcoming(days), queryFn: () => api.listUpcoming(days) });
 }
@@ -168,6 +182,22 @@ export function useArchiveReminder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.archiveReminder(id),
+    onSuccess: () => refresh(qc),
+  });
+}
+
+export function useSnoozeReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, until }: { id: string; until: string }) => api.snoozeReminder(id, until),
+    onSuccess: () => refresh(qc),
+  });
+}
+
+export function useRescheduleReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dueDate }: { id: string; dueDate: string }) => api.rescheduleReminder(id, dueDate),
     onSuccess: () => refresh(qc),
   });
 }

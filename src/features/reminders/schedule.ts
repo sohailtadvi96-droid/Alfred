@@ -13,7 +13,7 @@ const shortDateFmt = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: '
 const onceDateFmt = new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
 /** Postgres `time` comes back as "HH:MM:SS" -- drop the seconds. */
-function formatTime(t: string): string {
+export function formatTime(t: string): string {
   return t.slice(0, 5);
 }
 
@@ -81,6 +81,32 @@ export function describeSchedule(r: ScheduleFields): string {
       return `Every ${r.interval_n} day${r.interval_n === 1 ? '' : 's'}${timeSuffix}${untilSuffix}`;
     default:
       return 'No schedule set';
+  }
+}
+
+type ScheduleShortFields = Pick<Reminder, 'kind' | 'freq' | 'weekdays' | 'month_day' | 'interval_n' | 'due_time'>;
+
+/** The same schedule, without the time-of-day or "until" trailer -- for a
+ *  recurring row's own meta line, which shows the time as a separate leading
+ *  piece ("{time} · {describeScheduleShort}") and would otherwise say it
+ *  twice. A one_time row has no separate time piece in its meta line, so
+ *  this embeds due_time itself instead of ever leaving a caller to render a
+ *  bare "—" next to it when there's no time. */
+export function describeScheduleShort(r: ScheduleShortFields): string {
+  if (r.kind === 'one_time') return r.due_time ? `${formatTime(r.due_time)} · one-time` : 'one-time';
+  switch (r.freq) {
+    case 'daily':
+      return 'Daily';
+    case 'weekly': {
+      const days = r.weekdays ?? [];
+      return isWeekdaysOnly(days) ? 'Weekdays' : days.map((d) => WEEKDAY_ABBR[d - 1]).join(' · ');
+    }
+    case 'monthly':
+      return `Monthly · ${ordinal(r.month_day ?? 1)}`;
+    case 'every_n_days':
+      return `Every ${r.interval_n}d`;
+    default:
+      return 'No schedule';
   }
 }
 

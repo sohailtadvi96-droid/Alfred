@@ -14,6 +14,7 @@ import { DesignPage } from './DesignPage';
 import { DesignDiscoverPage } from './DesignDiscoverPage';
 import { DesignBoardPage } from './DesignBoardPage';
 import { GoalsPage } from './GoalsPage';
+import { RemindersPage } from './RemindersPage';
 import { ProjectDetailPage } from './ProjectDetailPage';
 import { OfficeDayPage } from './OfficeDayPage';
 import { InvoicesPage } from './InvoicesPage';
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
       { path: 'work/invoices/:invoiceId', element: <InvoiceViewPage /> },
       { path: 'work/:projectId', element: <ProjectDetailPage /> },
       { path: 'goals', element: <GoalsPage /> },
+      { path: 'reminders', element: <RemindersPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
   },

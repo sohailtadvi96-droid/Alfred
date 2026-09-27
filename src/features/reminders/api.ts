@@ -3,6 +3,16 @@ import type { Reminder, ReminderDraft, ReminderToday, ReminderUpcoming } from '.
 
 // ---------- reads ----------
 
+/** user_today() (0040) -- the ONE client source for "today" in this module.
+ *  Quick-add's due date and the row menu's snooze/reschedule actions read
+ *  this instead of `new Date()`, same rule as everywhere else in Reminders:
+ *  the server's timezone-aware clock decides, never the browser's. */
+export async function getUserToday(): Promise<string> {
+  const { data, error } = await supabase.rpc('user_today');
+  if (error) throw error;
+  return data as string;
+}
+
 /** reminders_today (0041). Omit `date` (the normal case -- every caller but
  *  a future "view an earlier/later day" affordance) so the server's
  *  user_today() decides, not the browser clock -- see plan §2 rule 5 and
@@ -116,6 +126,21 @@ export async function skipReminder(id: string, occurrenceDate?: string): Promise
     'reminder_skip',
     occurrenceDate ? { p_id: id, p_date: occurrenceDate } : { p_id: id },
   );
+  if (error) throw error;
+}
+
+/** snoozed_until is an absolute instant (now + an interval), so computing it
+ *  from the browser's clock is fine -- it's not a calendar-day judgement,
+ *  unlike due_date/occurrence_date elsewhere in this file. */
+export async function snoozeReminder(id: string, until: string): Promise<void> {
+  const { error } = await supabase.from('reminders').update({ snoozed_until: until }).eq('id', id);
+  if (error) throw error;
+}
+
+/** "Move to tomorrow" -- dueDate is string date math (+1 day) on the
+ *  server-provided user_today(), done by the caller, never `new Date()`. */
+export async function rescheduleReminder(id: string, dueDate: string): Promise<void> {
+  const { error } = await supabase.from('reminders').update({ due_date: dueDate }).eq('id', id);
   if (error) throw error;
 }
 

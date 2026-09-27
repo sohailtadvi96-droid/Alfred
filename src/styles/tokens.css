@@ -43,6 +43,7 @@
   --m-health: #7a9471;
   --m-goals: #8a5a83;
   --m-travel: #c9963f;
+  --m-reminders: var(--c-clay);
 }
 
 /* ===================== 12 GROUND PRESETS ===================== */
