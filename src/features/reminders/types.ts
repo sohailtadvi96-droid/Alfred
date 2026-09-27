@@ -74,7 +74,8 @@ export interface ReminderToday {
   streak: number | null;
 }
 
-/** reminders_upcoming row -- mirrors its return table exactly (0041). */
+/** reminders_upcoming row -- mirrors its return table exactly (0041,
+ *  widened by 0043 to carry enough fields for describeScheduleShort). */
 export interface ReminderUpcoming {
   occurrence_date: string;
   id: string;
@@ -83,6 +84,19 @@ export interface ReminderUpcoming {
   time: string | null;
   freq: ReminderFreq | null;
   satisfied_by: ReminderSatisfiedBy | null;
+  weekdays: number[] | null;
+  month_day: number | null;
+  interval_n: number;
+  due_time: string | null;
+}
+
+/** reminder_history row -- mirrors its return table exactly (0042). One row
+ *  per (recurring reminder, day) over the requested window. */
+export type ReminderHistoryState = 'unscheduled' | 'done' | 'module' | 'skipped' | 'excused' | 'missed' | 'open';
+export interface ReminderHistoryRow {
+  reminder_id: string;
+  d: string;
+  state: ReminderHistoryState;
 }
 
 /** Form input for create/update -- the union of one_time and recurring

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { errMessage } from '@/lib/errors';
+import type { SheetRequest } from './ReminderSheet';
 import { DoneTodayRow, ReminderRow } from './ReminderRow';
 import { useReminderRules, useRemindersToday, useUserToday } from './hooks';
 import { describeSchedule } from './schedule';
 
 const MAX_NOT_SCHEDULED_SHOWN = 2;
 
-export function TodayTab() {
+export function TodayTab({ onOpenSheet }: { onOpenSheet: (req: SheetRequest) => void }) {
   const { data: rows, isLoading, error, refetch } = useRemindersToday();
   const { data: rules } = useReminderRules();
   const { data: today } = useUserToday();
@@ -61,7 +62,7 @@ export function TodayTab() {
             <span>Overdue</span>
           </div>
           {overdue.map((r) => (
-            <ReminderRow key={r.id} row={r} today={today} />
+            <ReminderRow key={r.id} row={r} today={today} onOpenSheet={onOpenSheet} />
           ))}
         </section>
       )}
@@ -83,7 +84,7 @@ export function TodayTab() {
         {daily.length === 0 ? (
           <div className="rem-empty">Nothing recurring due today.</div>
         ) : (
-          daily.map((r) => <ReminderRow key={r.id} row={r} today={today} />)
+          daily.map((r) => <ReminderRow key={r.id} row={r} today={today} onOpenSheet={onOpenSheet} />)
         )}
       </section>
 
@@ -93,7 +94,7 @@ export function TodayTab() {
             <span>Today · one-time</span>
           </div>
           {oneTimeToday.map((r) => (
-            <ReminderRow key={r.id} row={r} today={today} />
+            <ReminderRow key={r.id} row={r} today={today} onOpenSheet={onOpenSheet} />
           ))}
         </section>
       )}

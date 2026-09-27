@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Reminder, ReminderDraft, ReminderToday, ReminderUpcoming } from './types';
+import type { Reminder, ReminderDraft, ReminderHistoryRow, ReminderToday, ReminderUpcoming } from './types';
 
 // ---------- reads ----------
 
@@ -55,6 +55,24 @@ export async function getStreak(id: string): Promise<number | null> {
   const { data, error } = await supabase.rpc('reminder_streak', { p_id: id });
   if (error) throw error;
   return data as number | null;
+}
+
+/** reminder_history (0042) -- one row per (recurring reminder, day) over the
+ *  last `days` days, for the All tab's per-rule dot strip. */
+export async function listHistory(days = 30): Promise<ReminderHistoryRow[]> {
+  const { data, error } = await supabase.rpc('reminder_history', { p_days: days });
+  if (error) throw error;
+  return (data ?? []) as ReminderHistoryRow[];
+}
+
+/** Every reminder_id with at least one 'done' completion -- used to tell a
+ *  completed one-time reminder apart from a pending one on the All tab
+ *  (reminders.status is active/paused/archived, not completion state, so
+ *  it can't answer that by itself). */
+export async function listDoneReminderIds(): Promise<Set<string>> {
+  const { data, error } = await supabase.from('reminder_completions').select('reminder_id').eq('status', 'done');
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.reminder_id as string));
 }
 
 // ---------- create / update / archive ----------

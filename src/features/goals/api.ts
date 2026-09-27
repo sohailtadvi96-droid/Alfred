@@ -18,7 +18,10 @@ export async function listAllProgress(): Promise<GoalProgress[]> {
   return data as GoalProgress[];
 }
 
-export async function saveGoal(input: NewGoal): Promise<void> {
+/** Returns the goal's id either way -- an update already knows it (`input.id`),
+ *  an insert reads it back -- so a caller that also needs to create/update a
+ *  linked reminder (R6) has an id to link it to right after this resolves. */
+export async function saveGoal(input: NewGoal): Promise<string> {
   const row: Record<string, unknown> = {
     title: input.title.trim(),
     type: input.type,
@@ -63,9 +66,11 @@ export async function saveGoal(input: NewGoal): Promise<void> {
   if (input.id) {
     const { error } = await supabase.from('goals').update(row).eq('id', input.id);
     if (error) throw error;
+    return input.id;
   } else {
-    const { error } = await supabase.from('goals').insert(row);
+    const { data, error } = await supabase.from('goals').insert(row).select('id').single();
     if (error) throw error;
+    return data.id as string;
   }
 }
 

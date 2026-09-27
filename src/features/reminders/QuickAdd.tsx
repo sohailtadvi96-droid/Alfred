@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { SheetRequest } from './ReminderSheet';
 import { useCreateReminder, useUserToday } from './hooks';
 import type { ReminderDraft } from './types';
 
@@ -24,7 +25,7 @@ function oneTimeDraft(title: string, dueDate: string): ReminderDraft {
   };
 }
 
-export function QuickAdd() {
+export function QuickAdd({ onOpenSheet }: { onOpenSheet: (req: SheetRequest) => void }) {
   const [title, setTitle] = useState('');
   const { data: today } = useUserToday();
   const create = useCreateReminder();
@@ -50,7 +51,17 @@ export function QuickAdd() {
           if (e.key === 'Enter') submit();
         }}
       />
-      <div className="rem-quickadd-hint">⏎ to add · repeating ones via New reminder</div>
+      <div className="rem-quickadd-hint">
+        ⏎ to add ·{' '}
+        <button
+          type="button"
+          className="rem-more-options"
+          onClick={() => onOpenSheet({ kind: 'create', prefillTitle: title.trim() || undefined })}
+        >
+          More options
+        </button>{' '}
+        for repeating ones
+      </div>
     </div>
   );
 }

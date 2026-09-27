@@ -6091,6 +6091,23 @@ textarea.office-journal {
   line-height: 1.4;
   color: var(--text-faint);
 }
+.goal-reminder-line {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+.goal-reminder-edit {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--base);
+  cursor: pointer;
+}
+.goal-reminder-edit:hover {
+  text-decoration: underline;
+}
 .goal-actions {
   display: flex;
   gap: 2px;
@@ -6370,9 +6387,13 @@ textarea.office-journal {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
-/* compact ~88px tiles -- .home-tile's own sizing is tuned for the taller
-   Home board grid, so override the pieces that assume that height. */
+/* compact ~88px tiles -- .home-tile's own sizing is tuned for the taller,
+   12-column Home board grid, so override the pieces that assume that
+   context. grid-column is the one that actually broke the 3-up layout:
+   .home-tile's own `span 3` (right for a 12-col board) fills this grid's
+   entire 3-column row inside .rem-stats, so every tile "stacked". */
 .rem-stats .home-tile {
+  grid-column: auto;
   min-height: 0;
   height: auto;
   padding: 12px 16px;
@@ -6398,6 +6419,17 @@ textarea.office-journal {
   font-size: 10.5px;
   letter-spacing: 0.04em;
   color: var(--text-faint);
+}
+.rem-more-options {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--base);
+  cursor: pointer;
+}
+.rem-more-options:hover {
+  text-decoration: underline;
 }
 
 .rem-tabs {
@@ -6644,6 +6676,10 @@ textarea.office-journal {
 .rem-done-row:first-child {
   border-top: none;
 }
+.rem-done-check {
+  color: var(--pos);
+  flex: none;
+}
 .rem-done-title {
   flex: 1;
   min-width: 0;
@@ -6688,4 +6724,374 @@ textarea.office-journal {
 .side nav a.active .rem-nav-badge {
   background: var(--base-ink);
   color: var(--base);
+}
+
+/* ---- Reminder sheet (right-side panel, R5) ---- */
+.rem-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 5, 0.6);
+  z-index: 100;
+}
+.rem-sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 100vw);
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--sh);
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  animation: rem-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes rem-sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.rem-sheet-head {
+  flex: none;
+  height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.rem-sheet-crumb {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.rem-sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+}
+.rem-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px;
+}
+.rem-sheet-footer {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+}
+
+.rem-type-readonly {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+.rem-add-note {
+  background: none;
+  border: none;
+  color: var(--base);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin: -8px 0 16px;
+}
+
+.rem-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.rem-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.rem-chip:hover {
+  border-color: var(--base-line);
+  color: var(--base);
+}
+.rem-chip.on {
+  background: var(--base);
+  border-color: var(--base);
+  color: var(--base-ink);
+}
+
+.rem-day-toggles {
+  display: flex;
+  gap: 6px;
+}
+.rem-day-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rem-day-toggle:hover {
+  border-color: var(--base-line);
+  color: var(--base);
+}
+.rem-day-toggle.on {
+  background: var(--base);
+  border-color: var(--base);
+  color: var(--base-ink);
+}
+
+.rem-warn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin: -6px 0 16px;
+}
+
+/* ---- switch row: shared by ReminderSheet and Goals' "Remind me" row ----
+   flex-direction is set explicitly (not left to the default) because this
+   row is sometimes combined with .field, which sets flex-direction:column
+   -- without this, that column direction wins and the label/hint stack
+   above a centred switch instead of sitting beside it. */
+.switch-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.switch-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.switch-row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.switch-row-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.switch {
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.switch.on {
+  background: var(--base);
+  border-color: var(--base);
+  justify-content: flex-end;
+}
+.switch-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.12s ease;
+}
+.switch.on .switch-thumb {
+  background: var(--base-ink);
+}
+
+.rem-summary {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--base-soft);
+  border: 1px solid var(--base-line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 16px 0;
+}
+.rem-summary-note {
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.rem-upcoming-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line-soft);
+  padding: 9px 4px;
+  cursor: pointer;
+  color: var(--text);
+}
+.rem-upcoming-row:first-child {
+  border-top: none;
+}
+.rem-upcoming-row:hover {
+  background: var(--surface-2);
+}
+.rem-upcoming-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  width: 44px;
+  flex: none;
+}
+.rem-upcoming-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rem-upcoming-schedule {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.rem-all-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--line-soft);
+}
+.rem-all-row:first-child {
+  border-top: none;
+}
+.rem-all-row .rem-row-titleblock {
+  flex: 1;
+  min-width: 0;
+}
+
+.rem-dot-strip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+.rem-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-soft);
+  flex: none;
+}
+.rem-dot.state-done,
+.rem-dot.state-module {
+  background: var(--pos);
+}
+.rem-dot.state-missed,
+.rem-dot.state-skipped {
+  background: color-mix(in srgb, var(--neg) 60%, transparent);
+}
+.rem-dot.state-excused {
+  background: transparent;
+  border: 1px solid var(--text-faint);
+}
+.rem-dot.state-open {
+  background: transparent;
+  border: 1px solid var(--base);
+}
+.rem-dot.state-unscheduled {
+  background: var(--line-soft);
+}
+
+.rem-archive-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  flex: none;
+}
+.rem-confirm-yes,
+.rem-confirm-no {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 2px 6px;
+}
+.rem-confirm-yes {
+  color: var(--neg);
+}
+.rem-confirm-no {
+  color: var(--text-faint);
+}
+
+.goals-kept-reminder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.goals-kept-reminder span {
+  flex: 1;
+}
+.goal-remind {
+  margin-bottom: 16px;
+}
+.goal-remind-fields {
+  padding: 4px 14px 0;
+}
+
+.rem-server-error {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-top: 8px;
 }

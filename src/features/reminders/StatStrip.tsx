@@ -22,9 +22,12 @@ export function StatStrip({ rows }: { rows: ReminderToday[] }) {
   const tasksGoal = goals?.find((g) => g.source.kind === 'tasks_completed');
   const { data: tasksPace } = useGoalPace(tasksGoal);
 
+  // Only a genuinely positive streak counts as "the" streak -- a 0-streak
+  // reminder isn't a streak to show off, so it must not win the reduce and
+  // force the card to name it instead of reading "no streaks yet".
   const recurring = rows.filter((r) => r.kind === 'recurring');
   const topStreak = recurring.reduce<ReminderToday | null>(
-    (best, r) => ((r.streak ?? 0) > (best?.streak ?? -1) ? r : best),
+    (best, r) => ((r.streak ?? 0) > (best?.streak ?? 0) ? r : best),
     null,
   );
 

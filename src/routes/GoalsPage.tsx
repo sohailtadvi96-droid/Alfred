@@ -3,9 +3,11 @@ import { TopBar } from '@/components/TopBar';
 import { GoalsView } from '@/features/goals/GoalsView';
 import { NewGoalDialog } from '@/features/goals/NewGoalDialog';
 import { useGoals } from '@/features/goals/hooks';
+import { ReminderSheet, type SheetRequest } from '@/features/reminders/ReminderSheet';
 
 export function GoalsPage() {
   const [newGoalOpen, setNewGoalOpen] = useState(false);
+  const [sheet, setSheet] = useState<SheetRequest | null>(null);
   const { data: goals } = useGoals();
   const activeCount = (goals ?? []).filter((g) => g.status === 'active').length;
 
@@ -25,9 +27,10 @@ export function GoalsPage() {
         }
       />
       <div className="wrap goals-wrap">
-        <GoalsView />
+        <GoalsView onOpenReminderSheet={setSheet} />
       </div>
       <NewGoalDialog open={newGoalOpen} onOpenChange={setNewGoalOpen} />
+      <ReminderSheet request={sheet} onClose={() => setSheet(null)} />
     </>
   );
 }

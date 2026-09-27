@@ -61,6 +61,14 @@ export function useReminderRules() {
   return useQuery({ queryKey: keys.rules, queryFn: api.listRules });
 }
 
+export function useReminderHistory(days = 30) {
+  return useQuery({ queryKey: ['reminders', 'history', days], queryFn: () => api.listHistory(days) });
+}
+
+export function useDoneReminderIds() {
+  return useQuery({ queryKey: ['reminders', 'done-ids'], queryFn: api.listDoneReminderIds });
+}
+
 export function useReminderStreak(id: string | undefined) {
   return useQuery({
     queryKey: id ? keys.streak(id) : keys.streak('none'),

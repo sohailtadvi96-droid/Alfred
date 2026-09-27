@@ -2,7 +2,10 @@ import { FormEvent, useState } from 'react';
 import { Dialog } from '@/components/Dialog';
 import { errMessage } from '@/lib/errors';
 import type { ModuleId } from '@/features/home/types';
+import { useCreateReminder } from '@/features/reminders/hooks';
+import { scheduleValueToFields, type ScheduleValue } from '@/features/reminders/ScheduleFields';
 import { useGoals, useSaveGoal } from './hooks';
+import { RemindMeRow } from './RemindMeRow';
 import type { GoalDirection, GoalSourceKind, GoalType } from './types';
 
 /** Per-type field behaviour and copy. The tab label is display-only — the
@@ -131,8 +134,22 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function defaultSchedule(mode: ScheduleValue['scheduleMode']): ScheduleValue {
+  return {
+    scheduleMode: mode,
+    weekdays: [],
+    monthDay: '',
+    intervalN: '2',
+    timeOfDay: '',
+    startDate: todayISO(),
+    noEnd: true,
+    endDate: '',
+  };
+}
+
 export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const save = useSaveGoal();
+  const createReminder = useCreateReminder();
   const { data: goals } = useGoals();
   const activeCount = (goals ?? []).filter((g) => g.status === 'active').length;
 
@@ -148,6 +165,16 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const [milestoneLabels, setMilestoneLabels] = useState(['', '']);
   const [error, setError] = useState<string | null>(null);
 
+  // "Remind me" -- streak and manual count goals only (0044). A count
+  // goal defaults to Custom days (empty -- the user picks) since that's
+  // the shape a "4x a week" goal naturally wants; saving with it on also
+  // sets the goal's own cadence to weekly, so goal_pace reads "this week"
+  // the same way the reminder's own days do.
+  const [remindMe, setRemindMe] = useState(false);
+  const [schedule, setSchedule] = useState<ScheduleValue>(defaultSchedule('daily'));
+  const [savedGoalId, setSavedGoalId] = useState<string | null>(null);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+
   const isSavings = sourceKind === 'savings_target';
   // a savings goal is always an 'value' goal, whatever the type tabs last said
   const effType: GoalType = isSavings ? 'value' : type;
@@ -161,10 +188,17 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         ? true // optional to type -- Number(target) || 1 below always sends a valid positive number
         : Number(target) > 0);
 
+  const canRemind = !isSavings && (type === 'streak' || type === 'count');
+
   function pickTracking(kind: 'manual' | 'savings_target') {
     setSourceKind(kind);
     // savings is a Money goal; don't override an area the user already chose
     if (kind === 'savings_target' && !moduleId) setModuleId('expenses');
+  }
+
+  function toggleRemindMe(v: boolean) {
+    setRemindMe(v);
+    if (v) setSchedule(defaultSchedule(type === 'streak' ? 'daily' : 'custom'));
   }
 
   function reset() {
@@ -179,6 +213,40 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     setModuleId('');
     setMilestoneLabels(['', '']);
     setError(null);
+    setRemindMe(false);
+    setSchedule(defaultSchedule('daily'));
+    setSavedGoalId(null);
+    setReminderError(null);
+  }
+
+  /** The reminder step, split out so a failure here can be retried without
+   *  re-submitting (and re-validating) the goal, which already saved. */
+  async function createLinkedReminder(goalId: string) {
+    setReminderError(null);
+    const f = scheduleValueToFields(schedule);
+    try {
+      await createReminder.mutateAsync({
+        title: title.trim(),
+        notes: '',
+        kind: 'recurring',
+        goal_id: goalId,
+        due_date: null,
+        due_time: null,
+        freq: f.freq,
+        weekdays: f.weekdays,
+        month_day: f.month_day,
+        interval_n: f.interval_n,
+        time_of_day: f.time_of_day,
+        start_date: f.start_date || todayISO(),
+        end_date: f.end_date,
+        satisfied_by: null,
+        counts_as_task: false,
+      });
+      reset();
+      onOpenChange(false);
+    } catch (err) {
+      setReminderError(errMessage(err, 'The goal saved, but the reminder could not be created.'));
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -190,7 +258,7 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       return;
     }
     try {
-      await save.mutateAsync({
+      const goalId = await save.mutateAsync({
         title,
         type: effType,
         target: Number(target) || 1,
@@ -203,11 +271,26 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           ? milestoneLabels.filter((l) => l.trim()).map((label, i) => ({ label: label.trim(), order: i }))
           : undefined,
         // only savings goals name a source/cadence; everything else keeps
-        // saveGoal's defaults (manual, cadence 'none')
-        ...(isSavings ? { source_kind: 'savings_target' as const, cadence: 'monthly' as const } : {}),
+        // saveGoal's defaults (manual, cadence 'none') -- except a
+        // Remind-me'd count goal, whose weekly day-picker makes it a
+        // "this many times this week" goal, so goal_pace should read it
+        // as one too.
+        ...(isSavings
+          ? { source_kind: 'savings_target' as const, cadence: 'monthly' as const }
+          : canRemind && remindMe && type === 'count' && schedule.scheduleMode === 'custom'
+            ? { cadence: 'weekly' as const }
+            : {}),
       });
-      reset();
-      onOpenChange(false);
+
+      if (canRemind && remindMe) {
+        // the goal is saved from here on; the dialog stays open only to
+        // retry the reminder step, never to re-save the goal itself.
+        setSavedGoalId(goalId);
+        await createLinkedReminder(goalId);
+      } else {
+        reset();
+        onOpenChange(false);
+      }
     } catch (err) {
       setError(errMessage(err, 'Could not add the goal.'));
     }
@@ -227,9 +310,27 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           <button className="btn ghost sm" type="button" onClick={() => onOpenChange(false)}>
             Cancel
           </button>
-          <button className="btn primary sm" type="submit" form="new-goal-form" disabled={save.isPending || !isValid || atCap}>
-            {save.isPending ? 'Adding…' : 'Add goal'}
-          </button>
+          {reminderError ? (
+            // the goal already saved -- this only retries the reminder step,
+            // never re-submits (and re-validates) the goal itself.
+            <button
+              className="btn primary sm"
+              type="button"
+              onClick={() => savedGoalId && createLinkedReminder(savedGoalId)}
+              disabled={createReminder.isPending}
+            >
+              {createReminder.isPending ? 'Retrying…' : 'Retry'}
+            </button>
+          ) : (
+            <button
+              className="btn primary sm"
+              type="submit"
+              form="new-goal-form"
+              disabled={save.isPending || createReminder.isPending || !isValid || atCap}
+            >
+              {save.isPending || createReminder.isPending ? 'Adding…' : 'Add goal'}
+            </button>
+          )}
         </>
       }
     >
@@ -350,6 +451,10 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           </div>
         )}
 
+        {canRemind && (
+          <RemindMeRow checked={remindMe} onToggle={toggleRemindMe} value={schedule} onChange={(patch) => setSchedule((prev) => ({ ...prev, ...patch }))} />
+        )}
+
         <div className="field-row">
           <div className="field">
             <label htmlFor="goal-start">Start date</label>
@@ -387,6 +492,12 @@ export function NewGoalDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             />
           </div>
         </div>
+
+        {reminderError && (
+          <div className="field err-banner">
+            <span className="err">{reminderError}</span>
+          </div>
+        )}
       </form>
     </Dialog>
   );

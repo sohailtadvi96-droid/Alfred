@@ -1,9 +1,12 @@
 import * as DM from '@radix-ui/react-dropdown-menu';
 import { Link } from 'react-router-dom';
+import { Icon } from '@/components/Icon';
 import { timeLabel } from '@/features/office/datetime';
+import type { SheetRequest } from './ReminderSheet';
 import {
   useCompleteReminder,
   useRescheduleReminder,
+  useReminderRules,
   useSkipReminder,
   useSnoozeReminder,
   useUncompleteReminder,
@@ -25,10 +28,28 @@ function addDaysToDateString(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function RowMenu({ row, today }: { row: ReminderToday; today: string | undefined }) {
+function RowMenu({
+  row,
+  today,
+  onOpenSheet,
+}: {
+  row: ReminderToday;
+  today: string | undefined;
+  onOpenSheet: (req: SheetRequest) => void;
+}) {
   const skip = useSkipReminder();
   const snooze = useSnoozeReminder();
   const reschedule = useRescheduleReminder();
+  // reminders_today doesn't carry the full row shape the edit sheet needs
+  // (status/start_date/end_date/paused_at/...) -- listRules is already
+  // cached for the All tab, so this is a lookup, not an extra round trip
+  // in the common case.
+  const { data: rules } = useReminderRules();
+
+  function openEdit() {
+    const full = rules?.find((r) => r.id === row.id);
+    if (full) onOpenSheet({ kind: 'edit', reminder: full });
+  }
 
   return (
     <DM.Root>
@@ -39,6 +60,10 @@ function RowMenu({ row, today }: { row: ReminderToday; today: string | undefined
       </DM.Trigger>
       <DM.Portal>
         <DM.Content className="menu" align="end" sideOffset={6}>
+          <DM.Item className="menu-item" onSelect={openEdit}>
+            Edit…
+          </DM.Item>
+          <DM.Separator className="menu-sep" />
           {row.kind === 'recurring' ? (
             <DM.Item className="menu-item" onSelect={() => skip.mutate({ id: row.id })}>
               Skip today
@@ -77,7 +102,15 @@ function RowMenu({ row, today }: { row: ReminderToday; today: string | undefined
 }
 
 /** An active (not-yet-done) row for the Overdue / Daily / Today sections. */
-export function ReminderRow({ row, today }: { row: ReminderToday; today: string | undefined }) {
+export function ReminderRow({
+  row,
+  today,
+  onOpenSheet,
+}: {
+  row: ReminderToday;
+  today: string | undefined;
+  onOpenSheet: (req: SheetRequest) => void;
+}) {
   const complete = useCompleteReminder();
   const timeStr = row.due_time ?? row.time_of_day;
   // one_time already embeds its own time (or its absence) in describeScheduleShort;
@@ -139,7 +172,7 @@ export function ReminderRow({ row, today }: { row: ReminderToday; today: string 
           <span className="rem-row-status tone-faint">Later</span>
         ) : null}
 
-        <RowMenu row={row} today={today} />
+        <RowMenu row={row} today={today} onOpenSheet={onOpenSheet} />
       </div>
     </div>
   );
@@ -158,6 +191,7 @@ export function DoneTodayRow({ row }: { row: ReminderToday }) {
 
   return (
     <div className="rem-done-row">
+      <Icon name="check" size={12} className="rem-done-check" />
       <span className="rem-done-title">{row.title}</span>
       <span className="rem-done-meta">{meta}</span>
       {!isModule && (

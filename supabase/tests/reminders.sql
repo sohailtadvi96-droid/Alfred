@@ -370,5 +370,231 @@ begin
   end;
 end $$;
 
+-- =====================================================================
+\echo '=== 11. reminder_history: weekly MWF over a fixed 2-week window ==='
+insert into public.reminders (id, title, kind, freq, weekdays, start_date)
+values ('a0000000-0000-0000-0000-00000000000b', 'History MWF', 'recurring', 'weekly',
+        array[1,3,5]::smallint[], '2026-08-01');
+
+insert into public.reminder_completions (reminder_id, occurrence_date, status) values
+  ('a0000000-0000-0000-0000-00000000000b', '2026-09-21', 'done'),  -- Mon
+  ('a0000000-0000-0000-0000-00000000000b', '2026-09-25', 'done');  -- Fri
+  -- 2026-09-23 (Wed) deliberately left with no completion -> missed
+
+do $$
+declare v_state text;
+begin
+  select state into v_state from public.reminder_history(14, '2026-09-27')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000b' and d = '2026-09-21';
+  assert v_state = 'done', format('Mon 21 Sep should be done, got %s', v_state);
+
+  select state into v_state from public.reminder_history(14, '2026-09-27')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000b' and d = '2026-09-22';
+  assert v_state = 'unscheduled', format('Tue 22 Sep should be unscheduled, got %s', v_state);
+
+  select state into v_state from public.reminder_history(14, '2026-09-27')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000b' and d = '2026-09-23';
+  assert v_state = 'missed', format('Wed 23 Sep (scheduled, no completion, past) should be missed, got %s', v_state);
+
+  select state into v_state from public.reminder_history(14, '2026-09-27')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000b' and d = '2026-09-25';
+  assert v_state = 'done', format('Fri 25 Sep should be done, got %s', v_state);
+
+  select state into v_state from public.reminder_history(14, '2026-09-27')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000b' and d = '2026-09-27';
+  assert v_state = 'unscheduled', format('Sun 27 Sep should be unscheduled, got %s', v_state);
+
+  -- a separate call with p_today = Mon 28 Sep: scheduled, no completion, IS p_today -> open
+  select state into v_state from public.reminder_history(14, '2026-09-28')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000b' and d = '2026-09-28';
+  assert v_state = 'open', format('Mon 28 Sep as p_today (scheduled, not yet done) should be open, got %s', v_state);
+
+  raise notice 'PASS: reminder_history covers done/unscheduled/missed/open over a weekly MWF window';
+end $$;
+
+-- =====================================================================
+\echo '=== 12. reminder_history: a module-satisfied day ==='
+insert into public.reminders (id, title, kind, freq, satisfied_by, start_date)
+values ('a0000000-0000-0000-0000-00000000000c', 'History Journal', 'recurring', 'daily',
+        'office_journal', '2026-08-01');
+
+insert into public.office_journal (user_id, entry_date, body)
+values ('11111111-1111-1111-1111-111111111111', '2026-09-20', 'wrote something on the 20th');
+
+do $$
+declare v_state text;
+begin
+  select state into v_state from public.reminder_history(30, '2026-09-27')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000c' and d = '2026-09-20';
+  assert v_state = 'module', format('20 Sep (journal entry exists) should be module, got %s', v_state);
+
+  select state into v_state from public.reminder_history(30, '2026-09-27')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000c' and d = '2026-09-19';
+  assert v_state = 'missed', format('19 Sep (no journal entry, past, scheduled) should be missed, got %s', v_state);
+
+  raise notice 'PASS: reminder_history reports module for a journal-satisfied day';
+end $$;
+
+-- =====================================================================
+\echo '=== 13. reminder_history: an excused day ==='
+insert into public.reminders (id, title, kind, freq, start_date)
+values ('a0000000-0000-0000-0000-00000000000d', 'History Excused', 'recurring', 'daily', '2026-08-01');
+
+insert into public.reminder_completions (reminder_id, occurrence_date, status)
+values ('a0000000-0000-0000-0000-00000000000d', '2026-09-18', 'excused');
+
+do $$
+declare v_state text;
+begin
+  select state into v_state from public.reminder_history(30, '2026-09-27')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000d' and d = '2026-09-18';
+  assert v_state = 'excused', format('18 Sep (excused completion) should be excused, got %s', v_state);
+
+  select state into v_state from public.reminder_history(30, '2026-09-27')
+    where reminder_id = 'a0000000-0000-0000-0000-00000000000d' and d = '2026-09-17';
+  assert v_state = 'missed', format('17 Sep (scheduled, no completion, past) should be missed, got %s', v_state);
+
+  raise notice 'PASS: reminder_history reports excused for a backfilled paused day';
+end $$;
+
+-- =====================================================================
+\echo '=== 14. reminder_complete/uncomplete on a manual count goal: +1 per tick, -1 per untick ==='
+insert into public.goals (id, title, type, target, source)
+values ('c0000000-0000-0000-0000-000000000001', 'Reading sessions', 'count', 10, '{"kind":"manual"}');
+
+insert into public.reminders (id, title, kind, freq, start_date, goal_id)
+values ('a0000000-0000-0000-0000-00000000000e', 'Read', 'recurring', 'daily', '2026-01-01',
+        'c0000000-0000-0000-0000-000000000001');
+
+select public.reminder_complete('a0000000-0000-0000-0000-00000000000e', '2026-09-15');
+select public.reminder_complete('a0000000-0000-0000-0000-00000000000e', '2026-09-16');
+
+do $$
+declare v_count int;
+begin
+  select count(*) into v_count from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000001';
+  assert v_count = 2, format('two distinct ticks should write two rows, got %s', v_count);
+
+  -- re-tick the same occurrence: idempotent, not a third row
+  perform public.reminder_complete('a0000000-0000-0000-0000-00000000000e', '2026-09-15');
+  select count(*) into v_count from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000001';
+  assert v_count = 2, format('re-ticking the same day should not add a third row, got %s', v_count);
+
+  raise notice 'PASS: a count goal gets one row per distinct tick, idempotent per occurrence';
+end $$;
+
+select public.reminder_uncomplete('a0000000-0000-0000-0000-00000000000e', '2026-09-15');
+
+do $$
+declare v_count int;
+begin
+  select count(*) into v_count from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000001';
+  assert v_count = 1, format('untick should remove exactly that day''s row, got %s left', v_count);
+  raise notice 'PASS: unticking a count-linked reminder removes exactly one row';
+end $$;
+
+-- =====================================================================
+\echo '=== 15. streak goal with a pre-existing hand-logged row: tick/untick leave it alone ==='
+insert into public.goals (id, title, type, target, source)
+values ('c0000000-0000-0000-0000-000000000002', 'Meditate streak', 'streak', 1, '{"kind":"manual"}');
+
+insert into public.reminders (id, title, kind, freq, start_date, goal_id)
+values ('a0000000-0000-0000-0000-00000000000f', 'Meditate', 'recurring', 'daily', '2026-01-01',
+        'c0000000-0000-0000-0000-000000000002');
+
+-- a hand-logged row, same shape toggleStreakDay writes: no source_reminder_id
+insert into public.goal_progress (goal_id, occurred_on, value)
+values ('c0000000-0000-0000-0000-000000000002', '2026-09-15', 1);
+
+select public.reminder_complete('a0000000-0000-0000-0000-00000000000f', '2026-09-15');
+
+do $$
+declare v_count int; v_source uuid;
+begin
+  select count(*) into v_count from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000002' and occurred_on = '2026-09-15';
+  assert v_count = 1, format('ticking a day already hand-logged should not duplicate it, got %s', v_count);
+
+  select source_reminder_id into v_source from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000002' and occurred_on = '2026-09-15';
+  assert v_source is null, 'the surviving row must still be the hand-logged one (source_reminder_id null)';
+
+  raise notice 'PASS: tick adds nothing when the day is already hand-logged';
+end $$;
+
+select public.reminder_uncomplete('a0000000-0000-0000-0000-00000000000f', '2026-09-15');
+
+do $$
+declare v_count int;
+begin
+  select count(*) into v_count from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000002' and occurred_on = '2026-09-15';
+  assert v_count = 1, format('untick must not remove a hand-logged row it never wrote, got %s left', v_count);
+  raise notice 'PASS: untick leaves a hand-logged row alone';
+end $$;
+
+-- =====================================================================
+\echo '=== 16. skip removes only the reminder''s own row, never another source''s ==='
+-- a count goal so two rows can legitimately coexist on the same day: one
+-- hand-logged, one from this reminder's own tick.
+insert into public.goals (id, title, type, target, source)
+values ('c0000000-0000-0000-0000-000000000003', 'Errands', 'count', 10, '{"kind":"manual"}');
+
+insert into public.reminders (id, title, kind, freq, start_date, goal_id)
+values ('a0000000-0000-0000-0000-000000000010', 'Errand reminder', 'recurring', 'daily', '2026-01-01',
+        'c0000000-0000-0000-0000-000000000003');
+
+insert into public.goal_progress (goal_id, occurred_on, value)
+values ('c0000000-0000-0000-0000-000000000003', '2026-09-15', 1);
+
+select public.reminder_complete('a0000000-0000-0000-0000-000000000010', '2026-09-15');
+
+do $$
+declare v_count int;
+begin
+  select count(*) into v_count from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000003' and occurred_on = '2026-09-15';
+  assert v_count = 2, format('hand-logged row + reminder tick should coexist, got %s', v_count);
+end $$;
+
+select public.reminder_skip('a0000000-0000-0000-0000-000000000010', '2026-09-15');
+
+do $$
+declare v_count int; v_source uuid;
+begin
+  select count(*) into v_count from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000003' and occurred_on = '2026-09-15';
+  assert v_count = 1, format('skip should remove only this reminder''s own row, got %s left', v_count);
+
+  select source_reminder_id into v_source from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000003' and occurred_on = '2026-09-15';
+  assert v_source is null, 'the row left behind must be the hand-logged one';
+
+  raise notice 'PASS: skip removes only the reminder''s own goal_progress row';
+end $$;
+
+-- =====================================================================
+\echo '=== 17. a computed-goal link never writes goal_progress ==='
+insert into public.goals (id, title, type, target, source)
+values ('c0000000-0000-0000-0000-000000000004', 'Journal streak (computed)', 'streak', 1, '{"kind":"journal_streak"}');
+
+insert into public.reminders (id, title, kind, freq, start_date, goal_id)
+values ('a0000000-0000-0000-0000-000000000011', 'Journal (goal-linked)', 'recurring', 'daily', '2026-01-01',
+        'c0000000-0000-0000-0000-000000000004');
+
+select public.reminder_complete('a0000000-0000-0000-0000-000000000011', '2026-09-16');
+
+do $$
+declare v_count int;
+begin
+  select count(*) into v_count from public.goal_progress
+  where goal_id = 'c0000000-0000-0000-0000-000000000004';
+  assert v_count = 0, format('a computed-goal link must never write goal_progress, got %s row(s)', v_count);
+  raise notice 'PASS: a reminder linked to a computed goal writes nothing to goal_progress';
+end $$;
+
 \echo '=== all blocks passed; rolling back now ==='
 rollback;

@@ -1,12 +1,28 @@
 import { FormEvent, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { errMessage } from '@/lib/errors';
+import type { SheetRequest } from '@/features/reminders/ReminderSheet';
+import {
+  emptyScheduleValue,
+  scheduleValueFromReminder,
+  scheduleValueToFields,
+  type ScheduleValue,
+} from '@/features/reminders/ScheduleFields';
+import { describeScheduleShort } from '@/features/reminders/schedule';
+import {
+  useCreateReminder,
+  useRemindersToday,
+  useReminderRules,
+  useUpcoming,
+  useUpdateReminder,
+} from '@/features/reminders/hooks';
 import { dateKey, sparklineSeries } from './progress';
 import { fractionLabel, paceStatusLabel } from './format';
 import { GoalVerdict } from './GoalVerdict';
 import { verdictOf, whyLine } from './goalSummary';
 import { PaceDot } from './PaceDot';
 import { ProgressBar } from './ProgressBar';
+import { RemindMeRow } from './RemindMeRow';
 import { SavingsDetail, SavingsVerdict } from './SavingsPlan';
 import { Sparkline } from './Sparkline';
 import {
@@ -46,11 +62,18 @@ export function GoalRow({
   goal,
   pace,
   progress,
+  onOpenReminderSheet,
+  onGoalDeleted,
 }: {
   goal: Goal;
   /** for an active savings goal, `status` is already the plan's (see useGoalsWithPace) */
   pace: GoalPace | null;
   progress: GoalProgress[];
+  onOpenReminderSheet: (req: SheetRequest) => void;
+  /** called right after a successful delete, only when the goal had a
+   *  (non-archived) linked reminder -- the row is gone by then, so the
+   *  parent is what shows the "kept" notice. */
+  onGoalDeleted: (info: { id: string; title: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -92,13 +115,56 @@ export function GoalRow({
   const why = whyLine(goal, pace, planQuery.data);
   const statusLabel = !isActive ? STATUS_WORD[goal.status as Exclude<GoalStatus, 'active'>] : pace ? paceStatusLabel(pace.status) : 'Checklist';
 
+  // ---------- reminder link (R6) ----------
+  // Streak goals, manual count goals, and journal_streak goals (whose
+  // reminder completes itself) can carry a "Remind me" reminder. Value and
+  // milestone goals, and any other computed source, can't.
+  const isJournalStreak = goal.source.kind === 'journal_streak';
+  const canRemind = isActive && (isStreak || (goal.type === 'count' && isManualSource) || isJournalStreak);
+
+  const { data: allReminders } = useReminderRules();
+  const { data: todayReminders } = useRemindersToday();
+  const { data: upcomingReminders } = useUpcoming();
+  const createReminder = useCreateReminder();
+  const updateReminder = useUpdateReminder();
+  const linkedReminder = allReminders?.find((r) => r.goal_id === goal.id && r.status !== 'archived');
+
+  const [remindMe, setRemindMe] = useState(!!linkedReminder);
+  const [schedule, setSchedule] = useState<ScheduleValue>(() =>
+    linkedReminder ? scheduleValueFromReminder(linkedReminder, todayKey) : emptyScheduleValue(isStreak ? 'daily' : 'custom', todayKey),
+  );
+
+  function startEditing() {
+    setEditing(true);
+    setRemindMe(!!linkedReminder);
+    setSchedule(
+      linkedReminder
+        ? scheduleValueFromReminder(linkedReminder, todayKey)
+        : emptyScheduleValue(isStreak ? 'daily' : 'custom', todayKey),
+    );
+  }
+
+  const scheduleDirty =
+    remindMe &&
+    linkedReminder &&
+    JSON.stringify({ ...schedule, weekdays: [...schedule.weekdays].sort() }) !==
+      JSON.stringify({ ...scheduleValueFromReminder(linkedReminder, todayKey), weekdays: [...(linkedReminder.weekdays ?? [])].sort() });
+  const remindMeDirty = canRemind && (remindMe !== !!linkedReminder || scheduleDirty);
+
+  // next occurrence: today's own row (if not already done) beats the
+  // nearest upcoming one -- both already server-computed, no date math here.
+  const todayRow = todayReminders?.find((r) => r.id === linkedReminder?.id);
+  const nextUpcoming = upcomingReminders?.find((r) => r.id === linkedReminder?.id);
+  const nextOccurrenceLabel = todayRow && !todayRow.is_done ? 'today' : nextUpcoming ? nextUpcoming.occurrence_date : null;
+
   // milestone target is derived from the checklist length (kept in sync by
   // setMilestones) and its input stays disabled, so it's never part of "dirty"
   const dirty =
     title.trim() !== goal.title ||
     (goal.type !== 'milestone' && Number(target) !== goal.target) ||
     (unit || null) !== goal.unit ||
-    (targetDate || null) !== goal.target_date;
+    (targetDate || null) !== goal.target_date ||
+    remindMeDirty;
 
   async function saveEdits() {
     setError(null);
@@ -114,10 +180,46 @@ export function GoalRow({
         target_date: targetDate || null,
         module_id: goal.module_id,
       });
+
+      if (remindMeDirty && remindMe) {
+        const f = scheduleValueToFields(schedule);
+        const satisfiedBy = isJournalStreak ? ('office_journal' as const) : null;
+        if (linkedReminder) {
+          await updateReminder.mutateAsync({
+            id: linkedReminder.id,
+            patch: { ...f, satisfied_by: satisfiedBy },
+          });
+        } else {
+          await createReminder.mutateAsync({
+            title: title.trim(),
+            notes: '',
+            kind: 'recurring',
+            goal_id: goal.id,
+            due_date: null,
+            due_time: null,
+            freq: f.freq,
+            weekdays: f.weekdays,
+            month_day: f.month_day,
+            interval_n: f.interval_n,
+            time_of_day: f.time_of_day,
+            start_date: f.start_date || todayKey,
+            end_date: f.end_date,
+            satisfied_by: satisfiedBy,
+            counts_as_task: false,
+          });
+        }
+      }
+
       setEditing(false);
     } catch (err) {
       setError(errMessage(err, 'Could not save changes.'));
     }
+  }
+
+  async function handleDelete() {
+    const reminderToKeep = linkedReminder ? { id: linkedReminder.id, title: linkedReminder.title } : null;
+    await deleteGoal.mutateAsync(goal.id);
+    if (reminderToKeep) onGoalDeleted(reminderToKeep);
   }
 
   async function logProgress(e: FormEvent) {
@@ -286,6 +388,21 @@ export function GoalRow({
               </div>
             )}
 
+            {linkedReminder && (
+              <p className="goal-reminder-line">
+                Reminder · {describeScheduleShort(linkedReminder)} · {linkedReminder.satisfied_by ? 'auto' : 'tick'}
+                {nextOccurrenceLabel && ` · next ${nextOccurrenceLabel}`}
+                {' — '}
+                <button
+                  type="button"
+                  className="goal-reminder-edit"
+                  onClick={() => onOpenReminderSheet({ kind: 'edit', reminder: linkedReminder })}
+                >
+                  Edit
+                </button>
+              </p>
+            )}
+
             {/* reassurance, not a headline */}
             <p className="goal-note">
               Source: {SOURCE_LABEL[goal.source.kind]}.
@@ -298,7 +415,7 @@ export function GoalRow({
           {/* ZONE 3 — actions */}
           <section className="goal-zone goal-zone-actions" aria-label="Actions">
             <div className="goal-actions">
-              <button className="btn ghost sm" type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing}>
+              <button className="btn ghost sm" type="button" onClick={() => (editing ? setEditing(false) : startEditing())} aria-expanded={editing}>
                 {editing ? 'Close edit' : 'Edit'}
               </button>
               {isActive && (
@@ -326,7 +443,7 @@ export function GoalRow({
                 </button>
               )}
               {(goal.status === 'achieved' || goal.status === 'abandoned') && (
-                <button className="btn ghost sm goal-abandon" type="button" onClick={() => deleteGoal.mutate(goal.id)}>
+                <button className="btn ghost sm goal-abandon" type="button" onClick={() => void handleDelete()}>
                   Delete
                 </button>
               )}
@@ -368,9 +485,25 @@ export function GoalRow({
                     </div>
                   )}
                 </div>
+
+                {canRemind && (
+                  <RemindMeRow
+                    checked={remindMe}
+                    onToggle={setRemindMe}
+                    value={schedule}
+                    onChange={(patch) => setSchedule((prev) => ({ ...prev, ...patch }))}
+                    autoNote={isJournalStreak ? 'Completes itself when you write the journal.' : undefined}
+                  />
+                )}
+
                 {dirty && (
-                  <button className="btn sec sm" type="button" onClick={saveEdits} disabled={saveGoal.isPending || !title.trim()}>
-                    Save changes
+                  <button
+                    className="btn sec sm"
+                    type="button"
+                    onClick={saveEdits}
+                    disabled={saveGoal.isPending || createReminder.isPending || updateReminder.isPending || !title.trim()}
+                  >
+                    {createReminder.isPending || updateReminder.isPending ? 'Saving…' : 'Save changes'}
                   </button>
                 )}
               </div>

@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { AllTab } from './AllTab';
 import { QuickAdd } from './QuickAdd';
+import type { SheetRequest } from './ReminderSheet';
 import { StatStrip } from './StatStrip';
 import { TodayTab } from './TodayTab';
+import { UpcomingTab } from './UpcomingTab';
 import { useRemindersToday, useReminderRules, useUpcoming } from './hooks';
 
 type Tab = 'today' | 'upcoming' | 'all';
 
-export function RemindersView() {
+export function RemindersView({ onOpenSheet }: { onOpenSheet: (req: SheetRequest) => void }) {
   const [tab, setTab] = useState<Tab>('today');
   const { data: today } = useRemindersToday();
   const { data: upcoming } = useUpcoming();
@@ -17,7 +20,7 @@ export function RemindersView() {
   return (
     <div className="rem-view">
       <StatStrip rows={rows} />
-      <QuickAdd />
+      <QuickAdd onOpenSheet={onOpenSheet} />
 
       <div className="rem-tabs">
         <button type="button" className={`rem-tab${tab === 'today' ? ' active' : ''}`} onClick={() => setTab('today')}>
@@ -35,9 +38,9 @@ export function RemindersView() {
         </button>
       </div>
 
-      {tab === 'today' && <TodayTab />}
-      {tab === 'upcoming' && <div className="rem-tab-placeholder">Coming in R5.</div>}
-      {tab === 'all' && <div className="rem-tab-placeholder">Coming in R5.</div>}
+      {tab === 'today' && <TodayTab onOpenSheet={onOpenSheet} />}
+      {tab === 'upcoming' && <UpcomingTab onOpenSheet={onOpenSheet} />}
+      {tab === 'all' && <AllTab onOpenSheet={onOpenSheet} />}
     </div>
   );
 }

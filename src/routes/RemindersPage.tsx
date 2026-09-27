@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { ReminderSheet, type SheetRequest } from '@/features/reminders/ReminderSheet';
 import { RemindersView } from '@/features/reminders/RemindersView';
 import { todayTally } from '@/features/reminders/StatStrip';
 import { useRemindersToday } from '@/features/reminders/hooks';
@@ -6,6 +8,7 @@ import { useRemindersToday } from '@/features/reminders/hooks';
 export function RemindersPage() {
   const { data: rows } = useRemindersToday();
   const { done, total } = todayTally(rows ?? []);
+  const [sheet, setSheet] = useState<SheetRequest | null>(null);
 
   return (
     <>
@@ -18,17 +21,16 @@ export function RemindersPage() {
             <span className="goals-cap-hint">
               {done} / {total} done today
             </span>
-            <span data-tip="Coming in R5">
-              <button className="btn primary" disabled>
-                New reminder
-              </button>
-            </span>
+            <button className="btn primary" onClick={() => setSheet({ kind: 'create' })}>
+              New reminder
+            </button>
           </>
         }
       />
       <div className="wrap">
-        <RemindersView />
+        <RemindersView onOpenSheet={setSheet} />
       </div>
+      <ReminderSheet request={sheet} onClose={() => setSheet(null)} />
     </>
   );
 }
