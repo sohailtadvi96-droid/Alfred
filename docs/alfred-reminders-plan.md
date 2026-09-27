@@ -1,7 +1,7 @@
 # Alfred — Reminders module plan
 
 > Drop this in `docs/` next to `alfred-goals-engine-plan.md`. Claude Code should read it
-> before any Reminders step. Status: **R2 applied locally (27 Sep). Not pushed, not committed.**
+> before any Reminders step. Status: **R1+R2 live in prod (27 Sep).**
 
 ### R0 findings that shaped this plan
 - The 0033 `reminders` table has **zero readers and zero rows**. It was scaffolded for goal nudges (`kind` = checkin/pace/…, opaque `recurrence` jsonb, `next_fire_at`). We **alter it in 0040**: keep id/user_id/goal_id/title/channel/snoozed_until/RLS/trigger, and replace the rest.
