@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { Icon } from '@/components/Icon';
 import { errMessage } from '@/lib/errors';
 import type { SheetRequest } from './ReminderSheet';
 import { DoneTodayRow, ReminderRow } from './ReminderRow';
 import { useReminderRules, useRemindersToday, useUserToday } from './hooks';
+import { useTickKeys } from './keys';
 import { describeSchedule } from './schedule';
 
 const MAX_NOT_SCHEDULED_SHOWN = 2;
@@ -12,6 +14,7 @@ export function TodayTab({ onOpenSheet }: { onOpenSheet: (req: SheetRequest) => 
   const { data: rules } = useReminderRules();
   const { data: today } = useUserToday();
   const [doneOpen, setDoneOpen] = useState(true);
+  useTickKeys();
 
   if (isLoading) {
     return (
@@ -53,6 +56,31 @@ export function TodayTab({ onOpenSheet }: { onOpenSheet: (req: SheetRequest) => 
   const notScheduledToday = (rules ?? []).filter(
     (r) => r.kind === 'recurring' && r.status === 'active' && !scheduledTodayIds.has(r.id),
   );
+
+  const doneSection = done.length > 0 && (
+    <section>
+      <button type="button" className="rem-section-label rem-done-toggle" onClick={() => setDoneOpen((v) => !v)}>
+        <span>
+          Done today ({done.length}) {doneOpen ? '▾' : '▸'}
+        </span>
+      </button>
+      {doneOpen && done.map((r) => <DoneTodayRow key={r.id} row={r} />)}
+    </section>
+  );
+
+  // Everything for today is ticked (or skipped): say so once, instead of an
+  // empty Daily section sitting above the Done list.
+  if (overdue.length + daily.length + oneTimeToday.length === 0) {
+    return (
+      <div>
+        <div className="rem-empty rem-alldone">
+          <Icon name="check" size={14} className="rem-alldone-check" />
+          Nothing else due today.
+        </div>
+        {doneSection}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -99,20 +127,7 @@ export function TodayTab({ onOpenSheet }: { onOpenSheet: (req: SheetRequest) => 
         </section>
       )}
 
-      {done.length > 0 && (
-        <section>
-          <button
-            type="button"
-            className="rem-section-label rem-done-toggle"
-            onClick={() => setDoneOpen((v) => !v)}
-          >
-            <span>
-              Done today ({done.length}) {doneOpen ? '▾' : '▸'}
-            </span>
-          </button>
-          {doneOpen && done.map((r) => <DoneTodayRow key={r.id} row={r} />)}
-        </section>
-      )}
+      {doneSection}
     </div>
   );
 }

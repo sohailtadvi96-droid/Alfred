@@ -12,21 +12,8 @@ import {
   useUncompleteReminder,
 } from './hooks';
 import { describeScheduleShort, formatTime } from './schedule';
+import { addDaysToDateString, daysBetween } from './today';
 import type { ReminderToday } from './types';
-
-/** UTC-anchored so a Y-M-D string can be diffed/offset without any local
- *  timezone reinterpretation -- these operate on dates the server already
- *  gave us (occurrence_date, user_today()), never on `new Date()`. */
-function daysBetween(fromDateStr: string, toDateStr: string): number {
-  const a = Date.parse(`${fromDateStr}T00:00:00Z`);
-  const b = Date.parse(`${toDateStr}T00:00:00Z`);
-  return Math.round((b - a) / 86_400_000);
-}
-function addDaysToDateString(dateStr: string, days: number): string {
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 function RowMenu({
   row,
@@ -122,7 +109,14 @@ export function ReminderRow({
   const daysLate = row.is_overdue && today ? daysBetween(row.occurrence_date, today) : null;
 
   return (
-    <div className={`rem-row${row.is_overdue ? ' tone-neg' : ''}`}>
+    <div
+      className={`rem-row${row.is_overdue ? ' tone-neg' : ''}`}
+      tabIndex={0}
+      data-rem-row={row.id}
+      data-rem-date={row.occurrence_date}
+      data-rem-done="false"
+      data-rem-tickable={row.satisfied_by ? 'false' : 'true'}
+    >
       <div className="rem-row-head">
         {row.satisfied_by ? (
           <span className="rem-auto-dot" aria-hidden="true" />
@@ -145,32 +139,36 @@ export function ReminderRow({
           {row.notes && <span className="rem-row-sub">{row.notes}</span>}
         </div>
 
-        <span className="rem-row-meta">{meta}</span>
+        {/* display: contents on desktop (each piece is its own grid column);
+            below the narrow breakpoint this becomes one wrapping line under the title */}
+        <div className="rem-row-info">
+          <span className="rem-row-meta">{meta}</span>
 
-        <div className="rem-row-badges">
-          {row.kind === 'recurring' && !!row.streak && (
-            <span className="rem-streak">{row.streak}d</span>
-          )}
-          {row.satisfied_by && (
-            <>
-              <span className="tag">Auto</span>
-              <Link className="rem-write-link" to={`/work/day/${row.occurrence_date}`}>
-                Write →
-              </Link>
-            </>
-          )}
+          <div className="rem-row-badges">
+            {row.kind === 'recurring' && !!row.streak && (
+              <span className="rem-streak">{row.streak}d</span>
+            )}
+            {row.satisfied_by && (
+              <>
+                <span className="tag">Auto</span>
+                <Link className="rem-write-link" to={`/work/day/${row.occurrence_date}`}>
+                  Write →
+                </Link>
+              </>
+            )}
+          </div>
+
+          {daysLate != null && daysLate > 0 ? (
+            <span className="rem-row-status tone-neg">{daysLate}d late</span>
+          ) : row.due_state === 'due_now' ? (
+            <span className="rem-row-status">
+              <span className="rem-due-dot" aria-hidden="true" />
+              Due now
+            </span>
+          ) : timeStr ? (
+            <span className="rem-row-status tone-faint">Later</span>
+          ) : null}
         </div>
-
-        {daysLate != null && daysLate > 0 ? (
-          <span className="rem-row-status tone-neg">{daysLate}d late</span>
-        ) : row.due_state === 'due_now' ? (
-          <span className="rem-row-status">
-            <span className="rem-due-dot" aria-hidden="true" />
-            Due now
-          </span>
-        ) : timeStr ? (
-          <span className="rem-row-status tone-faint">Later</span>
-        ) : null}
 
         <RowMenu row={row} today={today} onOpenSheet={onOpenSheet} />
       </div>
@@ -190,7 +188,14 @@ export function DoneTodayRow({ row }: { row: ReminderToday }) {
       }`;
 
   return (
-    <div className="rem-done-row">
+    <div
+      className="rem-done-row"
+      tabIndex={0}
+      data-rem-row={row.id}
+      data-rem-date={row.occurrence_date}
+      data-rem-done="true"
+      data-rem-tickable={isModule ? 'false' : 'true'}
+    >
       <Icon name="check" size={12} className="rem-done-check" />
       <span className="rem-done-title">{row.title}</span>
       <span className="rem-done-meta">{meta}</span>

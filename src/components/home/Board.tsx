@@ -9,7 +9,8 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
 import { Tile } from './Tile';
-import type { BoardLayout, TileSize } from '@/features/home/layout';
+import { NextUpList } from '@/features/reminders/NextUpList';
+import { tileSize, type BoardLayout, type TileSize } from '@/features/home/layout';
 import type { ModuleId, Snapshot } from '@/features/home/types';
 
 export function Board({
@@ -56,9 +57,11 @@ export function Board({
               <Tile
                 key={m}
                 snapshot={snap}
-                size={layout.sizes[m] ?? 'sm'}
+                size={tileSize(layout, m)}
                 onSizeChange={(size) => setSize(m, size)}
-              />
+              >
+                {m === 'reminders' ? <NextUpList /> : undefined}
+              </Tile>
             );
           })}
         </div>

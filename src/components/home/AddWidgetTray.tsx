@@ -5,6 +5,7 @@ import type { BoardLayout } from '@/features/home/layout';
 import type { ModuleId } from '@/features/home/types';
 
 const ALL_MODULES: { id: ModuleId; label: string; icon: IconName }[] = [
+  { id: 'reminders', label: 'Reminders · Next up', icon: 'bell' },
   { id: 'expenses', label: 'Expenses', icon: 'expenses' },
   { id: 'work', label: 'Work', icon: 'work' },
   { id: 'design', label: 'Design', icon: 'design' },

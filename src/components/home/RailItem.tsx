@@ -11,6 +11,7 @@ const MODULE_ICON: Record<ModuleId, IconName> = {
   health: 'health',
   goals: 'goals',
   travel: 'travel',
+  reminders: 'bell',
 };
 
 const ACTIONABLE_KINDS: TimeBound['kind'][] = ['task', 'deliverable'];

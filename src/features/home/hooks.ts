@@ -11,6 +11,7 @@ import * as workApi from '@/features/work/api';
 import { useMonthSummary, usePeriodComparison } from '@/features/expenses/hooks';
 import { useBoards } from '@/features/design/hooks';
 import { useGoalsWithPace } from '@/features/goals/hooks';
+import { useRemindersToday } from '@/features/reminders/hooks';
 import { monthKey } from '@/lib/format';
 import {
   buildBoardSnapshots,
@@ -70,6 +71,7 @@ export function useHomeBoard(): Snapshot[] {
   const { data: upcomingDeliverables } = useUpcomingDeliverables(7);
   const { data: boards } = useBoards();
   const { goalsWithPace } = useGoalsWithPace();
+  const { data: remindersToday } = useRemindersToday();
 
   return useMemo(
     () =>
@@ -80,7 +82,8 @@ export function useHomeBoard(): Snapshot[] {
         upcomingDeliverables,
         boards,
         goalsWithPace,
+        remindersToday,
       }),
-    [monthSummary, periodComparison, projects, upcomingDeliverables, boards, goalsWithPace],
+    [monthSummary, periodComparison, projects, upcomingDeliverables, boards, goalsWithPace, remindersToday],
   );
 }

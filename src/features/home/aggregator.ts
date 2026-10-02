@@ -10,6 +10,8 @@ import type { PeriodComparison } from '@/features/expenses/api';
 import type { BoardWithCover } from '@/features/design/types';
 import { fractionLabel, paceStatusLabel } from '@/features/goals/format';
 import type { Goal, GoalPace } from '@/features/goals/types';
+import { todayTally } from '@/features/reminders/today';
+import type { ReminderToday } from '@/features/reminders/types';
 
 function dueAt(dateOnly: string): string {
   return new Date(`${dateOnly}T23:59:00`).toISOString();
@@ -268,6 +270,23 @@ export function goalsToSnapshot(goalsWithPace: { goal: Goal; pace: GoalPace | nu
   };
 }
 
+/** The "Next up" tile. Its body is the live list (NextUpList, rendered by
+ *  Board as the tile's children), so `stats` is only what a tile without that
+ *  body would fall back to; the done/total line shows as the lg-size detail. */
+export function remindersToSnapshot(today: ReminderToday[] | undefined): Snapshot {
+  const { done, total } = todayTally(today ?? []);
+  return {
+    module: 'reminders',
+    title: 'Next up',
+    icon: 'bell',
+    live: true,
+    href: '/reminders',
+    stats: [{ label: 'Done today', value: `${done} / ${total}` }],
+    detail: total > 0 ? `${done} / ${total} done today` : null,
+    actions: [{ label: 'All reminders', href: '/reminders' }],
+  };
+}
+
 export function buildBoardSnapshots(input: {
   monthSummary: MonthSummary | undefined;
   periodComparison: PeriodComparison | undefined;
@@ -275,8 +294,10 @@ export function buildBoardSnapshots(input: {
   upcomingDeliverables: (Deliverable & { project: Pick<Project, 'id' | 'name'> })[] | undefined;
   boards: BoardWithCover[] | undefined;
   goalsWithPace: { goal: Goal; pace: GoalPace | null }[] | undefined;
+  remindersToday: ReminderToday[] | undefined;
 }): Snapshot[] {
-  const { monthSummary, periodComparison, projects, upcomingDeliverables, boards, goalsWithPace } = input;
+  const { monthSummary, periodComparison, projects, upcomingDeliverables, boards, goalsWithPace, remindersToday } =
+    input;
 
   const cmpStat = comparisonStat(periodComparison);
   const expenses: Snapshot = {
@@ -337,5 +358,12 @@ export function buildBoardSnapshots(input: {
     ],
   };
 
-  return [expenses, work, design, goalsToSnapshot(goalsWithPace), ...PLACEHOLDER_SNAPSHOTS];
+  return [
+    remindersToSnapshot(remindersToday),
+    expenses,
+    work,
+    design,
+    goalsToSnapshot(goalsWithPace),
+    ...PLACEHOLDER_SNAPSHOTS,
+  ];
 }

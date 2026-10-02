@@ -61,6 +61,10 @@ export function QuickAdd({ onOpenSheet }: { onOpenSheet: (req: SheetRequest) => 
           More options
         </button>{' '}
         for repeating ones
+        <span className="rem-keys-hint">
+          {' '}
+          · <kbd>N</kbd> new · <kbd>X</kbd> tick
+        </span>
       </div>
     </div>
   );

@@ -5606,6 +5606,7 @@ textarea.office-journal {
 .home-tile[data-module='health'] { border-left-color: var(--m-health); --tile-accent: var(--m-health); }
 .home-tile[data-module='goals'] { border-left-color: var(--m-goals); --tile-accent: var(--m-goals); }
 .home-tile[data-module='travel'] { border-left-color: var(--m-travel); --tile-accent: var(--m-travel); }
+.home-tile[data-module='reminders'] { border-left-color: var(--m-reminders); --tile-accent: var(--m-reminders); }
 
 /* ---- hover interaction (pointer devices only — see the touch block below) ---- */
 @media (hover: hover) and (pointer: fine) {
@@ -5671,6 +5672,7 @@ textarea.office-journal {
 .home-tile-icon[data-module='health'] { background: var(--m-health); }
 .home-tile-icon[data-module='goals'] { background: var(--m-goals); }
 .home-tile-icon[data-module='travel'] { background: var(--m-travel); }
+.home-tile-icon[data-module='reminders'] { background: var(--m-reminders); }
 
 /* icon micro-moment: container spring + one single-property glyph beat per type */
 .home-tile:hover .home-tile-icon,
@@ -5835,6 +5837,116 @@ textarea.office-journal {
 .home-tile-drag {
   font-size: 13px;
   line-height: 1;
+}
+
+/* ---- "Next up" tile body (Reminders) ----
+   A tile whose body is live content instead of a stat row. It sits above
+   .home-tile-link (z-index 0), so the ticks are clickable while the rest of
+   the tile still opens the module. */
+.home-tile-body {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  /* clicks on the gaps between rows fall through to the tile link */
+  pointer-events: none;
+}
+.home-next {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.home-next-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 32px;
+  border-top: 1px solid var(--line-soft);
+}
+.home-next-row:first-child {
+  border-top: none;
+}
+.home-next-tick {
+  pointer-events: auto;
+  width: 32px;
+  height: 32px;
+  margin: 0 -8px;
+}
+.home-next-tick:focus-visible {
+  outline: 2px solid var(--base);
+  outline-offset: -4px;
+  border-radius: 8px;
+}
+.home-next-dot {
+  width: 6px;
+  height: 6px;
+  margin: 0 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex: none;
+}
+.home-next-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-next-when {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.home-next-row[data-state='overdue'] .home-next-when {
+  color: var(--neg);
+  font-weight: 600;
+}
+.home-next-row[data-state='due_now'] .home-next-when {
+  color: var(--text);
+}
+.home-next-row[data-state='upcoming'] .home-next-title {
+  color: var(--text-dim);
+}
+/* sm tile (a quarter of the board): no room for title and label side by
+   side, so the label drops under the title instead of squeezing it to "Vit…" */
+.home-tile[data-span='sm'] .home-next-row {
+  flex-wrap: wrap;
+  row-gap: 0;
+  padding: 5px 0;
+}
+.home-tile[data-span='sm'] .home-next-title {
+  flex-basis: calc(100% - 42px);
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.3;
+}
+.home-tile[data-span='sm'] .home-next-when {
+  flex-basis: 100%;
+  padding-left: 26px;
+}
+.home-next-empty {
+  font-size: 13px;
+  color: var(--text-dim);
+  padding: 6px 0;
+}
+.home-next-skel {
+  height: 14px;
+  margin: 9px 0;
+  border-radius: 6px;
+  background: linear-gradient(100deg, var(--surface-2) 35%, var(--line-soft) 50%, var(--surface-2) 65%);
+  background-size: 200% 100%;
+  animation: item-shimmer 1.4s ease-in-out infinite;
 }
 
 /* ---- Add widget tray (Dialog) ---- */
@@ -6393,6 +6505,9 @@ textarea.office-journal {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  /* the narrow layout (end of this section) keys off this box's own width,
+     not the viewport's -- see the note there */
+  container: rem-view / inline-size;
 }
 .rem-stats {
   display: grid;
@@ -6414,11 +6529,6 @@ textarea.office-journal {
 .rem-stats .home-tile-stat-value {
   font-size: 26px;
   font-weight: 600;
-}
-@media (max-width: 720px) {
-  .rem-stats {
-    grid-template-columns: 1fr;
-  }
 }
 
 .rem-quickadd {
@@ -7106,4 +7216,205 @@ textarea.office-journal {
   border-radius: 10px;
   padding: 9px 12px;
   margin-top: 8px;
+}
+
+/* ---- keyboard: focusable rows + shortcut hint (R8) ---- */
+.rem-row:focus-visible,
+.rem-done-row:focus-visible {
+  outline: 2px solid var(--base);
+  outline-offset: 1px;
+}
+.rem-done-row:focus-visible {
+  border-radius: 8px;
+}
+.rem-tick:focus-visible {
+  outline: none;
+}
+.rem-tick:focus-visible .rem-tick-shape {
+  border-color: var(--base);
+  box-shadow: 0 0 0 3px var(--base-soft);
+}
+.rem-row-info {
+  display: contents;
+}
+.rem-keys-hint kbd {
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+/* no keyboard to speak of on a touch device */
+@media (hover: none) {
+  .rem-keys-hint {
+    display: none;
+  }
+}
+
+/* ---- empty states (R8) ---- */
+.rem-alldone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+.rem-alldone-check {
+  color: var(--pos);
+  flex: none;
+}
+.rem-firstrun {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 22px 20px;
+}
+.rem-firstrun-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+.rem-firstrun-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  max-width: 52ch;
+  margin-bottom: 6px;
+}
+
+/* ---- narrow layout (R8) ----
+   Two different questions, so two different queries:
+
+   - In-page layout (stat strip, rows, tabs) depends on how wide the content
+     column is, not the viewport: above 900px the sidebar takes 232px or 68px
+     of it, at 900px the shell stacks the sidebar on top and the column jumps
+     back to nearly full width. So these rules are a container query on
+     .rem-view itself -- they apply when the column is too narrow for a
+     one-line row (in practice a viewport of about 600px or less), whatever
+     the sidebar is doing.
+   - The sheet is position: fixed against the viewport, so it uses a plain
+     viewport query -- 640px, the same breakpoint Office uses. */
+@container rem-view (max-width: 560px) {
+  .rem-stats {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .rem-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .rem-tab {
+    margin-right: 14px;
+    white-space: nowrap;
+    flex: none;
+  }
+
+  .rem-section-label {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .rem-section-note {
+    text-align: left;
+    white-space: normal;
+  }
+
+  /* row: tick + title + menu on the first line, everything that used to sit
+     to the right of the title wraps onto a second line under it */
+  .rem-row-head {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: 4px;
+    padding: 10px 12px 10px 16px;
+  }
+  .rem-row-head > .rem-row-menu-btn {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .rem-row-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    grid-column: 2 / -1;
+    grid-row: 2;
+    min-width: 0;
+  }
+  .rem-row-title,
+  .rem-row-sub {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .rem-done-row {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .rem-done-title {
+    flex: 1 1 0;
+  }
+  .rem-done-meta {
+    order: 4;
+    flex-basis: 100%;
+    padding-left: 22px;
+    white-space: normal;
+  }
+
+  .rem-upcoming-row {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .rem-upcoming-schedule {
+    flex-basis: 100%;
+    padding-left: 54px;
+    white-space: normal;
+  }
+
+  .rem-all-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .rem-all-row .rem-row-titleblock {
+    flex: 1 1 0;
+  }
+  .rem-dot-strip {
+    order: 5;
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+  }
+
+  .rem-firstrun {
+    padding: 18px 16px;
+  }
+  .rem-firstrun .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .rem-wrap {
+    padding: 20px 16px 40px;
+  }
+  .rem-top-tally {
+    display: none;
+  }
+  /* full-width sheet instead of a 480px side panel */
+  .rem-sheet {
+    width: 100vw;
+    border-left: none;
+  }
+  .rem-sheet-head,
+  .rem-sheet-body,
+  .rem-sheet-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .rem-sheet-footer .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .rem-day-toggles {
+    flex-wrap: wrap;
+  }
 }

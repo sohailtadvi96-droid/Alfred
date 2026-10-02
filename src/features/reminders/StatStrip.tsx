@@ -1,13 +1,6 @@
 import { useGoalPace, useGoals } from '@/features/goals/hooks';
+import { todayTally } from './today';
 import type { ReminderToday } from './types';
-
-/** A skipped occurrence is neither "due" nor "done" -- it's dismissed, so it
- *  counts toward neither side of the ratio. Shared with RemindersPage's
- *  header count, which must read the same number. */
-export function todayTally(rows: ReminderToday[]): { done: number; total: number } {
-  const counted = rows.filter((r) => r.completion_status !== 'skipped');
-  return { done: counted.filter((r) => r.is_done).length, total: counted.length };
-}
 
 /** Three home-tile-style stat cards. Reuses .home-tile/.home-tile-title/
  *  .home-tile-stat-value/.home-tile-stat-label/.goal-bar as-is (same visual
@@ -17,6 +10,7 @@ export function todayTally(rows: ReminderToday[]): { done: number; total: number
 export function StatStrip({ rows }: { rows: ReminderToday[] }) {
   const { done, total } = todayTally(rows);
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const allDone = total > 0 && done === total;
 
   const { data: goals } = useGoals();
   const tasksGoal = goals?.find((g) => g.source.kind === 'tasks_completed');
@@ -34,12 +28,15 @@ export function StatStrip({ rows }: { rows: ReminderToday[] }) {
   return (
     <div className="rem-stats">
       <div className="home-tile" style={{ borderLeftColor: 'var(--base)' }}>
-        <div className="home-tile-title">Today</div>
+        <div className="home-tile-title">{allDone ? 'Today · all done' : 'Today'}</div>
         <div className="home-tile-stat-value">
           {done} / {total}
         </div>
         <div className="goal-bar">
-          <div className="goal-bar-fill" style={{ width: `${pct}%`, background: 'var(--base)' }} />
+          <div
+            className="goal-bar-fill"
+            style={{ width: `${pct}%`, background: allDone ? 'var(--pos)' : 'var(--base)' }}
+          />
         </div>
       </div>
 

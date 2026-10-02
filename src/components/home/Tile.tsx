@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -11,10 +12,15 @@ export function Tile({
   snapshot,
   size,
   onSizeChange,
+  children,
 }: {
   snapshot: Snapshot;
   size: TileSize;
   onSizeChange: (size: TileSize) => void;
+  /** A live body in place of the stat row, for a tile whose content is
+   *  interactive (Reminders' "Next up" list). Rendered above the full-bleed
+   *  tile link, so controls inside it are clickable. */
+  children?: ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: snapshot.module,
@@ -66,14 +72,18 @@ export function Tile({
           {size.toUpperCase()}
         </button>
       </div>
-      <div className="home-tile-stats">
-        {stats.map((s) => (
-          <div key={s.label}>
-            <div className="home-tile-stat-value num">{s.value}</div>
-            <div className="home-tile-stat-label">{s.label}</div>
-          </div>
-        ))}
-      </div>
+      {children ? (
+        <div className="home-tile-body">{children}</div>
+      ) : (
+        <div className="home-tile-stats">
+          {stats.map((s) => (
+            <div key={s.label}>
+              <div className="home-tile-stat-value num">{s.value}</div>
+              <div className="home-tile-stat-label">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
       {showFoot && (
         <div className="home-tile-foot">
           {showDetail && <div className="home-tile-meta">{snapshot.detail}</div>}

@@ -1,6 +1,6 @@
 import type { IconName } from '@/components/Icon';
 
-export type ModuleId = 'expenses' | 'work' | 'design' | 'invest' | 'health' | 'goals' | 'travel';
+export type ModuleId = 'expenses' | 'work' | 'design' | 'invest' | 'health' | 'goals' | 'travel' | 'reminders';
 
 export type TimeBoundKind = 'event' | 'task' | 'deliverable' | 'invoice' | 'milestone';
 
