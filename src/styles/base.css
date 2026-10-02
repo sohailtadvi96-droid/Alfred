@@ -3578,6 +3578,18 @@ textarea.input {
   align-items: center;
   padding-top: 1px;
 }
+.office-check-done {
+  display: flex;
+  align-items: center;
+  padding-top: 1px;
+  color: var(--pos);
+  flex: none;
+}
+.office-done-bell {
+  color: var(--text-faint);
+  margin-right: 5px;
+  vertical-align: -1px;
+}
 .office-check input {
   width: 15px;
   height: 15px;

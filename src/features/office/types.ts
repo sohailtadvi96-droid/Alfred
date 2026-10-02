@@ -13,6 +13,17 @@ export interface OfficeTask {
   updated_at: string;
 }
 
+/** done_today_feed row (0045) -- a task or a reminder completion, done on
+ *  the same local day. reminder_kind is null for a task row. */
+export interface DoneFeedRow {
+  source: 'task' | 'reminder';
+  id: string;
+  title: string;
+  completed_at: string;
+  counts_as_task: boolean;
+  reminder_kind: 'one_time' | 'recurring' | null;
+}
+
 export interface OfficeEvent {
   id: string;
   title: string;

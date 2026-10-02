@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Icon } from '@/components/Icon';
 import { errMessage } from '@/lib/errors';
 import { localEventId, mergeAgenda } from './agenda';
 import { addDays, dayEndISO, dayStartISO, dayTitle, todayKey } from './calendar';
@@ -17,6 +18,7 @@ import {
   useDayTasks,
   useDeleteEvent,
   useDeleteTask,
+  useDoneFeed,
   useSetTaskStatus,
   useUpdateNote,
 } from './hooks';
@@ -175,6 +177,50 @@ function DueTasks({ date }: { date: string }) {
   );
 }
 
+/** done_today_feed (0045) -- tasks and reminder completions done on this
+ *  day, local time. Read-only here: a task's own done/undo lives in Due
+ *  above (it just no longer shows a struck-through row there once done),
+ *  and a reminder's lives on its own row in Reminders. */
+function DoneToday({ date }: { date: string }) {
+  const { data: rows, isLoading, error } = useDoneFeed(date);
+  const list = rows ?? [];
+
+  return (
+    <section className="office-section">
+      <div className="office-section-head">
+        <h3>Done</h3>
+        <span className="office-count">{list.length}</span>
+      </div>
+      <div className="office-list">
+        {error ? (
+          <div className="office-empty">Couldn’t load what's done.</div>
+        ) : isLoading ? (
+          <div className="office-empty">Loading…</div>
+        ) : list.length === 0 ? (
+          <div className="office-empty">Nothing done yet.</div>
+        ) : (
+          list.map((r) => (
+            <div key={`${r.source}-${r.id}`} className="office-row done">
+              <span className="office-check-done" aria-hidden="true">
+                <Icon name="check" size={12} />
+              </span>
+              <span className="office-row-main">
+                <span className="office-row-label">
+                  {r.source === 'reminder' && <Icon name="bell" size={11} className="office-done-bell" />}
+                  {r.title}
+                </span>
+                <span className="office-row-sub">
+                  <span className="office-row-note">{timeLabel(r.completed_at)}</span>
+                </span>
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 function DayNotes({ date }: { date: string }) {
   const { data: notes, isLoading, error } = useDayNotes(date);
   const add = useAddNote();
@@ -272,6 +318,7 @@ export function DayView({ date }: { date: string }) {
         <DueTasks date={date} />
       </div>
 
+      <DoneToday date={date} />
       <JournalBox date={date} />
       <DayNotes date={date} />
     </div>

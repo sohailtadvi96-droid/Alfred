@@ -6,6 +6,7 @@ import type { NewEvent, NewTask, OfficeNote, TaskStatus } from './types';
 const keys = {
   tasks: ['office', 'tasks'] as const,
   dayTasks: (date: string, overdue: boolean) => ['office', 'dayTasks', date, overdue] as const,
+  doneFeed: (date: string) => ['office', 'doneFeed', date] as const,
   events: ['office', 'events'] as const,
   dayEvents: (date: string) => ['office', 'dayEvents', date] as const,
   notes: ['office', 'notes'] as const,
@@ -28,6 +29,16 @@ export function useDayTasks(date: string, includeOverdue: boolean) {
   return useQuery({
     queryKey: keys.dayTasks(date, includeOverdue),
     queryFn: () => api.listDayTasks(date, includeOverdue),
+    enabled: !!date,
+  });
+}
+
+/** done_today_feed (0045) for the day being viewed -- not just today's own
+ *  page; a past Office day reads that day's feed too. */
+export function useDoneFeed(date: string) {
+  return useQuery({
+    queryKey: keys.doneFeed(date),
+    queryFn: () => api.listDoneFeed(date),
     enabled: !!date,
   });
 }

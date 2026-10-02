@@ -596,5 +596,77 @@ begin
   raise notice 'PASS: a reminder linked to a computed goal writes nothing to goal_progress';
 end $$;
 
+-- =====================================================================
+\echo '=== 18. goal_current_value tasks_completed: 00:30 IST counts toward the LOCAL day ==='
+insert into public.goals (id, title, type, target, source, cadence)
+values ('e0000000-0000-0000-0000-000000000001', 'Tasks parity test', 'count', 100, '{"kind":"tasks_completed"}', 'none');
+
+-- 2026-09-19 19:00:00 UTC = 2026-09-20 00:30 IST
+insert into public.office_tasks (title, status, done_at)
+values ('Midnight-crossing task', 'done', '2026-09-19 19:00:00+00');
+
+do $$
+declare v_new numeric; v_old_utc_day numeric;
+begin
+  select public.goal_current_value('e0000000-0000-0000-0000-000000000001', '2026-09-20', '2026-09-20') into v_new;
+  assert v_new = 1, format('expected 1 task on the correct IST day (Sep 20), got %s', v_new);
+
+  select public.goal_current_value('e0000000-0000-0000-0000-000000000001', '2026-09-19', '2026-09-19') into v_old_utc_day;
+  assert v_old_utc_day = 0, format('the old UTC day (Sep 19) should no longer count it, got %s', v_old_utc_day);
+
+  raise notice 'PASS: a task done at 00:30 IST (19:00 UTC the day before) counts on the IST day, not the UTC day';
+end $$;
+
+-- =====================================================================
+\echo '=== 19. goal_current_value tasks_completed: a reminder completion counts only when counts_as_task ==='
+-- tasks_completed sums across ALL of the user's done office_tasks +
+-- counts_as_task reminder completions in range, not scoped to one goal --
+-- so this uses its own date (22 Sep) to stay clear of block 18's fixture
+-- office_task on 20 Sep for the same shared test user.
+insert into public.goals (id, title, type, target, source)
+values ('e0000000-0000-0000-0000-000000000002', 'Tasks parity test 2', 'count', 100, '{"kind":"tasks_completed"}');
+
+insert into public.reminders (id, title, kind, due_date, counts_as_task)
+values ('a0000000-0000-0000-0000-000000000012', 'Counted one-time', 'one_time', '2026-09-22', true);
+insert into public.reminders (id, title, kind, due_date, counts_as_task)
+values ('a0000000-0000-0000-0000-000000000013', 'Not counted one-time', 'one_time', '2026-09-22', false);
+
+insert into public.reminder_completions (reminder_id, occurrence_date, status, completed_at)
+values ('a0000000-0000-0000-0000-000000000012', '2026-09-22', 'done', '2026-09-22 10:00:00+05:30');
+insert into public.reminder_completions (reminder_id, occurrence_date, status, completed_at)
+values ('a0000000-0000-0000-0000-000000000013', '2026-09-22', 'done', '2026-09-22 10:00:00+05:30');
+
+do $$
+declare v_count numeric;
+begin
+  select public.goal_current_value('e0000000-0000-0000-0000-000000000002', '2026-09-22', '2026-09-22') into v_count;
+  assert v_count = 1, format('only the counts_as_task reminder completion should count, got %s', v_count);
+  raise notice 'PASS: tasks_completed only counts a reminder completion when counts_as_task is true';
+end $$;
+
+-- =====================================================================
+\echo '=== 20. done_today_feed: a task and a reminder completion on the same local day, one each, correctly sourced ==='
+insert into public.office_tasks (title, status, done_at)
+values ('Feed task', 'done', '2026-09-20 06:00:00+05:30');
+
+insert into public.reminders (id, title, kind, due_date, counts_as_task)
+values ('a0000000-0000-0000-0000-000000000014', 'Feed reminder', 'one_time', '2026-09-20', true);
+insert into public.reminder_completions (reminder_id, occurrence_date, status, completed_at)
+values ('a0000000-0000-0000-0000-000000000014', '2026-09-20', 'done', '2026-09-20 07:00:00+05:30');
+
+do $$
+declare v_task_count int; v_reminder_count int;
+begin
+  select count(*) into v_task_count from public.done_today_feed('2026-09-20')
+    where source = 'task' and title = 'Feed task';
+  assert v_task_count = 1, format('expected exactly one task row in the feed, got %s', v_task_count);
+
+  select count(*) into v_reminder_count from public.done_today_feed('2026-09-20')
+    where source = 'reminder' and title = 'Feed reminder';
+  assert v_reminder_count = 1, format('expected exactly one reminder row in the feed, got %s', v_reminder_count);
+
+  raise notice 'PASS: done_today_feed shows one task row and one reminder row for the same local day, correctly sourced';
+end $$;
+
 \echo '=== all blocks passed; rolling back now ==='
 rollback;

@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { localDateKey } from './datetime';
 import type {
   DaySummary,
+  DoneFeedRow,
   JournalEntry,
   NewEvent,
   NewTask,
@@ -142,17 +143,28 @@ export async function listEventsOn(dayStartISO: string, dayEndISO: string): Prom
 }
 
 /** Tasks for one calendar day. When `includeOverdue`, also returns still-open
- *  tasks whose due date has already passed (used on the *today* page). */
+ *  tasks whose due date has already passed (used on the *today* page). Open/
+ *  pending only as of 0045 -- a done task's due-date row no longer shows up
+ *  here struck-through; it moves to listDoneFeed's "done" list instead. */
 export async function listDayTasks(date: string, includeOverdue: boolean): Promise<OfficeTask[]> {
-  let q = supabase.from('office_tasks').select('*');
-  q = includeOverdue
-    ? q.or(`due_date.eq.${date},and(status.eq.open,due_date.lt.${date})`)
-    : q.eq('due_date', date);
+  let q = supabase.from('office_tasks').select('*').eq('status', 'open');
+  q = includeOverdue ? q.or(`due_date.eq.${date},due_date.lt.${date}`) : q.eq('due_date', date);
   const { data, error } = await q
     .order('due_date', { ascending: true })
     .order('priority', { ascending: false });
   if (error) throw error;
   return data as OfficeTask[];
+}
+
+/** done_today_feed (0045) -- every office_task done on `date`'s LOCAL day,
+ *  plus every counts_as_task-agnostic reminder completion on the same day
+ *  (reminder_kind tells a one-time tick from a recurring one; counts_as_task
+ *  is informational here, not a filter -- the feed shows everything done,
+ *  same as the Reminders module's own Done Today list does). */
+export async function listDoneFeed(date: string): Promise<DoneFeedRow[]> {
+  const { data, error } = await supabase.rpc('done_today_feed', { p_date: date });
+  if (error) throw error;
+  return (data ?? []) as DoneFeedRow[];
 }
 
 // ---------- journal ----------
