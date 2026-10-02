@@ -49,10 +49,10 @@ src/
   lib/         supabase client, TanStack queryClient, color/format/error helpers
   styles/      tokens.css (grounds/design tokens), base.css (shell + components)
 supabase/
-  migrations/  0001 … 0039, sequential, immutable once pushed
+  migrations/  0001 … 0045, sequential, immutable once pushed
   functions/   categorise-ai, design-search, design-capture, design-ingest, design-retry,
                design-backfill-dimensions (+ _shared/: cors.ts, imageDimensions.ts)
-docs/          MVP.md (spec), DEPLOY.md
+docs/          MVP.md (spec), DEPLOY.md, alfred-reminders-plan.md (Reminders design doc)
 ```
 
 Each feature module under `src/features/<name>/` follows the same shape: `api.ts`
@@ -69,8 +69,9 @@ components, not business logic.
 | **Work** (freelance: clients/projects/invoices) | `WorkPage`, `ProjectDetailPage`, `InvoicesPage`, `InvoiceViewPage` | 0004, 0008 | Shipped |
 | **Office** (tasks/calendar/journal) | `OfficeDayPage` | 0009, 0010 | Shipped |
 | **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011, 0029–0032, 0036, 0037 | Shipped; Discover is parked (route and `DiscoverView` kept, no nav link to it) |
-| **Goals** | `GoalsPage` | 0016, 0033–0035, 0038, 0039 | Shipped. `NewGoalDialog` creates `manual` and `savings_target` goals (a "Tracking" control; savings is fixed to type `value`, cadence `monthly`, direction `up`, unit ₹, no deadline). Computed progress exists server-side (`goal_current_value`, `goal_pace`, cadence periods) for `journal_streak` / `tasks_completed` sources fed from Office — still seeded, nothing creates them from the UI — and `savings_target`, income minus spend from `transaction_flows` (0038), whose expanded `GoalRow` renders the `savings_plan` coach RPC (0039) via `SavingsPlan.tsx` / `savingsPlanView.ts`. An active savings goal's header status comes from the plan (`statusFromPlan`), overlaid in `useGoalsWithPace` so the module page, its grouping and the Home tile agree with the body — `goal_pace`'s linear expectation is wrong for a lump-sum salary and is dropped for that kind. A `GoalRow` expands into three zones in order: verdict, detail, actions (Edit is a toggle). No goal reads Work / Design data yet |
-| **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped |
+| **Goals** | `GoalsPage` | 0016, 0033–0035, 0038, 0039 | Shipped. `NewGoalDialog` creates `manual` and `savings_target` goals (a "Tracking" control; savings is fixed to type `value`, cadence `monthly`, direction `up`, unit ₹, no deadline). Computed progress exists server-side (`goal_current_value`, `goal_pace`, cadence periods) for `journal_streak` / `tasks_completed` sources fed from Office — still seeded, nothing creates them from the UI — and `savings_target`, income minus spend from `transaction_flows` (0038), whose expanded `GoalRow` renders the `savings_plan` coach RPC (0039) via `SavingsPlan.tsx` / `savingsPlanView.ts`. An active savings goal's header status comes from the plan (`statusFromPlan`), overlaid in `useGoalsWithPace` so the module page, its grouping and the Home tile agree with the body — `goal_pace`'s linear expectation is wrong for a lump-sum salary and is dropped for that kind. A `GoalRow` expands into three zones in order: verdict, detail, actions (Edit is a toggle). `RemindMeRow` (R6) lets a manual streak/count goal link to a reminder via `reminders.goal_id` — ticking that reminder logs `goal_progress` (see Reminders below). No goal reads Work / Design data yet |
+| **Reminders** | `RemindersPage` (`/reminders`) | 0040–0045 | Shipped. One-time and recurring personal reminders, derived-on-read (no per-day materialisation — only `reminder_completions` is stored state). Today/Upcoming/All tabs (`RemindersView`), quick-add + full `ReminderSheet` for recurrence, keyboard shortcuts (`n` new, `x` tick/untick), a sidebar due-count badge, and a `NextUpList` "Next up" tile on Home (`md`-sized by default, overdue → due now → later, falls back to tomorrow's items with no tick boxes when today is clear). A reminder can link to a manual streak/count Goal (`RemindMeRow`) or be Office-`satisfied_by` (`office_journal` — a module marks the day done, no manual tick). Office's Done Today list (`DoneToday` in `DayView.tsx`) reads the union of done tasks and done reminders via `done_today_feed`. See the Database schema section below for the full RPC surface and `docs/alfred-reminders-plan.md` for the design rationale |
+| **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped. Board tile order/size persisted to `localStorage` (`alfred-home-board`), with a `known`-modules list so a module added after a layout was saved (e.g. Reminders, R8) appears once on existing boards without clobbering a deliberate removal (`withNewModules` in `src/features/home/layout.ts`) |
 
 ## Expenses engine (client-side categorisation)
 
@@ -192,7 +193,7 @@ the gate.
 - The month views (`listTransactions`, `getMonthSummary`) aren't paged — fine until a single month
   passes 1,000 rows.
 
-## Database schema (as of migration 0039)
+## Database schema (as of migration 0045)
 
 All tables live in `public`, have RLS enabled, and (unless noted) use the same
 per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`.
@@ -201,7 +202,12 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 **Core / auth**
 - `profiles` (1:1 with `auth.users`) — `ground` (active background preset), `custom_ground`,
   `sidebar_collapsed`, `timezone` (0033 — the client's calendar day, so goal-pace period
-  boundaries agree between client and server). Auto-created on signup via `handle_new_user()` trigger.
+  boundaries agree between client and server; defaults `'Asia/Kolkata'`). Auto-created on
+  signup via `handle_new_user()` trigger. `user_today()` (0040, `sql stable`) is the single
+  server-side read of this column — `(now() at time zone profiles.timezone)::date` — and every
+  Reminders RPC goes through it; the client never computes "today" for reminder logic via
+  `new Date()`. `goal_pace` / `savings_plan` keep their own inline timezone lookup, not yet
+  refactored onto this helper.
 
 **Expenses**
 - `accounts` — name, type (bank/credit/cash/wallet), last4, `opening_balance_cents`.
@@ -407,9 +413,18 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   `next_task_id` (→ `office_tasks`).
 - `goal_progress` — append-only ledger for `manual` goals: count/value goals log incremental rows
   (summed), streak goals log at most one row per day (enforced in `api.ts`, not a DB constraint).
+  `source_reminder_id` (0044, → `reminders`, `on delete set null`) is null for a hand-logged row
+  and set when `reminder_complete` wrote the row by ticking a linked reminder — unlogging
+  (`reminder_uncomplete` / `reminder_skip`) deletes only rows matching this, so a hand-logged
+  entry for the same day is never touched.
 - `goal_periods` (0033) — frozen per-cadence snapshots (target/actual/status fixed once a period
-  closes, never recomputed), `reminders` (general-purpose; `goal_id` nullable) and `goal_reviews`
-  (continue/adjust/drop check-ins, one per goal per day). All owner-all RLS.
+  closes, never recomputed) and `goal_reviews` (continue/adjust/drop check-ins, one per goal per
+  day). All owner-all RLS. (0033 also created a `reminders` table here, as an unused goal-nudge
+  scaffold with zero readers and zero rows — `kind` = checkin/pace/…, an opaque `recurrence`
+  jsonb, `next_fire_at`. 0040 **altered it in place** — kept `id`/`user_id`/`goal_id`/`title`/
+  `channel`/`snoozed_until`/RLS/the `updated_at` trigger, dropped `recurrence`/`next_fire_at`, and
+  added the one-time/recurring columns below — rather than dropping and recreating it. It's no
+  longer Goals-specific; see Reminders below.)
 - RPCs (plain SQL, invoker — RLS applies as the caller): `goal_current_value(goal, from, to)`
   (0034, dispatches on `source.kind`; 0038 added `savings_target` = income − spend in **rupees**
   over the range, `flow_kind = 'income'` credits whose category is in `source.income_categories`
@@ -417,7 +432,11 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   debits, `excluded_from_spend` rows dropped; an explicit `[]` counts no income, only an absent or
   non-array key takes the default) and `goal_pace(goal)` (0035 — streak: trailing 28 days;
   count/value with `cadence = 'none'`: linear over the goal's lifetime; with a cadence: per-period
-  target; milestone goals are rejected).
+  target; milestone goals are rejected). `goal_current_value`'s `tasks_completed` branch is
+  restated in 0045: counts `office_tasks` done + `counts_as_task` `reminder_completions`, both by
+  the **local** calendar day of `done_at`/`completed_at` (was `done_at::date`, the UTC day — a
+  task done after 00:00 and before the IST offset rolled over used to land on the wrong day; see
+  Reminders below). Every other branch is unchanged from 0038.
 - `savings_plan(goal)` (0039, `stable`, invoker, jsonb; `null` = no such goal, `{error}` = not a
   `savings_target` or cadence other than `monthly`) — the honest month-end projection (`goal_pace`'s
   linear expectation is wrong for a lump-sum salary): meter to `as_of` (the last transaction day
@@ -432,6 +451,85 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   complete month. Also lists active `subscriptions` `recurring_series` rows — a list to eyeball,
   no "dead" flag exists, and `recurring_series` is only as fresh as the last manual
   `detect_recurring_series()`.
+
+**Reminders** (0040–0045)
+- `reminders` — one row per reminder *rule*, not per occurrence; a recurring reminder's
+  occurrences are derived on read (`reminder_occurs_on`), never materialised. `kind`
+  (`one_time`/`recurring`) picks one of two mutually-exclusive shapes, enforced by check
+  constraints: `one_time` needs `due_date` and forbids `freq`/`satisfied_by`; `recurring` needs
+  `freq` + `start_date` and forbids `due_date`/`due_time`. `freq` is `daily` / `weekly` (needs
+  non-empty `weekdays`, ISO 1=Mon..7=Sun) / `monthly` (needs `month_day`, clamped to the month's
+  actual length) / `every_n_days` (needs `interval_n`, counted from `start_date`). `status`
+  (`active`/`paused`/`archived`); `paused_at` set by `reminder_pause`. `goal_id` (→ `goals`, `on
+  delete set null` — a habit's history survives the goal it was created from being deleted).
+  `satisfied_by` (`office_journal` only, so far) marks a recurring reminder as module-satisfied:
+  another module's own data marks the day done, no manual tick, no tick UI for that row.
+  `counts_as_task` (defaults `true` for `one_time`, `false` for `recurring`, via a
+  before-insert trigger, since the default depends on `kind` — editable per reminder) gates
+  whether a completion feeds a `tasks_completed` goal meter. `notes`, `time_of_day` (recurring) /
+  `due_time` (one-time) are both optional.
+- `reminder_completions` — the only materialised state a recurring reminder has: one row per
+  `(reminder_id, occurrence_date)` actually completed. `status` is `done` / `skipped` (a miss —
+  breaks `reminder_streak`) / `excused` (written by `reminder_resume` for days a rule was paused —
+  doesn't break a streak). One-time reminders always use `occurrence_date = due_date`.
+- `goal_progress.source_reminder_id` — see the Goals schema section above.
+- Key RPCs, all `security invoker` (the default — reminders/reminder_completions/goals/
+  goal_progress/office_journal/profiles all carry standard owner-all RLS, so running as the
+  caller is enough): `user_today()` (see Core/auth above); `reminder_occurs_on(r, d)` (pure
+  schedule check, ignores status and completions); `reminder_satisfied(r, d)` (whether another
+  module's data already marks `d` done — dispatches on `satisfied_by`); `reminder_streak(id,
+  today)` (walks backward over the reminder's own scheduled days only, bounded to 400 days;
+  `excused` days are stepped over, today-if-still-open neither counts nor breaks, `null` for
+  `one_time`); `reminders_today(date)` (everything for one day's page — unions a recurring
+  occurrence, an open overdue-or-due one-time reminder, and a one-time reminder completed that
+  local day; returns `due_state` of `done`/`overdue`/`due_now`/`later` and each row's `streak`);
+  `reminders_upcoming(days)` (the next N days, recurring occurrences + open one-time reminders due
+  in range; 0043 widened the row shape with `weekdays`/`month_day`/`interval_n`/`due_time` so the
+  Upcoming tab can render the same schedule label as everywhere else); `reminder_history(days,
+  today)` (0042 — one row per recurring reminder per day over the window, states
+  `done`/`skipped`/`excused`/`missed`/`open`/`unscheduled`, for the All tab's per-rule dot strip);
+  `reminder_complete(id, date)` / `reminder_uncomplete(id, date)` (tick/untick; `one_time` ignores
+  `date` and always resolves to its own `due_date`; ticking a reminder linked to a manual
+  streak/count goal also logs/unlogs that day's `goal_progress` row, tagged with
+  `source_reminder_id` so unlogging never touches a hand-logged entry — restated in 0044 to cover
+  `count` goals, not just `streak`); `reminder_skip(id, date)` (recurring only — marks the
+  occurrence `skipped` and unlogs any goal row the same way uncomplete would); `reminder_pause(id)`
+  / `reminder_resume(id)` (resume backfills `excused` for every day the rule was scheduled while
+  paused, so the streak walk steps over the whole pause instead of reading it as misses);
+  `done_today_feed(date)` (0045 — the union `office_tasks` done + `counts_as_task`
+  `reminder_completions` done on `date`'s **local** day; Office's Done Today list reads this
+  instead of assembling itself from `office_tasks` alone).
+- **Client (`src/features/reminders/`)**: `types.ts`, `api.ts`, `hooks.ts` (TanStack Query
+  wrappers, one per RPC) follow the standard feature-module shape. `schedule.ts` /
+  `ScheduleFields.tsx` build and render the recurrence rule; `describeScheduleShort()` is the one
+  label format used in the Today/Upcoming/All tabs and the Home tile. `today.ts` holds pure
+  functions over server-computed rows only — `todayTally`, `isOpen`, `nextUp(today, upcoming,
+  limit)` (ranks `overdue` → `due_now` → `later`, falling back to `upcoming` with
+  `tickable: false` only when `today` has zero open items) — nothing in it asks what day it is;
+  every date comes from the server (`occurrence_date`, `user_today()`). `keys.ts` wires the `n`
+  (new reminder) and `x` (tick/untick the focused or first row) shortcuts: `shortcutBlocked()`
+  stands them down for a modifier key, a focused input/textarea/select/contenteditable, or any
+  open Radix layer (`[role="dialog"], [role="menu"]`); row state for `x` is read from
+  `data-rem-row`/`data-rem-date`/`data-rem-done`/`data-rem-tickable` DOM attributes, not the query
+  cache, so "the first row" is always what's actually on screen, with a short focus-follow window
+  so repeated `x` presses track the same row as it moves between the open and Done sections.
+  `RemindersView.tsx` (tabs) / `TodayTab.tsx` / `UpcomingTab.tsx` / `AllTab.tsx` /
+  `ReminderRow.tsx` / `ReminderSheet.tsx` / `QuickAdd.tsx` / `StatStrip.tsx` are the page; the
+  sidebar's due-count badge excludes skipped rows.
+- **Home tile**: `NextUpList.tsx`, rendered by `Board.tsx` when the tile's module is `reminders`
+  (`md`-sized by default — three titled rows with a tick and a due label need the width, see
+  `DEFAULT_TILE_SIZE` in `src/features/home/layout.ts`). Uses the same optimistic
+  `useCompleteReminder` hook as the Today tab, so a tick from the tile is instant and consistent
+  everywhere. Falls back to tomorrow's items with no tick boxes when today has nothing open, and
+  reads "Nothing due." with zero reminders in the system at all.
+- **Office integration**: `done_today_feed` (above) backs `DoneToday` in
+  `src/features/office/DayView.tsx` — each reminder-sourced row gets a small bell icon
+  (`office-done-bell`) next to the done-check so it's visually distinct from a task.
+- **Not built**: there is no dispatch or notification layer — a reminder surfaces only when the
+  Today tab or Home tile is open and read, nothing pushes, emails, or alerts on its own.
+  `reminders.channel` (kept from the 0033 scaffold) is unused — no code reads or writes it. The
+  `satisfied_by` whitelist has exactly one member, `office_journal`; no other module marks a
+  reminder done on its own yet.
 
 ## Conventions worth knowing
 
@@ -497,6 +595,27 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   updated optimistically by `useSetItemBoard`).
 - See [`docs/MVP.md`](docs/MVP.md) for product spec and [`supabase/README.md`](supabase/README.md)
   for local setup (migrations, Vault key, turning off signups).
+- **Reminders date logic is server-side, always.** Every date decision (which day is "today",
+  whether a recurring rule occurs on a given day, streak counting) goes through `user_today()` /
+  `reminder_occurs_on` / `reminder_streak` on the server. The client's own date helpers
+  (`src/features/reminders/today.ts`) only ever read `occurrence_date` and other fields the server
+  already computed — never `new Date()` — so the day boundary can't drift between the browser's
+  clock and `profiles.timezone`.
+- **A streak counts scheduled days only.** `reminder_streak` walks backward over days the rule
+  itself occurs on (`reminder_occurs_on`); a day the rule wasn't scheduled for doesn't exist for
+  streak purposes, so a `weekly` Mon/Wed/Fri reminder has no streak gap on a Tuesday.
+- **Skip vs. pause are different kinds of "not done."** `reminder_skip` marks one occurrence
+  `skipped` — a miss that breaks the streak, and unlogs that day's goal progress the same as
+  unticking would. `reminder_pause` stops a rule from generating occurrences at all and, on
+  `reminder_resume`, backfills every day it was scheduled while paused as `excused` — stepped over
+  by the streak walk, not counted as a miss. Use skip for "not doing this one," pause for "not
+  running this rule for a while."
+- **Component-scoped responsive layout uses CSS container queries**, not just viewport `@media`.
+  `.rem-view` declares `container: rem-view / inline-size`; `@container rem-view (max-width:
+  560px)` reflows the reminders column (row meta wraps below the row instead of staying inline)
+  independent of the browser's own width, so the column behaves the same whether it's the full
+  page or a narrower slot. The sheet still uses a `@media (max-width: 640px)` breakpoint, matching
+  Office's own convention for dialogs.
 
 ## Keeping this file current
 
