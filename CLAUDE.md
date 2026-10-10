@@ -35,7 +35,21 @@ concept of teams/orgs/sharing.
 - **Env vars:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, optional
   `VITE_GOOGLE_CLIENT_ID` (Google Calendar read-only sync in Work/Office). App still
   boots without `.env` and shows a "not configured" login screen.
-- **Deploy:** Vercel (`vercel.json`, `.vercel/`).
+- **Deploy:** Vercel (`vercel.json`, `.vercel/`). `vercel.json`'s catch-all rewrite to
+  `/index.html` only applies when no real file matches, so `public/` files are served as
+  themselves; `/sw.js` gets `Cache-Control: no-cache` and an explicit JS content type,
+  `/manifest.webmanifest` an explicit `application/manifest+json`.
+- **Installable app (phone track P1):** `public/manifest.webmanifest` (`start_url /home`,
+  `display standalone`, Pine `#10201a` colours) plus the icons in `public/`, so "Add to Home
+  Screen" on iPhone opens Alfred as its own app. `public/sw.js` is a hand-written,
+  behaviour-free service worker (skipWaiting / clients.claim — **no fetch handler, no
+  caching**, so a deploy can never be masked by a stale cache; push handlers arrive in P2),
+  registered from `main.tsx` in production builds only, after `load`. No vite-plugin-pwa.
+  `<meta name="theme-color">` (the installed app's status bar) is kept on the active
+  ground's `--ground` by the ground-paint script in `index.html` — last colour from
+  `localStorage['alfred-ground-color']` first, the live value once CSS loads, then on every
+  `data-ground` change. iOS ignores the manifest's `orientation` and `background_color`, and
+  uses `apple-touch-icon` over the manifest icons.
 
 ## Layout
 
@@ -53,6 +67,13 @@ supabase/
   functions/   categorise-ai, design-search, design-capture, design-ingest, design-retry,
                design-backfill-dimensions (+ _shared/: cors.ts, imageDimensions.ts)
 docs/          MVP.md (spec), DEPLOY.md, alfred-reminders-plan.md (Reminders design doc)
+public/        manifest.webmanifest, sw.js, apple-touch-icon.png (180, opaque),
+               icon-192/512.png, icon-maskable-512.png, favicon.svg, favicon-32.png —
+               the icons are generated, never hand-edited (see scripts/icons/)
+scripts/
+  icons/       alfred-mark.svg (brand mark source: the .mark tile, "A" outlined from
+               Archivo 900) + export-icons.mjs (`node scripts/icons/export-icons.mjs`
+               re-renders every icon in public/ through headless Chrome; no npm deps)
 ```
 
 Each feature module under `src/features/<name>/` follows the same shape: `api.ts`

@@ -9,3 +9,13 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+// The installed (home-screen) app needs a worker to subscribe push through;
+// public/sw.js does nothing else yet. Production only, so dev never caches one.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* not fatal — the app runs the same without it */
+    });
+  });
+}

@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ALFRED</title>
     <meta name="description" content="ALFRED — a personal butler for one." />
+    <meta name="theme-color" content="#17150f" />
+    <meta name="apple-mobile-web-app-title" content="Alfred" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -17,6 +23,28 @@
         var g = localStorage.getItem('alfred-ground');
         if (g && g !== 'ink') document.documentElement.setAttribute('data-ground', g);
       } catch (e) {}
+
+      // Keep theme-color (the installed app's status bar) on the ground's own
+      // colour. The stylesheet isn't loaded yet, so start from the last colour
+      // seen, read the live --ground once it is, and again on every ground change.
+      (function () {
+        var root = document.documentElement;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        try {
+          var last = localStorage.getItem('alfred-ground-color');
+          if (last) meta.setAttribute('content', last);
+        } catch (e) {}
+        function sync() {
+          var c = getComputedStyle(root).getPropertyValue('--ground').trim();
+          if (!c) return;
+          meta.setAttribute('content', c);
+          try {
+            localStorage.setItem('alfred-ground-color', c);
+          } catch (e) {}
+        }
+        document.addEventListener('DOMContentLoaded', sync);
+        new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['data-ground'] });
+      })();
     </script>
   </head>
   <body>

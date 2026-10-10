@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26">
+  <!-- ALFRED brand mark: the sidebar's .mark tile (26px, 8px radius) on the
+       Pine ground's base/base-ink. The "A" is Archivo at weight 900 (the
+       Google Fonts static instance the app loads), converted to outlines —
+       no font needed. Glyph units are 1000/em; scale 0.015 = the tile's 15px
+       font-size, translated so the glyph's bounding box is centred (the CSS
+       line box puts it within 0.15px of the same place). Source for every
+       icon in public/ — run scripts/icons/export-icons.mjs after editing. -->
+  <rect width="26" height="26" rx="8" fill="#e7c873"/>
+  <path fill="#152410" transform="translate(7.1575 18.16) scale(0.015 -0.015)" d="M10 0 261 688H518L769 0H535L506 97H265L236 0ZM311 251H461L428 361Q424 373 419 390Q414 407 409 426Q404 445 399 463.5Q394 482 390 496H382Q378 478 371.5 455Q365 432 358 407.5Q351 383 344 361Z"/>
+</svg>
