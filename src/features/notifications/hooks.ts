@@ -4,7 +4,20 @@ import * as api from './api';
 
 const keys = {
   state: ['push', 'state'] as const,
+  digestTime: ['push', 'digest-time'] as const,
 };
+
+export function useDigestTime() {
+  return useQuery({ queryKey: keys.digestTime, queryFn: () => api.getDigestTime() });
+}
+
+export function useSetDigestTime() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (value: string) => api.setDigestTime(value),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.digestTime }),
+  });
+}
 
 /** Permission can change outside the app (iOS Settings, the browser's site
  *  settings), so re-read whenever the window regains focus. */

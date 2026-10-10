@@ -1,5 +1,13 @@
+import { useEffect, useState } from 'react';
 import { errMessage } from '@/lib/errors';
-import { useDisablePush, useEnablePush, usePushState, useSendTestPush } from './hooks';
+import {
+  useDigestTime,
+  useDisablePush,
+  useEnablePush,
+  usePushState,
+  useSendTestPush,
+  useSetDigestTime,
+} from './hooks';
 import type { TestResult } from './api';
 
 // Same text styles the rest of the Settings page uses inline.
@@ -105,5 +113,45 @@ export function EnablePush() {
 
       {error && <p style={fail}>{errMessage(error)}</p>}
     </>
+  );
+}
+
+/** profiles.digest_time — when the one daily push for untimed reminders
+ *  arrives, on every device. Saved when the field loses focus. */
+export function DigestTimeField() {
+  const { data: saved } = useDigestTime();
+  const save = useSetDigestTime();
+  const [value, setValue] = useState('');
+  useEffect(() => {
+    if (saved) setValue(saved);
+  }, [saved]);
+
+  function commit() {
+    if (value && saved && value !== saved) save.mutate(value);
+  }
+
+  return (
+    <div className="field" style={{ maxWidth: 200, marginTop: 20, marginBottom: 0 }}>
+      <label htmlFor="digest-time">Daily summary time</label>
+      <input
+        id="digest-time"
+        type="time"
+        className="input"
+        value={value}
+        disabled={!saved}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+        }}
+      />
+      {save.error ? (
+        <span className="err">{errMessage(save.error)}</span>
+      ) : (
+        <span className="hint">
+          {save.isPending ? 'Saving…' : 'Reminders without a time arrive together, once a day, at this time.'}
+        </span>
+      )}
+    </div>
   );
 }

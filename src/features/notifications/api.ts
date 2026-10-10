@@ -139,13 +139,39 @@ export async function enablePush(permission: Promise<NotificationPermission>): P
 }
 
 /** Unsubscribe this browser and delete its row. Used by "Turn off" and by
- *  sign-out, so a signed-out device stops getting pushes. */
+ *  sign-out, so a signed-out device stops getting pushes. The browser goes
+ *  first: if the delete then fails (offline sign-out), the leftover row points
+ *  at a dead endpoint, and the next send's 404/410 prunes it — whereas the
+ *  other order could leave a live subscription with no row to manage it. */
 export async function disablePush(): Promise<void> {
   const sub = await currentSubscription();
   if (!sub) return;
-  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+  const endpoint = sub.endpoint;
   await sub.unsubscribe();
+  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
   if (error) throw error;
+}
+
+/** The daily summary time for untimed reminders (profiles.digest_time),
+ *  as 'HH:MM' in the user's own timezone. Shared by all their devices. */
+export async function getDigestTime(): Promise<string> {
+  const { data, error } = await supabase.from('profiles').select('digest_time').maybeSingle();
+  if (error) throw error;
+  return (data?.digest_time as string | undefined)?.slice(0, 5) ?? '09:00';
+}
+
+export async function setDigestTime(value: string): Promise<void> {
+  if (!/^\d{2}:\d{2}$/.test(value)) throw new Error('Pick a time.');
+  const { data: session } = await supabase.auth.getSession();
+  const userId = session.session?.user.id;
+  if (!userId) throw new Error('Not signed in.');
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ digest_time: value })
+    .eq('id', userId)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('Couldn’t save the summary time.');
 }
 
 /** On each app launch: refresh this device's row (last_seen_at, and the

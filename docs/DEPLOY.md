@@ -2,18 +2,44 @@
 
 Frontend deploys to Vercel; backend is Supabase Cloud (see `../supabase/README.md`).
 
+## Pushing `main` deploys production — by itself
+
+A `git push` to `main` on GitHub **is** the production deploy. Two GitHub
+integrations react to it within about a minute (found during the phone P2
+rollout, 2026-10-10; every `main` push since at least 2026-10-02 shows both):
+
+- **Supabase GitHub integration** (check run "Supabase Preview"): applies any
+  new migrations in `supabase/migrations/` to the production database and
+  deploys the Edge Functions in `supabase/functions/`. It does **not** set
+  function secrets or Vault secrets.
+- **Vercel Git integration**: builds a Production deployment (alias
+  `alfred-murex-pi.vercel.app`) with whatever Vercel environment variables
+  exist **at that moment**.
+
+`.github/workflows/ci.yml` only runs `npm ci && npm run build`.
+
+So, for any change that needs a new secret or variable:
+
+1. Set Supabase function secrets (`supabase secrets set …`), Vault secrets (SQL),
+   and Vercel environment variables (`vercel env add …`) **first**.
+2. Then merge / push to `main`. That push is the deploy; `supabase db push`,
+   `supabase functions deploy` and `vercel --prod` are not separate steps.
+3. Verify (below). A branch push only makes a Vercel *Preview* — it never
+   touches the production database.
+
 ## Environment variables
 
-The app reads exactly two variables, both at **build time**, and both are
-embedded in the shipped JS bundle. Neither is a true secret — the anon key is
-the public key from Supabase → Project Settings → API — but Vercel still needs
-them present for every build.
+The app reads these variables at **build time**; all of them are embedded in
+the shipped JS bundle, so none may be a real secret — the anon key is the
+public key from Supabase → Project Settings → API, and the VAPID key is the
+*public* half of the Web Push key pair. Vercel needs them present for every build.
 
 | Key | Value | Environments |
 |---|---|---|
 | `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` | Production, Preview, Development |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anon **public** key | Production, Preview, Development |
 | `VITE_GOOGLE_CLIENT_ID` | OAuth web client ID (optional) | Production, Preview, Development |
+| `VITE_VAPID_PUBLIC_KEY` | Web Push VAPID **public** key, base64url (optional — Settings → Notifications says "not configured" without it) | Production |
 
 > Never add the Supabase `service_role` key (or any other real secret) as a
 > `VITE_*` variable — anything with that prefix is compiled into client code
@@ -58,6 +84,25 @@ vercel env add VITE_SUPABASE_URL production
 vercel env add VITE_SUPABASE_ANON_KEY production
 # repeat for preview / development
 ```
+
+## Server-side secrets (Supabase — never in Vercel)
+
+Set by hand per environment; nothing deploys them. Names only here — values
+live in the git-ignored `supabase/functions/.env` locally.
+
+| Where | Name | Used by |
+|---|---|---|
+| Function secret | `ANTHROPIC_API_KEY` | `categorise-ai` |
+| Function secret | `VAPID_KEYS_JWK`, `VAPID_SUBJECT` | `push-test`, `push-dispatch` |
+| Function secret | `PUSH_DISPATCH_SECRET` | `push-dispatch` (checks the caller's bearer) |
+| Vault secret | `push_dispatch_url` | `_push_dispatch_tick()` (0047) — the full `https://<ref>.supabase.co/functions/v1/push-dispatch` |
+| Vault secret | `push_dispatch_secret` | `_push_dispatch_tick()` — must equal `PUSH_DISPATCH_SECRET` |
+
+Function secrets: `supabase secrets set NAME=…` (or `--env-file` with a file
+holding **only** the lines you mean to set). Vault secrets: in the SQL editor,
+`select vault.create_secret('<value>', '<name>');` (to change one later:
+`vault.update_secret`). The every-minute cron tick returns quietly until both
+Vault secrets exist, so a migration can ship before they are set.
 
 ## Build settings
 

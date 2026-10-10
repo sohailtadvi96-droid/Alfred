@@ -132,3 +132,11 @@ verify_jwt = true
 # `supabase secrets set VAPID_KEYS_JWK=... VAPID_SUBJECT=...`
 [functions.push-test]
 verify_jwt = true
+
+# Web Push — the scheduled sender (0047). Called by pg_cron's
+# _push_dispatch_tick through pg_net, not by a browser, so the platform JWT
+# gate is off; the function checks `Authorization: Bearer <PUSH_DISPATCH_SECRET>`
+# itself (constant-time). Secrets: PUSH_DISPATCH_SECRET (must equal the Vault
+# secret push_dispatch_secret), VAPID_KEYS_JWK, VAPID_SUBJECT.
+[functions.push-dispatch]
+verify_jwt = false

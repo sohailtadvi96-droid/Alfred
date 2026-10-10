@@ -2,7 +2,7 @@ import { TopBar } from '@/components/TopBar';
 import { GroundPicker } from '@/components/GroundPicker';
 import { replayIntro } from '@/components/IntroChoreography';
 import { useAuth } from '@/auth/AuthProvider';
-import { EnablePush } from '@/features/notifications/EnablePush';
+import { DigestTimeField, EnablePush } from '@/features/notifications/EnablePush';
 
 export function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -35,6 +35,7 @@ export function SettingsPage() {
             Notifications
           </div>
           <EnablePush />
+          <DigestTimeField />
         </section>
 
         <section>

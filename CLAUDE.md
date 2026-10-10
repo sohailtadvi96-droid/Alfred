@@ -39,17 +39,35 @@ concept of teams/orgs/sharing.
   'sent'|'gone'|'failed', status, detail? }] }`; a 404/410 deletes that row, any other failure
   bumps `failure_count`/`last_failure_*`, a success stamps `last_success_at` and resets
   `failure_count`; `503 {error:'not configured'}` without the VAPID secrets; uses
-  `jsr:@negrel/webpush@0.5.0`). API keys live server-side as Supabase secrets, never in the
+  `jsr:@negrel/webpush@0.5.0`), and `push-dispatch` (the scheduled sender, 0047 —
+  `verify_jwt = false` because its caller is pg_net, not a user; it checks
+  `Authorization: Bearer <PUSH_DISPATCH_SECRET>` itself in constant time, calls
+  `push_claim_due()` with the service role, sends each claim with the same Declarative Web
+  Push JSON as `push-test` — `navigate` = `VAPID_SUBJECT`'s origin + `/reminders`, TTL capped
+  at the 2-hour late limit — and reports each result through `push_mark_result()`; returns
+  `{ claimed, sent, failed, gone, removed, mark_errors }`, `503 not configured` without its
+  secrets, `401` on a bad bearer). API keys live server-side as Supabase secrets, never in the
   client `.env`. Web Push secrets: `VAPID_KEYS_JWK` (the key pair as exported by
-  `@negrel/webpush`'s `exportVapidKeys`, JSON) and `VAPID_SUBJECT` (the VAPID contact —
-  `https://alfred-murex-pi.vercel.app`); locally they live in the git-ignored
-  `supabase/functions/.env`.
+  `@negrel/webpush`'s `exportVapidKeys`, JSON), `VAPID_SUBJECT` (the VAPID contact and app
+  URL — `https://alfred-murex-pi.vercel.app`) and `PUSH_DISPATCH_SECRET` (push-dispatch's
+  bearer; must equal the Vault secret `push_dispatch_secret`); locally they live in the
+  git-ignored `supabase/functions/.env`. **Vault** (set by hand per environment, SQL
+  `vault.create_secret`): `alfred_secret_key` (Secrets module), `push_dispatch_url` (the full
+  push-dispatch URL) and `push_dispatch_secret`. Extensions: `pg_cron` and `pg_net` (0047).
 - **Env vars:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, optional
   `VITE_GOOGLE_CLIENT_ID` (Google Calendar read-only sync in Work/Office), optional
   `VITE_VAPID_PUBLIC_KEY` (Web Push `applicationServerKey`, base64url — the public half of
   `VAPID_KEYS_JWK`; without it Settings → Notifications says "not configured"). App still
   boots without `.env` and shows a "not configured" login screen.
-- **Deploy:** Vercel (`vercel.json`, `.vercel/`). `vercel.json`'s catch-all rewrite to
+- **Deploy — pushing `main` IS the production deploy.** Two GitHub integrations react to
+  every push to `main` within about a minute: the **Supabase GitHub integration** (check run
+  "Supabase Preview") applies new migrations to the prod database and deploys the Edge
+  Functions, and the **Vercel Git integration** builds a Production deployment with whatever
+  Vercel env vars exist at that moment. Neither sets function secrets, Vault secrets or Vercel
+  variables, so **set those BEFORE pushing `main`**; `supabase db push` / `functions deploy` /
+  `vercel --prod` are not separate rollout steps. A branch push only makes a Vercel Preview.
+  `.github/workflows/ci.yml` only builds. Full procedure: `docs/DEPLOY.md`.
+- **Vercel** (`vercel.json`, `.vercel/`). `vercel.json`'s catch-all rewrite to
   `/index.html` only applies when no real file matches, so `public/` files are served as
   themselves; `/sw.js` gets `Cache-Control: no-cache` and an explicit JS content type,
   `/manifest.webmanifest` an explicit `application/manifest+json`.
@@ -68,8 +86,18 @@ concept of teams/orgs/sharing.
   payload won't parse or an option is rejected) because iOS can revoke a subscription after a
   push that shows nothing. `notificationclick` focuses an open Alfred window and navigates it
   to the notification's same-origin URL (else `/home`), or opens a new window. One switch per
-  device — no per-reminder opt-in; `reminders.channel` stays unread. Only `push-test` sends
-  so far; scheduled reminder pushes (P3) are not built.
+  device — no per-reminder opt-in; `reminders.channel` stays unread.
+- **Scheduled dispatch (phone track P3, 0047):** pg_cron job `alfred-push-dispatch` runs
+  `_push_dispatch_tick()` every minute. It does nothing unless something is due and unsent
+  (or a claim is stuck); then it reads `push_dispatch_url` / `push_dispatch_secret` from Vault
+  and POSTs (pg_net) to `push-dispatch` — and returns quietly if either Vault secret is
+  missing. Timed reminders push once per occurrence at their fire time (recurring:
+  `time_of_day`; one-time: the later of `due_time` and `snoozed_until`); untimed ones go into
+  one digest per local day at `profiles.digest_time`; a send more than 2 hours late is
+  dropped; done/skipped/excused, paused/archived and module-satisfied occurrences never push,
+  nor does an occurrence whose fire time had passed when the reminder — or the device's
+  subscription — was created. Tags `reminder:<id>:<date>` / `digest:<date>`; tap opens
+  `/reminders`. See the Notifications schema section for the functions.
   `<meta name="theme-color">` (the installed app's status bar) is kept on the active
   ground's `--ground` by the ground-paint script in `index.html` — last colour from
   `localStorage['alfred-ground-color']` first, the live value once CSS loads, then on every
@@ -90,10 +118,12 @@ src/
   lib/         supabase client, TanStack queryClient, color/format/error helpers
   styles/      tokens.css (grounds/design tokens), base.css (shell + components)
 supabase/
-  migrations/  0001 … 0046, sequential, immutable once pushed
+  migrations/  0001 … 0047, sequential, immutable once pushed
   functions/   categorise-ai, design-search, design-capture, design-ingest, design-retry,
-               design-backfill-dimensions, push-test (+ _shared/: cors.ts, imageDimensions.ts)
-  tests/       reminders.sql, push.sql — psql scripts, one rolled-back transaction each
+               design-backfill-dimensions, push-test, push-dispatch
+               (+ _shared/: cors.ts, imageDimensions.ts)
+  tests/       reminders.sql, push.sql, push_dispatch.sql — psql scripts, one rolled-back
+               transaction each
 docs/          MVP.md (spec), DEPLOY.md, alfred-reminders-plan.md (Reminders design doc),
                alfred-phone-p0-findings.md (phone install + Web Push investigation)
 public/        manifest.webmanifest, sw.js, apple-touch-icon.png (180, opaque),
@@ -122,7 +152,7 @@ components, not business logic.
 | **Goals** | `GoalsPage` | 0016, 0033–0035, 0038, 0039 | Shipped. `NewGoalDialog` creates `manual` and `savings_target` goals (a "Tracking" control; savings is fixed to type `value`, cadence `monthly`, direction `up`, unit ₹, no deadline). Computed progress exists server-side (`goal_current_value`, `goal_pace`, cadence periods) for `journal_streak` / `tasks_completed` sources fed from Office — still seeded, nothing creates them from the UI — and `savings_target`, income minus spend from `transaction_flows` (0038), whose expanded `GoalRow` renders the `savings_plan` coach RPC (0039) via `SavingsPlan.tsx` / `savingsPlanView.ts`. An active savings goal's header status comes from the plan (`statusFromPlan`), overlaid in `useGoalsWithPace` so the module page, its grouping and the Home tile agree with the body — `goal_pace`'s linear expectation is wrong for a lump-sum salary and is dropped for that kind. A `GoalRow` expands into three zones in order: verdict, detail, actions (Edit is a toggle). `RemindMeRow` (R6) lets a manual streak/count goal link to a reminder via `reminders.goal_id` — ticking that reminder logs `goal_progress` (see Reminders below). No goal reads Work / Design data yet |
 | **Reminders** | `RemindersPage` (`/reminders`) | 0040–0045 | Shipped. One-time and recurring personal reminders, derived-on-read (no per-day materialisation — only `reminder_completions` is stored state). Today/Upcoming/All tabs (`RemindersView`), quick-add + full `ReminderSheet` for recurrence, keyboard shortcuts (`n` new, `x` tick/untick), a sidebar due-count badge, and a `NextUpList` "Next up" tile on Home (`md`-sized by default, overdue → due now → later, falls back to tomorrow's items with no tick boxes when today is clear). A reminder can link to a manual streak/count Goal (`RemindMeRow`) or be Office-`satisfied_by` (`office_journal` — a module marks the day done, no manual tick). Office's Done Today list (`DoneToday` in `DayView.tsx`) reads the union of done tasks and done reminders via `done_today_feed`. See the Database schema section below for the full RPC surface and `docs/alfred-reminders-plan.md` for the design rationale |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped. Board tile order/size persisted to `localStorage` (`alfred-home-board`), with a `known`-modules list so a module added after a layout was saved (e.g. Reminders, R8) appears once on existing boards without clobbering a deliberate removal (`withNewModules` in `src/features/home/layout.ts`) |
-| **Notifications** (Web Push, per device) | `SettingsPage` → "Notifications" section (`EnablePush`) | 0046 | Built (P2), test push only. Five states: unavailable (no `PushManager`, or an iPhone/iPad not running from the Home Screen → Add to Home Screen steps; also "no service worker" in dev and "not configured" without `VITE_VAPID_PUBLIC_KEY`), ask, denied (→ iOS Settings → Notifications → Alfred), enabled ("Send test" / "Turn off"), allowed-but-unsubscribed ("Re-enable"). The click calls `Notification.requestPermission()` synchronously and hands the promise to the mutation, so nothing is awaited before it (iOS ignores a prompt that isn't in the tap). `AppShell` re-asserts this device's row (`last_seen_at`) once per signed-in launch (`useReassertPush`); `AuthProvider.signOut` unsubscribes and deletes this device's row first (capped at 3s). Scheduled reminder pushes (P3) not built |
+| **Notifications** (Web Push, per device) | `SettingsPage` → "Notifications" section (`EnablePush`) | 0046, 0047 | Built (P2 subscribe + test push, P3 scheduled dispatch). Five states: unavailable (no `PushManager`, or an iPhone/iPad not running from the Home Screen → Add to Home Screen steps; also "no service worker" in dev and "not configured" without `VITE_VAPID_PUBLIC_KEY`), ask, denied (→ iOS Settings → Notifications → Alfred), enabled ("Send test" / "Turn off"), allowed-but-unsubscribed ("Re-enable"). The click calls `Notification.requestPermission()` synchronously and hands the promise to the mutation, so nothing is awaited before it (iOS ignores a prompt that isn't in the tap). `AppShell` re-asserts this device's row (`last_seen_at`) once per signed-in launch (`useReassertPush`); `AuthProvider.signOut` runs `disablePush` first (capped at 3s) — the browser unsubscribes BEFORE the row is deleted, so an offline sign-out leaves at worst a dead row (pruned by the next 404/410), never a live subscription with no row. `DigestTimeField` ("Daily summary time", shared `.field`/`.input` classes) edits `profiles.digest_time`, saved on blur. Reminder pushes are sent by cron (P3, see Stack → Scheduled dispatch) |
 
 ## Expenses engine (client-side categorisation)
 
@@ -244,7 +274,7 @@ the gate.
 - The month views (`listTransactions`, `getMonthSummary`) aren't paged — fine until a single month
   passes 1,000 rows.
 
-## Database schema (as of migration 0046)
+## Database schema (as of migration 0047)
 
 All tables live in `public`, have RLS enabled, and (unless noted) use the same
 per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`.
@@ -252,11 +282,17 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 
 **Core / auth**
 - `profiles` (1:1 with `auth.users`) — `ground` (active background preset), `custom_ground`,
-  `sidebar_collapsed`, `timezone` (0033 — the client's calendar day, so goal-pace period
-  boundaries agree between client and server; defaults `'Asia/Kolkata'`). Auto-created on
-  signup via `handle_new_user()` trigger. `user_today()` (0040, `sql stable`) is the single
-  server-side read of this column — `(now() at time zone profiles.timezone)::date` — and every
-  Reminders RPC goes through it; the client never computes "today" for reminder logic via
+  `sidebar_collapsed`, `timezone` (0033 — the user's calendar day, so goal-pace period
+  boundaries, reminder days and push fire times agree between client and server; the **column
+  default is `'UTC'`** and no client code writes it, so a new profile schedules in UTC until it
+  is set by hand — the owner's prod profile is `'Asia/Kolkata'`; `Asia/Kolkata` is only the
+  fallback when there is no profile row at all). Auto-created on
+  signup via `handle_new_user()` trigger. `digest_time` (0047, `time not null default '09:00'`)
+  — local time of the daily Web Push digest. `user_timezone(u)` (0047) is the one place the
+  "no profile/timezone → `Asia/Kolkata`" fallback lives; `user_today_for(u)` (0047) is that
+  user's local date; `user_today()` (0040, redefined in 0047 as `user_today_for(auth.uid())`,
+  identical behaviour, `sql stable`) is the single server-side read of today for the caller —
+  every Reminders RPC goes through it; the client never computes "today" for reminder logic via
   `new Date()`. `goal_pace` / `savings_plan` keep their own inline timezone lookup, not yet
   refactored onto this helper.
 
@@ -576,11 +612,11 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 - **Office integration**: `done_today_feed` (above) backs `DoneToday` in
   `src/features/office/DayView.tsx` — each reminder-sourced row gets a small bell icon
   (`office-done-bell`) next to the done-check so it's visually distinct from a task.
-- **Not built**: there is no scheduled dispatch — a reminder surfaces only when the Today tab or
-  Home tile is open and read; nothing pushes, emails, or alerts on its own. (Web Push delivery
-  exists since 0046 — `push_subscriptions` + `push-test` — but only sends a manual test; the
-  cron-driven sender is phone track P3, see `docs/alfred-phone-p0-findings.md`.)
-  `reminders.channel` (kept from the 0033 scaffold) is unused — no code reads or writes it. The
+- **Push notifications** (0046–0047): every active reminder is pushed by Web Push to every
+  subscribed device — timed ones at their fire time, untimed ones in the daily digest — by the
+  cron-driven sender (see the Notifications section below and Stack → Scheduled dispatch).
+  Nothing emails. `reminders.channel` (kept from the 0033 scaffold) is still unused — no code
+  reads or writes it; there is no per-reminder opt-in. The
   `satisfied_by` whitelist has exactly one member, `office_journal`; no other module marks a
   reminder done on its own yet.
 
@@ -594,8 +630,35 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   (`set_updated_at()` trigger). `unique (user_id, endpoint)` — the client upserts on it, so a
   re-subscribe never duplicates. Standard owner-all RLS; written by the client and by `push-test`
   under the caller's JWT, never the service role. Every column is commented in the migration.
-  Rows are deleted on "Turn off", on sign-out from that device, and when a send gets 404/410.
-  Tested by `supabase/tests/push.sql`.
+  Rows are deleted on "Turn off", on sign-out from that device, when a send gets 404/410, and
+  once 5 consecutive failures span at least 24 hours (`first_failure_at`, 0047 — when the current
+  failure run began; null after a success). Tested by `supabase/tests/push.sql`.
+- `push_sends` (0047) — the send ledger: one row per (device, occurrence) claimed for sending —
+  `subscription_id` (cascade), `kind` (`reminder`/`digest`/`test`), `reminder_id` (only for
+  `reminder`), `occurrence_date`, `fire_at`, `title`/`body` as claimed, `status`
+  (`claimed`/`sent`/`failed`), `http_status` (0 = no response), `error`, `attempts`,
+  `claimed_at`, `sent_at`, timestamps. `unique nulls not distinct (subscription_id, kind,
+  reminder_id, occurrence_date, fire_at)` — so overlapping cron runs claim once, while an edited
+  time or a new snooze (a new `fire_at`) sends again. **RLS: owner may SELECT only** — every
+  write goes through the service-role functions below.
+- Functions (all 0047): `_push_due(p_now)` — the ONE place that decides what is due: per user
+  in their own `profiles.timezone`, today and yesterday, timed occurrences and the digest with
+  a fire time in `(p_now − 2h, p_now]`, reusing `reminder_occurs_on` / `reminder_satisfied`;
+  skips done/skipped/excused (any `reminder_completions` row), paused/archived, module-satisfied,
+  and anything created after its fire time; the digest lists untimed recurring reminders still
+  open that day plus untimed one-time reminders due that day or overdue (overdue first, three
+  titles + "+N more"), and is omitted when empty. `_push_unclaimed(p_now)` — due × the user's
+  devices subscribed at or before the fire time, minus the ledger (a digest is once per device
+  per local day, even if `digest_time` changes). `push_claim_due(p_now default now())` —
+  `security definer`, service_role only: fails stuck claims that are out of attempts or no
+  longer due, re-claims the rest of the stuck ones (>5 min, up to 3 attempts), inserts new
+  claims `on conflict do nothing`, and returns only the rows this call claimed, with endpoint,
+  keys, title, body, tag and `url_path`. `push_mark_result(claim_id, http_status, error,
+  p_now)` — service_role only: 2xx → sent and the device's failure run resets; 404/410 → the
+  subscription is deleted; otherwise failed, `failure_count` + 1, and the device is removed at
+  5 failures spanning ≥ 24h. `_push_dispatch_tick()` — the cron entry point (see Stack). The
+  internal `_push_*` functions are executable by their owner only. Tested by
+  `supabase/tests/push_dispatch.sql` (fixed `p_now` throughout; DST and other timezones).
 
 ## Conventions worth knowing
 
@@ -609,6 +672,11 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 - Privileged operations (secret encrypt/decrypt, invoice numbering, ingestion) are
   Postgres RPCs marked `security definer`, not client-side logic — keep it that way for
   anything touching the Vault key or needing atomic sequence generation.
+- **`push_sends` is owner read-only** — a deliberate exception to owner-all: the client may
+  read its own ledger, but only `push_claim_due` / `push_mark_result` (security definer,
+  service_role only) write it.
+- **Pushing `main` deploys production** (Supabase migrations + Edge Functions, Vercel
+  Production). Set secrets and Vercel variables first; never push `main` to "test" anything.
 - **`design_item_boards` has no `user_id`** — a deliberate exception to the owner-all
   pattern: ownership is the item's (`exists` on `design_items`), and a write also requires
   the *board* to be the caller's so a row can never link into someone else's board.
