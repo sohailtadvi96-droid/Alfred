@@ -110,6 +110,13 @@ button {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+/* Touch screens have no hover: a tap would leave a tooltip stuck on screen. */
+@media (hover: none) {
+  [data-tip]::before,
+  [data-tip]::after {
+    display: none;
+  }
+}
 [data-tip].tip-wide::after {
   white-space: normal;
   width: 210px;
@@ -5986,11 +5993,22 @@ textarea.office-journal {
    (Threshold accounts for the app's own 232px sidebar eating into this
    viewport width before .home ever sees it.) */
 @media (max-width: 1320px) {
-  .home {
+  .home,
+  .home[data-rail='slim'],
+  .home[data-rail='hidden'] {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* One column now, so both go in it. Pinned to column 2 (as above), the
+     board made an implicit second column and squashed the rail beside it. */
+  .home > .home-rail,
+  .home > .home-board {
+    grid-column: 1;
+  }
   .home-rail {
-    position: static;
+    /* relative, not static: the rail's "[" toggle is absolutely placed and
+       otherwise escapes to the page's top-right corner */
+    position: relative;
+    top: auto; /* the sticky offset above would otherwise shift it down */
     max-height: none;
   }
 }

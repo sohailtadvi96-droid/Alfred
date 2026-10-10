@@ -1,6 +1,6 @@
 import { Dialog } from '@/components/Dialog';
 import { Icon, type IconName } from '@/components/Icon';
-import { LATER } from '@/components/Sidebar';
+import { LATER } from '@/components/nav';
 import type { BoardLayout } from '@/features/home/layout';
 import type { ModuleId } from '@/features/home/types';
 

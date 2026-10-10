@@ -6,7 +6,7 @@ import type { ReminderDraft } from './types';
 /** A one-time reminder due today, with nothing else set — every recurring
  *  field is present (ReminderDraft has no optional fields besides
  *  counts_as_task) but null/empty, matching 0040's one_time shape check. */
-function oneTimeDraft(title: string, dueDate: string): ReminderDraft {
+export function oneTimeDraft(title: string, dueDate: string): ReminderDraft {
   return {
     title,
     notes: '',

@@ -7,6 +7,8 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { isKnownGround } from '@/theme/grounds';
 import { supabase } from '@/lib/supabase';
 import { useReassertPush } from '@/features/notifications/hooks';
+import { PhoneShell } from './phone/PhoneShell';
+import { useIsPhone } from './phone/useIsPhone';
 
 const COLLAPSE_KEY = 'alfred-sidebar-collapsed';
 
@@ -68,6 +70,18 @@ export function AppShell() {
         /* ignore */
       });
   }, [ground, user]);
+
+  const isPhone = useIsPhone();
+
+  // Phones get their own shell (tab bar, compact headers) around the same
+  // routed screen; the desktop branch below is unchanged.
+  if (isPhone) {
+    return (
+      <IntroChoreography>
+        <PhoneShell />
+      </IntroChoreography>
+    );
+  }
 
   return (
     <IntroChoreography>

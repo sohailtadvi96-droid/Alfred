@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { PhoneHome } from '@/components/home/PhoneHome';
+import { useIsPhone } from '@/components/phone/useIsPhone';
 import { AddWidgetTray } from '@/components/home/AddWidgetTray';
 import { Board } from '@/components/home/Board';
 import { Rail } from '@/components/home/Rail';
@@ -14,7 +16,13 @@ import {
 } from '@/features/home/layout';
 import type { ModuleId } from '@/features/home/types';
 
+/** Phones get their own Home (PhoneHome); the desktop board and rail below
+ *  are unchanged. */
 export function HomePage() {
+  return useIsPhone() ? <PhoneHome /> : <DesktopHome />;
+}
+
+function DesktopHome() {
   const rail = useHomeRail();
   const board = useHomeBoard();
   const [railWidth, setRailWidth] = useState<RailWidth>(readRailWidth);

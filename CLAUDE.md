@@ -77,8 +77,27 @@ concept of teams/orgs/sharing.
   worker (skipWaiting / clients.claim — **no fetch handler, no caching**, so a deploy can
   never be masked by a stale cache), registered from `main.tsx` in production builds only,
   after `load` — so push can't be exercised under `npm run dev`; use `vite build` +
-  `vite preview`. No vite-plugin-pwa.
-- **Web Push (phone track P2):** messages use WebKit's Declarative Web Push JSON —
+  `vite preview`. No vite-plugin-pwa. The viewport meta has `viewport-fit=cover` (P1.5),
+  always paired with the `env(safe-area-inset-*)` padding in `phone.css` — never one without
+  the other.
+- **Phone shell (phone track P1.5):** design source `docs/mobile/alfred-mobile-prototype.html`
+  (on the owner's `phone/design-system-prototype` branch). `AppShell` renders the unchanged
+  desktop shell or `PhoneShell` around the same `<Outlet/>`, chosen in JS by `useIsPhone()`
+  (`PHONE_QUERY`: `max-width: 640px`, or a touch device in landscape with a short viewport —
+  which keeps the phone layout in a centred 560px column). `PhoneShell` = the routed screen +
+  `TabBar` (Home, Expenses, Reminders, Work, More; More owns `/more`, `/goals`, `/design`,
+  `/secrets`, `/settings`). Every tab is a real address: each tab remembers its last address
+  (`localStorage['alfred-phone-tabs']`), tapping the active tab goes to its root, and a cold
+  launch of the installed app at `/home` restores the last screen
+  (`localStorage['alfred-phone-last']`, once per session via `sessionStorage`; standalone only,
+  never for a deep link such as a notification's `/reminders`). Screens keep their own `TopBar`;
+  on phones `phone.css` compacts it (crumb, title, ≤2 actions, no wallet chip) and the shell
+  passes a labelled back button through `PhoneChromeContext` — it walks real history when the
+  previous screen is in the same tab (so it matches an iPhone edge-swipe), else goes to
+  `parentOf()` keeping the search string. Nested pages' own "‹ back" header links are hidden on
+  phones. `HomePage` renders `PhoneHome` on phones (greeting + Settings gear, "Remind me to…"
+  quick-add on the Reminders create path, today's timed items with NOW, Next up, Today's tasks,
+  four glance tiles; no drag/resize/rail) and the unchanged `DesktopHome` otherwise. messages use WebKit's Declarative Web Push JSON —
   `{ "web_push": 8030, "notification": { title, body, navigate, tag, lang, dir, silent } }`
   (field names checked against https://webkit.org/blog/16535/meet-declarative-web-push/).
   iOS 18.4+ can show that with no worker; `sw.js`'s `push` handler parses the same JSON and
@@ -110,13 +129,19 @@ concept of teams/orgs/sharing.
 src/
   auth/        AuthProvider, RequireAuth, LoginPage
   theme/       grounds.ts (12 background presets), ThemeProvider
-  components/  AppShell, Sidebar, TopBar, GroundPicker, Tooltip, Icon, home/ (Board/Rail)
-  routes/      router.tsx + one page per module (one file per feature screen)
+  components/  AppShell, Sidebar, TopBar, GroundPicker, Tooltip, Icon, LoadState (shared
+               loading / "couldn't load, retry" states), nav.ts (MODULES, LATER, PHONE_TABS,
+               tabFor/parentOf/screenLabel), home/ (Board/Rail, PhoneHome), phone/ (PhoneShell,
+               TabBar, chrome.ts context, phoneNav.ts tab memory + launch restore, useIsPhone)
+  routes/      router.tsx + one page per module (one file per feature screen); MorePage is
+               the phone's fifth tab (renders on desktop too, but nothing links to it there)
   features/    one folder per module: {api.ts, hooks.ts, types.ts, *.tsx components}
                (+ notifications/: Web Push on this device — api.ts, hooks.ts, EnablePush.tsx,
                rendered as the Settings page's "Notifications" section; not a module route)
   lib/         supabase client, TanStack queryClient, color/format/error helpers
-  styles/      tokens.css (grounds/design tokens), base.css (shell + components)
+  styles/      tokens.css (grounds/design tokens, plus the phone layout tokens), base.css
+               (shell + components), phone.css (phone layer — every screen rule is scoped
+               to .ph-app, so desktop can never match it)
 supabase/
   migrations/  0001 … 0047, sequential, immutable once pushed
   functions/   categorise-ai, design-search, design-capture, design-ingest, design-retry,
@@ -151,7 +176,7 @@ components, not business logic.
 | **Design** (inspiration boards) | `DesignPage`, `DesignBoardPage`, `DesignDiscoverPage` | 0011, 0029–0032, 0036, 0037 | Shipped; Discover is parked (route and `DiscoverView` kept, no nav link to it) |
 | **Goals** | `GoalsPage` | 0016, 0033–0035, 0038, 0039 | Shipped. `NewGoalDialog` creates `manual` and `savings_target` goals (a "Tracking" control; savings is fixed to type `value`, cadence `monthly`, direction `up`, unit ₹, no deadline). Computed progress exists server-side (`goal_current_value`, `goal_pace`, cadence periods) for `journal_streak` / `tasks_completed` sources fed from Office — still seeded, nothing creates them from the UI — and `savings_target`, income minus spend from `transaction_flows` (0038), whose expanded `GoalRow` renders the `savings_plan` coach RPC (0039) via `SavingsPlan.tsx` / `savingsPlanView.ts`. An active savings goal's header status comes from the plan (`statusFromPlan`), overlaid in `useGoalsWithPace` so the module page, its grouping and the Home tile agree with the body — `goal_pace`'s linear expectation is wrong for a lump-sum salary and is dropped for that kind. A `GoalRow` expands into three zones in order: verdict, detail, actions (Edit is a toggle). `RemindMeRow` (R6) lets a manual streak/count goal link to a reminder via `reminders.goal_id` — ticking that reminder logs `goal_progress` (see Reminders below). No goal reads Work / Design data yet |
 | **Reminders** | `RemindersPage` (`/reminders`) | 0040–0045 | Shipped. One-time and recurring personal reminders, derived-on-read (no per-day materialisation — only `reminder_completions` is stored state). Today/Upcoming/All tabs (`RemindersView`), quick-add + full `ReminderSheet` for recurrence, keyboard shortcuts (`n` new, `x` tick/untick), a sidebar due-count badge, and a `NextUpList` "Next up" tile on Home (`md`-sized by default, overdue → due now → later, falls back to tomorrow's items with no tick boxes when today is clear). A reminder can link to a manual streak/count Goal (`RemindMeRow`) or be Office-`satisfied_by` (`office_journal` — a module marks the day done, no manual tick). Office's Done Today list (`DoneToday` in `DayView.tsx`) reads the union of done tasks and done reminders via `done_today_feed`. See the Database schema section below for the full RPC surface and `docs/alfred-reminders-plan.md` for the design rationale |
-| **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped. Board tile order/size persisted to `localStorage` (`alfred-home-board`), with a `known`-modules list so a module added after a layout was saved (e.g. Reminders, R8) appears once on existing boards without clobbering a deliberate removal (`withNewModules` in `src/features/home/layout.ts`) |
+| **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped. Board tile order/size persisted to `localStorage` (`alfred-home-board`), with a `known`-modules list so a module added after a layout was saved (e.g. Reminders, R8) appears once on existing boards without clobbering a deliberate removal (`withNewModules` in `src/features/home/layout.ts`). Below 1320px the rail stacks above the board in one column (P1.5 fix: both are pinned to column 1 there, the slim/hidden templates collapse too, and the rail is `position: relative; top: auto` so its `[` toggle stays inside it). Phones render `PhoneHome` instead (see Stack → Phone shell) |
 | **Notifications** (Web Push, per device) | `SettingsPage` → "Notifications" section (`EnablePush`) | 0046, 0047 | Built (P2 subscribe + test push, P3 scheduled dispatch). Five states: unavailable (no `PushManager`, or an iPhone/iPad not running from the Home Screen → Add to Home Screen steps; also "no service worker" in dev and "not configured" without `VITE_VAPID_PUBLIC_KEY`), ask, denied (→ iOS Settings → Notifications → Alfred), enabled ("Send test" / "Turn off"), allowed-but-unsubscribed ("Re-enable"). The click calls `Notification.requestPermission()` synchronously and hands the promise to the mutation, so nothing is awaited before it (iOS ignores a prompt that isn't in the tap). `AppShell` re-asserts this device's row (`last_seen_at`) once per signed-in launch (`useReassertPush`); `AuthProvider.signOut` runs `disablePush` first (capped at 3s) — the browser unsubscribes BEFORE the row is deleted, so an offline sign-out leaves at worst a dead row (pruned by the next 404/410), never a live subscription with no row. `DigestTimeField` ("Daily summary time", shared `.field`/`.input` classes) edits `profiles.digest_time`, saved on blur. Reminder pushes are sent by cron (P3, see Stack → Scheduled dispatch) |
 
 ## Expenses engine (client-side categorisation)
@@ -750,6 +775,15 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
   independent of the browser's own width, so the column behaves the same whether it's the full
   page or a narrower slot. The sheet still uses a `@media (max-width: 640px)` breakpoint, matching
   Office's own convention for dialogs.
+
+- **Phone layout lives in `phone.css`, scoped to `.ph-app`; desktop must not change.** The
+  shell switch is JS (`useIsPhone`), not CSS, so desktop markup is byte-identical and
+  desktop-only hooks (Rail, Board) don't run on phones. Phone tokens (`--space-*`, `--tap-min`,
+  `--control-h`, `--tabbar-h`, `--radius-*`, `--dur-*`/`--ease-*`, `--chip-ink`, `--m-secrets`)
+  are in `tokens.css` and ground-independent. Phone rows stack title above subtitle
+  (`.ph-row-main` → `.ph-row-t` / `.ph-row-s`) and never repeat a reminder's time. Touch
+  devices (`hover: none`) get no CSS tooltips. Verify a phone change at 390×844 in a light and a
+  dark ground, and that `/reminders`, `/expenses`, `/settings` stay pixel-identical at 1280.
 
 ## Keeping this file current
 

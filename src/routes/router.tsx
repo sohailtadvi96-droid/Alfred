@@ -20,6 +20,7 @@ import { OfficeDayPage } from './OfficeDayPage';
 import { InvoicesPage } from './InvoicesPage';
 import { InvoiceViewPage } from './InvoiceViewPage';
 import { SettingsPage } from './SettingsPage';
+import { MorePage } from './MorePage';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
       { path: 'goals', element: <GoalsPage /> },
       { path: 'reminders', element: <RemindersPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'more', element: <MorePage /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

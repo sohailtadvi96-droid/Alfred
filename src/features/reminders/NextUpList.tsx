@@ -5,7 +5,7 @@ import { daysBetween, nextUp, type NextUpItem } from './today';
 // Only ever formats a date the server already gave us (occurrence_date).
 const weekdayFmt = new Intl.DateTimeFormat('en-IN', { weekday: 'short' });
 
-function whenLabel(item: NextUpItem, today: string | undefined): string {
+export function whenLabel(item: NextUpItem, today: string | undefined): string {
   const time = item.time ? formatTime(item.time) : null;
   switch (item.state) {
     case 'overdue': {

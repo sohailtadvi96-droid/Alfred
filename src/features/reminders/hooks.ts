@@ -39,6 +39,17 @@ export function useRemindersToday() {
   });
 }
 
+/** The due-now + overdue count behind the Reminders badge — shared by the
+ *  desktop sidebar and the phone tab bar so the two can never disagree. A
+ *  skipped occurrence is still in today's list (so reminder_streak can see
+ *  it), but it's not something to act on any more, so it doesn't count. */
+export function useRemindersDueCount(): number {
+  const { data } = useRemindersToday();
+  return (data ?? []).filter(
+    (r) => r.completion_status !== 'skipped' && (r.due_state === 'due_now' || r.due_state === 'overdue'),
+  ).length;
+}
+
 /** The one client source for "today" in this module (user_today(), 0040).
  *  staleTime: Infinity means it never goes stale on its own -- refetchOnWindowFocus:
  *  'always' forces exactly one refresh the moment the window regains focus
