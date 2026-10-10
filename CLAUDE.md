@@ -66,7 +66,10 @@ supabase/
   migrations/  0001 … 0045, sequential, immutable once pushed
   functions/   categorise-ai, design-search, design-capture, design-ingest, design-retry,
                design-backfill-dimensions (+ _shared/: cors.ts, imageDimensions.ts)
-docs/          MVP.md (spec), DEPLOY.md, alfred-reminders-plan.md (Reminders design doc)
+docs/          MVP.md (spec), DEPLOY.md, alfred-reminders-plan.md (Reminders design doc),
+               mobile/alfred-mobile-prototype.html (phone track: self-contained clickable
+               layout prototype, sample data only, not wired to Supabase — the matching
+               "Alfred Mobile" design system lives as a claude.ai artifact)
 public/        manifest.webmanifest, sw.js, apple-touch-icon.png (180, opaque),
                icon-192/512.png, icon-maskable-512.png, favicon.svg, favicon-32.png —
                the icons are generated, never hand-edited (see scripts/icons/)
