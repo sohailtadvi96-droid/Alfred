@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
+import { disablePush } from '@/features/notifications/api';
 
 interface AuthContextValue {
   session: Session | null;
@@ -43,6 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       async signOut() {
+        // This device stops getting pushes: unsubscribe and delete its row
+        // while the session still exists. Capped so a stuck push service can
+        // never hold up signing out.
+        await Promise.race([
+          disablePush().catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
         await supabase.auth.signOut();
       },
     }),

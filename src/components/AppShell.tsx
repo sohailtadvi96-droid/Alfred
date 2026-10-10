@@ -6,6 +6,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { isKnownGround } from '@/theme/grounds';
 import { supabase } from '@/lib/supabase';
+import { useReassertPush } from '@/features/notifications/hooks';
 
 const COLLAPSE_KEY = 'alfred-sidebar-collapsed';
 
@@ -22,6 +23,7 @@ export function AppShell() {
   const { user } = useAuth();
   const { ground, setGround } = useTheme();
   const pulled = useRef(false);
+  useReassertPush(user?.id);
 
   function toggleCollapsed() {
     setCollapsed((c) => {

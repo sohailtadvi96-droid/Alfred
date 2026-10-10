@@ -14,7 +14,10 @@ concept of teams/orgs/sharing.
 - **Schema management:** raw SQL migrations in `supabase/migrations/`, applied via the
   Supabase CLI. **Migrations are immutable once pushed** — never edit a shipped file;
   always add a new `NNNN_name.sql`. Filenames are zero-padded sequence numbers, applied
-  in order.
+  in order. Postgres **17** locally and in prod (`config.toml` `major_version = 17`; prod is
+  17.6 — local was 15 until P2). SQL tests live in `supabase/tests/` (`reminders.sql`,
+  `push.sql`), each one transaction that rolls back; run them with psql inside the local db
+  container: `docker exec -i supabase_db_<project_id> psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/<file>.sql`.
 - **Edge Functions** (`supabase/functions/`): `categorise-ai` (Claude Haiku 4.5
   second opinion on payees the rule engine can't place — see "Expenses engine" → AI sweep; at most
   40 items per call, and its answer allow-list excludes the structural categories and `my_ferrari`;
@@ -30,10 +33,21 @@ concept of teams/orgs/sharing.
   service-role only, invoked via `EdgeRuntime.waitUntil`, never awaited by the caller),
   `design-retry` (re-invokes `design-ingest` for one item under the caller's own JWT),
   `design-backfill-dimensions` (manual-only sweep, caller's own JWT throughout — see
-  Design schema section). API keys live server-side as Supabase secrets, never in the
-  client `.env`.
+  Design schema section); for Web Push, `push-test` (`verify_jwt = true`; sends one test
+  notification to the caller's own `push_subscriptions` rows through a client carrying the
+  caller's JWT, so RLS applies; returns `{ sent, results: [{ id, device_label, outcome:
+  'sent'|'gone'|'failed', status, detail? }] }`; a 404/410 deletes that row, any other failure
+  bumps `failure_count`/`last_failure_*`, a success stamps `last_success_at` and resets
+  `failure_count`; `503 {error:'not configured'}` without the VAPID secrets; uses
+  `jsr:@negrel/webpush@0.5.0`). API keys live server-side as Supabase secrets, never in the
+  client `.env`. Web Push secrets: `VAPID_KEYS_JWK` (the key pair as exported by
+  `@negrel/webpush`'s `exportVapidKeys`, JSON) and `VAPID_SUBJECT` (the VAPID contact —
+  `https://alfred-murex-pi.vercel.app`); locally they live in the git-ignored
+  `supabase/functions/.env`.
 - **Env vars:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, optional
-  `VITE_GOOGLE_CLIENT_ID` (Google Calendar read-only sync in Work/Office). App still
+  `VITE_GOOGLE_CLIENT_ID` (Google Calendar read-only sync in Work/Office), optional
+  `VITE_VAPID_PUBLIC_KEY` (Web Push `applicationServerKey`, base64url — the public half of
+  `VAPID_KEYS_JWK`; without it Settings → Notifications says "not configured"). App still
   boots without `.env` and shows a "not configured" login screen.
 - **Deploy:** Vercel (`vercel.json`, `.vercel/`). `vercel.json`'s catch-all rewrite to
   `/index.html` only applies when no real file matches, so `public/` files are served as
@@ -41,10 +55,21 @@ concept of teams/orgs/sharing.
   `/manifest.webmanifest` an explicit `application/manifest+json`.
 - **Installable app (phone track P1):** `public/manifest.webmanifest` (`start_url /home`,
   `display standalone`, Pine `#10201a` colours) plus the icons in `public/`, so "Add to Home
-  Screen" on iPhone opens Alfred as its own app. `public/sw.js` is a hand-written,
-  behaviour-free service worker (skipWaiting / clients.claim — **no fetch handler, no
-  caching**, so a deploy can never be masked by a stale cache; push handlers arrive in P2),
-  registered from `main.tsx` in production builds only, after `load`. No vite-plugin-pwa.
+  Screen" on iPhone opens Alfred as its own app. `public/sw.js` is a hand-written service
+  worker (skipWaiting / clients.claim — **no fetch handler, no caching**, so a deploy can
+  never be masked by a stale cache), registered from `main.tsx` in production builds only,
+  after `load` — so push can't be exercised under `npm run dev`; use `vite build` +
+  `vite preview`. No vite-plugin-pwa.
+- **Web Push (phone track P2):** messages use WebKit's Declarative Web Push JSON —
+  `{ "web_push": 8030, "notification": { title, body, navigate, tag, lang, dir, silent } }`
+  (field names checked against https://webkit.org/blog/16535/meet-declarative-web-push/).
+  iOS 18.4+ can show that with no worker; `sw.js`'s `push` handler parses the same JSON and
+  **always** calls `showNotification` (falling back to a plain "Alfred" notification if the
+  payload won't parse or an option is rejected) because iOS can revoke a subscription after a
+  push that shows nothing. `notificationclick` focuses an open Alfred window and navigates it
+  to the notification's same-origin URL (else `/home`), or opens a new window. One switch per
+  device — no per-reminder opt-in; `reminders.channel` stays unread. Only `push-test` sends
+  so far; scheduled reminder pushes (P3) are not built.
   `<meta name="theme-color">` (the installed app's status bar) is kept on the active
   ground's `--ground` by the ground-paint script in `index.html` — last colour from
   `localStorage['alfred-ground-color']` first, the live value once CSS loads, then on every
@@ -60,13 +85,17 @@ src/
   components/  AppShell, Sidebar, TopBar, GroundPicker, Tooltip, Icon, home/ (Board/Rail)
   routes/      router.tsx + one page per module (one file per feature screen)
   features/    one folder per module: {api.ts, hooks.ts, types.ts, *.tsx components}
+               (+ notifications/: Web Push on this device — api.ts, hooks.ts, EnablePush.tsx,
+               rendered as the Settings page's "Notifications" section; not a module route)
   lib/         supabase client, TanStack queryClient, color/format/error helpers
   styles/      tokens.css (grounds/design tokens), base.css (shell + components)
 supabase/
-  migrations/  0001 … 0045, sequential, immutable once pushed
+  migrations/  0001 … 0046, sequential, immutable once pushed
   functions/   categorise-ai, design-search, design-capture, design-ingest, design-retry,
-               design-backfill-dimensions (+ _shared/: cors.ts, imageDimensions.ts)
-docs/          MVP.md (spec), DEPLOY.md, alfred-reminders-plan.md (Reminders design doc)
+               design-backfill-dimensions, push-test (+ _shared/: cors.ts, imageDimensions.ts)
+  tests/       reminders.sql, push.sql — psql scripts, one rolled-back transaction each
+docs/          MVP.md (spec), DEPLOY.md, alfred-reminders-plan.md (Reminders design doc),
+               alfred-phone-p0-findings.md (phone install + Web Push investigation)
 public/        manifest.webmanifest, sw.js, apple-touch-icon.png (180, opaque),
                icon-192/512.png, icon-maskable-512.png, favicon.svg, favicon-32.png —
                the icons are generated, never hand-edited (see scripts/icons/)
@@ -93,6 +122,7 @@ components, not business logic.
 | **Goals** | `GoalsPage` | 0016, 0033–0035, 0038, 0039 | Shipped. `NewGoalDialog` creates `manual` and `savings_target` goals (a "Tracking" control; savings is fixed to type `value`, cadence `monthly`, direction `up`, unit ₹, no deadline). Computed progress exists server-side (`goal_current_value`, `goal_pace`, cadence periods) for `journal_streak` / `tasks_completed` sources fed from Office — still seeded, nothing creates them from the UI — and `savings_target`, income minus spend from `transaction_flows` (0038), whose expanded `GoalRow` renders the `savings_plan` coach RPC (0039) via `SavingsPlan.tsx` / `savingsPlanView.ts`. An active savings goal's header status comes from the plan (`statusFromPlan`), overlaid in `useGoalsWithPace` so the module page, its grouping and the Home tile agree with the body — `goal_pace`'s linear expectation is wrong for a lump-sum salary and is dropped for that kind. A `GoalRow` expands into three zones in order: verdict, detail, actions (Edit is a toggle). `RemindMeRow` (R6) lets a manual streak/count goal link to a reminder via `reminders.goal_id` — ticking that reminder logs `goal_progress` (see Reminders below). No goal reads Work / Design data yet |
 | **Reminders** | `RemindersPage` (`/reminders`) | 0040–0045 | Shipped. One-time and recurring personal reminders, derived-on-read (no per-day materialisation — only `reminder_completions` is stored state). Today/Upcoming/All tabs (`RemindersView`), quick-add + full `ReminderSheet` for recurrence, keyboard shortcuts (`n` new, `x` tick/untick), a sidebar due-count badge, and a `NextUpList` "Next up" tile on Home (`md`-sized by default, overdue → due now → later, falls back to tomorrow's items with no tick boxes when today is clear). A reminder can link to a manual streak/count Goal (`RemindMeRow`) or be Office-`satisfied_by` (`office_journal` — a module marks the day done, no manual tick). Office's Done Today list (`DoneToday` in `DayView.tsx`) reads the union of done tasks and done reminders via `done_today_feed`. See the Database schema section below for the full RPC surface and `docs/alfred-reminders-plan.md` for the design rationale |
 | **Home** (Board/Rail dashboard) | `HomePage` | — (reads across modules, no own tables) | Shipped. Board tile order/size persisted to `localStorage` (`alfred-home-board`), with a `known`-modules list so a module added after a layout was saved (e.g. Reminders, R8) appears once on existing boards without clobbering a deliberate removal (`withNewModules` in `src/features/home/layout.ts`) |
+| **Notifications** (Web Push, per device) | `SettingsPage` → "Notifications" section (`EnablePush`) | 0046 | Built (P2), test push only. Five states: unavailable (no `PushManager`, or an iPhone/iPad not running from the Home Screen → Add to Home Screen steps; also "no service worker" in dev and "not configured" without `VITE_VAPID_PUBLIC_KEY`), ask, denied (→ iOS Settings → Notifications → Alfred), enabled ("Send test" / "Turn off"), allowed-but-unsubscribed ("Re-enable"). The click calls `Notification.requestPermission()` synchronously and hands the promise to the mutation, so nothing is awaited before it (iOS ignores a prompt that isn't in the tap). `AppShell` re-asserts this device's row (`last_seen_at`) once per signed-in launch (`useReassertPush`); `AuthProvider.signOut` unsubscribes and deletes this device's row first (capped at 3s). Scheduled reminder pushes (P3) not built |
 
 ## Expenses engine (client-side categorisation)
 
@@ -214,7 +244,7 @@ the gate.
 - The month views (`listTransactions`, `getMonthSummary`) aren't paged — fine until a single month
   passes 1,000 rows.
 
-## Database schema (as of migration 0045)
+## Database schema (as of migration 0046)
 
 All tables live in `public`, have RLS enabled, and (unless noted) use the same
 per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = user_id)`.
@@ -546,11 +576,26 @@ per-row policy: `for all using (auth.uid() = user_id) with check (auth.uid() = u
 - **Office integration**: `done_today_feed` (above) backs `DoneToday` in
   `src/features/office/DayView.tsx` — each reminder-sourced row gets a small bell icon
   (`office-done-bell`) next to the done-check so it's visually distinct from a task.
-- **Not built**: there is no dispatch or notification layer — a reminder surfaces only when the
-  Today tab or Home tile is open and read, nothing pushes, emails, or alerts on its own.
+- **Not built**: there is no scheduled dispatch — a reminder surfaces only when the Today tab or
+  Home tile is open and read; nothing pushes, emails, or alerts on its own. (Web Push delivery
+  exists since 0046 — `push_subscriptions` + `push-test` — but only sends a manual test; the
+  cron-driven sender is phone track P3, see `docs/alfred-phone-p0-findings.md`.)
   `reminders.channel` (kept from the 0033 scaffold) is unused — no code reads or writes it. The
   `satisfied_by` whitelist has exactly one member, `office_journal`; no other module marks a
   reminder done on its own yet.
+
+**Notifications** (0046)
+- `push_subscriptions` — one row per (user, browser push subscription): `endpoint` (the push
+  service URL — `web.push.apple.com` for an iPhone, `fcm.googleapis.com` for Chrome), `p256dh`
+  / `auth` (the device's encryption keys, base64url), `device_label` ("iPhone", "Mac · Chrome",
+  display only), `user_agent`, `last_seen_at` (re-asserted on every signed-in launch while
+  notifications are allowed), `last_success_at`, `failure_count` / `last_failure_at` /
+  `last_failure_status` (non-404/410 failures; `0` = no response), `created_at` / `updated_at`
+  (`set_updated_at()` trigger). `unique (user_id, endpoint)` — the client upserts on it, so a
+  re-subscribe never duplicates. Standard owner-all RLS; written by the client and by `push-test`
+  under the caller's JWT, never the service role. Every column is commented in the migration.
+  Rows are deleted on "Turn off", on sign-out from that device, and when a send gets 404/410.
+  Tested by `supabase/tests/push.sql`.
 
 ## Conventions worth knowing
 

@@ -24,7 +24,7 @@ port = 54322
 shadow_port = 54320
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW
 # server_version;` on the remote database to check.
-major_version = 15
+major_version = 17
 
 [db.migrations]
 # Specifies an ordered list of schema files that describe your database.
@@ -125,4 +125,10 @@ verify_jwt = true
 # wired to any UI; invoke manually and re-run while has_more is true, same
 # spirit as pair_internal_transfers()/detect_recurring_series().
 [functions.design-backfill-dimensions]
+verify_jwt = true
+
+# Web Push — sends one test notification to the caller's own subscribed
+# devices (push_subscriptions), under the caller's own JWT so RLS applies.
+# `supabase secrets set VAPID_KEYS_JWK=... VAPID_SUBJECT=...`
+[functions.push-test]
 verify_jwt = true

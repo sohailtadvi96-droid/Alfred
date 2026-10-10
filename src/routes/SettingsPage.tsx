@@ -2,6 +2,7 @@ import { TopBar } from '@/components/TopBar';
 import { GroundPicker } from '@/components/GroundPicker';
 import { replayIntro } from '@/components/IntroChoreography';
 import { useAuth } from '@/auth/AuthProvider';
+import { EnablePush } from '@/features/notifications/EnablePush';
 
 export function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -27,6 +28,13 @@ export function SettingsPage() {
           <button className="btn sec sm" onClick={replayIntro}>
             Replay the intro
           </button>
+        </section>
+
+        <section>
+          <div className="tlabel" style={{ marginBottom: 12 }}>
+            Notifications
+          </div>
+          <EnablePush />
         </section>
 
         <section>
