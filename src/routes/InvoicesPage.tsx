@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
+import { Icon } from '@/components/Icon';
 import { InvoiceList } from '@/features/work/InvoiceList';
 import { InvoiceFormDialog } from '@/features/work/InvoiceFormDialog';
 import { useInvoiceEditor } from '@/features/work/InvoiceEditor';
@@ -18,6 +19,11 @@ export function InvoicesPage() {
         title="Invoices"
         crumb="03 / WORK"
         showWallet={false}
+        phoneAction={
+          <button type="button" className="hbtn primary" onClick={() => setAddOpen(true)} aria-label="New invoice">
+            <Icon name="plus" size={18} />
+          </button>
+        }
         action={
           <>
             <Link className="btn sec" to="/work">
