@@ -44,44 +44,9 @@
   --m-goals: #8a5a83;
   --m-travel: #c9963f;
   --m-reminders: var(--c-clay);
-  /* phone prototype: Secrets' chip is the faint text colour, so it re-derives
-     per ground; chip glyphs are white on the fixed module colours */
-  --m-secrets: var(--text-faint);
+  /* phone Home tile chips: white glyph on the fixed module colour
+     (docs/mobile/alfred-mobile-prototype.html) */
   --chip-ink: #ffffff;
-
-  /* ---- phone layout tokens — from docs/mobile/alfred-mobile-prototype.html
-     (its :root block, "generated from tokens.json"). Ground-independent: none
-     of them is a colour, so all 12 grounds share them. Used by phone.css; the
-     desktop stylesheet doesn't read them (yet). ---- */
-  /* spacing: the prototype's 4px scale */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  /* touch: minimum tap target (Apple's 44pt) and a full-height control */
-  --tap-min: 44px;
-  --control-h: 48px;
-  /* the bottom tab bar's height — the prototype calls it --dock-h */
-  --tabbar-h: 64px;
-  /* radii: the prototype's scale; --radius (15px) is the card radius the
-     desktop already uses literally (.ledger, .sumcard) */
-  --radius-xs: 6px;
-  --radius-sm: 10px;
-  --radius-md: 12px;
-  --radius: 15px;
-  --radius-lg: 18px;
-  --radius-xl: 20px;
-  --radius-2xl: 24px;
-  --radius-pill: 100px;
-  /* motion */
-  --dur-quick: 130ms;
-  --dur-lift: 280ms;
-  --dur-settle: 420ms;
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-settle: cubic-bezier(0.33, 0, 0.2, 1);
 }
 
 /* ===================== 12 GROUND PRESETS ===================== */

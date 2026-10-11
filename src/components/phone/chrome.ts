@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 
-/** What the phone shell tells the screens inside it. Only PhoneShell provides
- *  it, so on desktop usePhoneChrome() is null and nothing renders differently. */
+/** What AppShell tells the screens inside it (useNavChrome). The back button
+ *  it describes is rendered as .phone-only, so desktop never shows it. */
 export interface PhoneChrome {
   /** the labelled back button for a nested screen; null at a tab's root */
   back: { label: string; onBack: () => void } | null;

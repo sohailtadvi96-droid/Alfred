@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { Icon } from '@/components/Icon';
 import { BackfillDimensionsButton } from '@/features/design/BackfillDimensionsButton';
 import { DesignPopover } from '@/features/design/DesignPopover';
 import { DesignView } from '@/features/design/DesignView';
@@ -16,6 +17,11 @@ export function DesignPage() {
       <TopBar
         title="Design"
         crumb="04 / MODULE"
+        phoneAction={
+          <button type="button" className="hbtn primary" onClick={() => setNewBoardOpen(true)} aria-label="New board">
+            <Icon name="plus" size={18} />
+          </button>
+        }
         showWallet={false}
         action={
           <>

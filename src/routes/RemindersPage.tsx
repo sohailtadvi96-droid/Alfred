@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { Icon } from '@/components/Icon';
 import { ReminderSheet, type SheetRequest } from '@/features/reminders/ReminderSheet';
 import { RemindersView } from '@/features/reminders/RemindersView';
 import { todayTally } from '@/features/reminders/today';
@@ -17,6 +18,11 @@ export function RemindersPage() {
       <TopBar
         title="Reminders"
         crumb="06 / MODULE"
+        phoneAction={
+          <button type="button" className="hbtn primary" onClick={() => setSheet({ kind: 'create' })} aria-label="New reminder">
+            <Icon name="plus" size={18} />
+          </button>
+        }
         showWallet={false}
         action={
           <>

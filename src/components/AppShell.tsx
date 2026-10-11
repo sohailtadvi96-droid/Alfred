@@ -7,8 +7,9 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { isKnownGround } from '@/theme/grounds';
 import { supabase } from '@/lib/supabase';
 import { useReassertPush } from '@/features/notifications/hooks';
-import { PhoneShell } from './phone/PhoneShell';
-import { useIsPhone } from './phone/useIsPhone';
+import { Dock } from './Dock';
+import { PhoneChromeContext } from './phone/chrome';
+import { useNavChrome } from './phone/useNavChrome';
 
 const COLLAPSE_KEY = 'alfred-sidebar-collapsed';
 
@@ -71,26 +72,20 @@ export function AppShell() {
       });
   }, [ground, user]);
 
-  const isPhone = useIsPhone();
-
-  // Phones get their own shell (tab bar, compact headers) around the same
-  // routed screen; the desktop branch below is unchanged.
-  if (isPhone) {
-    return (
-      <IntroChoreography>
-        <PhoneShell />
-      </IntroChoreography>
-    );
-  }
+  // the phone header's back button (shown by mobile.css only) and the dock's memory
+  const chrome = useNavChrome();
 
   return (
     <IntroChoreography>
-      <div className="app" data-collapsed={collapsed ? 'true' : 'false'}>
-        <Sidebar collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />
-        <main className="main">
-          <Outlet />
-        </main>
-      </div>
+      <PhoneChromeContext.Provider value={chrome}>
+        <div className="app" data-collapsed={collapsed ? 'true' : 'false'}>
+          <Sidebar collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />
+          <main className="main">
+            <Outlet />
+          </main>
+          <Dock />
+        </div>
+      </PhoneChromeContext.Provider>
     </IntroChoreography>
   );
 }

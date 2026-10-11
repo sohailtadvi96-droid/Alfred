@@ -64,6 +64,22 @@ export function ExpensesPage() {
       <TopBar
         title="Expenses"
         crumb="01 / MODULE"
+        phoneAction={
+          <>
+            <button
+              type="button"
+              className={`hbtn${hidden ? ' on' : ''}`}
+              onClick={toggle}
+              aria-pressed={hidden}
+              aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
+            >
+              <Icon name="eye" size={18} />
+            </button>
+            <button type="button" className="hbtn primary" onClick={() => setAddOpen(true)} aria-label="Add transaction">
+              <Icon name="plus" size={18} />
+            </button>
+          </>
+        }
         walletValue={walletValue}
         onWalletAdd={() => setAddOpen(true)}
         action={

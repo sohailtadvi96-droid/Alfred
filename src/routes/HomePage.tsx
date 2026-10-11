@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TopBar } from '@/components/TopBar';
-import { PhoneHome } from '@/components/home/PhoneHome';
-import { useIsPhone } from '@/components/phone/useIsPhone';
 import { AddWidgetTray } from '@/components/home/AddWidgetTray';
+import { PhoneHome } from '@/components/home/PhoneHome';
 import { Board } from '@/components/home/Board';
 import { Rail } from '@/components/home/Rail';
 import { useHomeBoard, useHomeRail } from '@/features/home/hooks';
@@ -16,13 +15,7 @@ import {
 } from '@/features/home/layout';
 import type { ModuleId } from '@/features/home/types';
 
-/** Phones get their own Home (PhoneHome); the desktop board and rail below
- *  are unchanged. */
 export function HomePage() {
-  return useIsPhone() ? <PhoneHome /> : <DesktopHome />;
-}
-
-function DesktopHome() {
   const rail = useHomeRail();
   const board = useHomeBoard();
   const [railWidth, setRailWidth] = useState<RailWidth>(readRailWidth);
@@ -88,19 +81,26 @@ function DesktopHome() {
 
   return (
     <>
-      <TopBar
-        title="Home"
-        crumb="00 / TODAY"
-        showWallet={false}
-        action={
-          <button type="button" className="btn sec" onClick={() => setAddOpen(true)}>
-            Add widget
-          </button>
-        }
-      />
-      <div className="home" data-rail={railWidth}>
-        <Rail ref={cmdkRef} rows={rail} width={railWidth} onWidthChange={handleWidthChange} />
-        <Board snapshots={board} layout={boardLayout} onLayoutChange={handleLayoutChange} />
+      {/* Desktop: the board and rail, unchanged — display: contents keeps the
+          wrapper out of the layout. Phones: PhoneHome (mobile.css swaps them). */}
+      <div className="desk-only" style={{ display: 'contents' }}>
+        <TopBar
+          title="Home"
+          crumb="00 / TODAY"
+          showWallet={false}
+          action={
+            <button type="button" className="btn sec" onClick={() => setAddOpen(true)}>
+              Add widget
+            </button>
+          }
+        />
+        <div className="home" data-rail={railWidth}>
+          <Rail ref={cmdkRef} rows={rail} width={railWidth} onWidthChange={handleWidthChange} />
+          <Board snapshots={board} layout={boardLayout} onLayoutChange={handleLayoutChange} />
+        </div>
+      </div>
+      <div className="phone-only">
+        <PhoneHome />
       </div>
       <AddWidgetTray open={addOpen} onOpenChange={setAddOpen} layout={boardLayout} onToggle={toggleModule} />
     </>

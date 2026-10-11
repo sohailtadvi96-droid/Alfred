@@ -20,9 +20,13 @@ const PATHS: Record<string, string> = {
   chevron: 'M9 6l6 6-6 6',
   pencil: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z',
   bell: 'M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2Zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5S10.5 3.17 10.5 4v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2Z',
-  // phone (docs/mobile/alfred-mobile-prototype.html)
+  // phone (docs/mobile/IMPLEMENTATION.md, Phase 0)
   plus: 'M10.5 3h3v7.5H21v3h-7.5V21h-3v-7.5H3v-3h7.5Z',
   more: 'M5 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z',
+  close: 'M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4Z',
+  search: 'M10 2a8 8 0 0 1 6.32 12.9l5.4 5.4-2.12 2.12-5.4-5.4A8 8 0 1 1 10 2Zm0 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z',
+  grid: 'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z',
+  list: 'M3 4.5h3.5V8H3zM9 4.5h12V8H9zM3 10.25h3.5v3.5H3zM9 10.25h12v3.5H9zM3 16h3.5v3.5H3zM9 16h12v3.5H9z',
 };
 
 export type IconName = keyof typeof PATHS;

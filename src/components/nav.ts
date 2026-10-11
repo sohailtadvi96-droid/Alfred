@@ -1,6 +1,6 @@
 import type { IconName } from './Icon';
 
-/** Navigation shared by the desktop sidebar and the phone tab bar. */
+/** Navigation shared by the desktop sidebar and the phone dock. */
 
 export interface NavItem {
   to: string;
@@ -24,42 +24,38 @@ export const LATER: NavItem[] = [
   { to: '#', label: 'Health', index: '08', icon: 'health', tip: 'Planned — not in the first build' },
 ];
 
-// ---------- phone ----------
+// ---------- phone dock (docs/mobile/IMPLEMENTATION.md, Phase 1) ----------
 
-export type PhoneTabId = 'home' | 'expenses' | 'reminders' | 'work' | 'more';
+export type DockId = 'home' | 'expenses' | 'reminders' | 'work' | 'goals' | 'design' | 'secrets';
 
-export interface PhoneTab {
-  id: PhoneTabId;
+export interface DockItem {
+  id: DockId;
+  to: string;
   label: string;
   icon: IconName;
-  /** the tab's root address — tapping the active tab returns here */
-  root: string;
-  /** every address that belongs to the tab (prefix match on a path segment) */
-  prefixes: string[];
 }
 
-export const PHONE_TABS: PhoneTab[] = [
-  { id: 'home', label: 'Home', icon: 'home', root: '/home', prefixes: ['/home'] },
-  { id: 'expenses', label: 'Expenses', icon: 'expenses', root: '/expenses', prefixes: ['/expenses'] },
-  { id: 'reminders', label: 'Reminders', icon: 'bell', root: '/reminders', prefixes: ['/reminders'] },
-  { id: 'work', label: 'Work', icon: 'work', root: '/work', prefixes: ['/work'] },
-  {
-    id: 'more',
-    label: 'More',
-    icon: 'more',
-    root: '/more',
-    prefixes: ['/more', '/goals', '/design', '/secrets', '/settings'],
-  },
+// Module index order, same as the sidebar. Add Invest / Health / Travel only
+// once those modules are built.
+export const DOCK: DockItem[] = [
+  { id: 'home', to: '/home', label: 'Home', icon: 'home' },
+  { id: 'expenses', to: '/expenses', label: 'Expenses', icon: 'expenses' },
+  { id: 'reminders', to: '/reminders', label: 'Reminders', icon: 'bell' },
+  { id: 'work', to: '/work', label: 'Work', icon: 'work' },
+  { id: 'goals', to: '/goals', label: 'Goals', icon: 'goals' },
+  { id: 'design', to: '/design', label: 'Design', icon: 'design' },
+  { id: 'secrets', to: '/secrets', label: 'Secrets', icon: 'secrets' },
 ];
 
 const under = (path: string, prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
 
-/** Which tab an address belongs to; Home for anything unknown. */
-export function tabFor(pathname: string): PhoneTabId {
-  return PHONE_TABS.find((t) => t.prefixes.some((p) => under(pathname, p)))?.id ?? 'home';
+/** Which dock item an address belongs to. Settings is opened from Home's A
+ *  mark, so it belongs to Home (as in the prototype); anything unknown too. */
+export function dockFor(pathname: string): DockId {
+  return DOCK.find((d) => under(pathname, d.to))?.id ?? 'home';
 }
 
-/** Short screen names, used as the back button's label. */
+/** Short screen names — the back button's label. */
 export function screenLabel(pathname: string): string {
   const exact: Record<string, string> = {
     '/home': 'Home',
@@ -71,7 +67,6 @@ export function screenLabel(pathname: string): string {
     '/reminders': 'Reminders',
     '/work': 'Work',
     '/work/invoices': 'Invoices',
-    '/more': 'More',
     '/goals': 'Goals',
     '/design': 'Design',
     '/design/discover': 'Discover',
@@ -86,15 +81,31 @@ export function screenLabel(pathname: string): string {
   return 'Back';
 }
 
-/** The screen a nested address goes back to when there is no in-app history
- *  to go back through (opened from a link, a notification, or a reload).
- *  null for a tab's root. */
+/** Where a nested screen goes back to when there's no in-app history to go
+ *  back through (opened from a link, a notification or a reload). null for a
+ *  module's root, which has no back button. */
 export function parentOf(pathname: string): string | null {
-  if (PHONE_TABS.some((t) => t.root === pathname)) return null;
+  if (DOCK.some((d) => d.to === pathname)) return null;
+  if (pathname === '/settings') return '/home';
   if (pathname.startsWith('/expenses/')) return '/expenses';
   if (pathname.startsWith('/work/invoices/')) return '/work/invoices';
   if (pathname.startsWith('/work/')) return '/work';
   if (pathname.startsWith('/design/')) return '/design';
-  if (['/goals', '/design', '/secrets', '/settings'].includes(pathname)) return '/more';
   return null;
+}
+
+/** The crumb over a bottom sheet's title (phones only), as the prototype
+ *  numbers modules: the same numbers as the desktop TopBar crumbs. */
+const SHEET_CRUMB: Record<DockId, string | null> = {
+  home: null,
+  expenses: '01 / EXPENSES',
+  secrets: '02 / SECRETS',
+  work: '03 / WORK',
+  design: '04 / DESIGN',
+  goals: '05 / GOALS',
+  reminders: '06 / REMINDERS',
+};
+export function sheetCrumb(pathname: string): string | null {
+  if (pathname === '/settings') return 'SETTINGS';
+  return SHEET_CRUMB[dockFor(pathname)];
 }

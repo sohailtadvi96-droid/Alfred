@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { Icon } from '@/components/Icon';
 import { GoalsView } from '@/features/goals/GoalsView';
 import { NewGoalDialog } from '@/features/goals/NewGoalDialog';
 import { useGoals } from '@/features/goals/hooks';
@@ -16,6 +17,11 @@ export function GoalsPage() {
       <TopBar
         title="Goals"
         crumb="05 / MODULE"
+        phoneAction={
+          <button type="button" className="hbtn primary" onClick={() => setNewGoalOpen(true)} aria-label="New goal">
+            <Icon name="plus" size={18} />
+          </button>
+        }
         showWallet={false}
         action={
           <>

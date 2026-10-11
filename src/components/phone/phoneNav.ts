@@ -1,52 +1,54 @@
-import { PHONE_TABS, tabFor, type PhoneTabId } from '../nav';
+import { DOCK, dockFor, type DockId } from '../nav';
 
-/** Phone navigation memory, per device (localStorage): each tab's last
- *  address, so switching tabs returns to where you were in it, and the last
- *  address overall, so reopening the installed app lands on the last screen.
- *  Every value is a real address (pathname + search) — no in-memory stacks. */
+/** Phone navigation memory, per device (localStorage): each dock item's last
+ *  address — so switching modules returns to where you were in one, as the
+ *  prototype's per-tab stacks do — and the last address overall, so reopening
+ *  the installed app lands on the last screen. Every value is a real address
+ *  (pathname + search); there are no in-memory stacks. Harmless on desktop:
+ *  nothing there reads it. */
 
-const TABS_KEY = 'alfred-phone-tabs';
+const DOCK_KEY = 'alfred-phone-dock';
 const LAST_KEY = 'alfred-phone-last';
 // sessionStorage: present for the rest of this app session, gone on a cold launch
 const SESSION_KEY = 'alfred-phone-session';
 
-type TabMemory = Partial<Record<PhoneTabId, string>>;
+type DockMemory = Partial<Record<DockId, string>>;
 
-function readTabs(): TabMemory {
+function readDock(): DockMemory {
   try {
-    const raw = localStorage.getItem(TABS_KEY);
-    return raw ? (JSON.parse(raw) as TabMemory) : {};
+    const raw = localStorage.getItem(DOCK_KEY);
+    return raw ? (JSON.parse(raw) as DockMemory) : {};
   } catch {
     return {};
   }
 }
 
-/** Record where the user is. Called on every phone navigation. */
+/** Record where the user is. Called on every navigation. */
 export function rememberLocation(pathname: string, search: string): void {
   const address = pathname + search;
   try {
-    const tabs = readTabs();
-    tabs[tabFor(pathname)] = address;
-    localStorage.setItem(TABS_KEY, JSON.stringify(tabs));
+    const mem = readDock();
+    mem[dockFor(pathname)] = address;
+    localStorage.setItem(DOCK_KEY, JSON.stringify(mem));
     localStorage.setItem(LAST_KEY, address);
   } catch {
-    /* storage disabled — tabs just open at their root */
+    /* storage disabled — dock items just open at their root */
   }
 }
 
-/** Where a tab button goes: the tab's root when it is the active tab (tap
- *  the active tab to return to its root), else its last address. */
-export function tabTarget(tab: PhoneTabId, activeTab: PhoneTabId): string {
-  const root = PHONE_TABS.find((t) => t.id === tab)?.root ?? '/home';
-  if (tab === activeTab) return root;
-  const last = readTabs()[tab];
-  return last && tabFor(last.split('?')[0]) === tab ? last : root;
+/** Where a dock item goes: its root when it is the active item (tapping the
+ *  active item returns to the module's root), else its last address. */
+export function dockTarget(item: DockId, active: DockId): string {
+  const root = DOCK.find((d) => d.id === item)?.to ?? '/home';
+  if (item === active) return root;
+  const last = readDock()[item];
+  return last && dockFor(last.split('?')[0]) === item ? last : root;
 }
 
 /** On a cold launch of the installed app (which always starts at the
  *  manifest's start_url, /home), the address to restore instead — or null.
- *  Only ever answers once per app session, and never for a deep link (a
- *  notification tap opens /reminders, which is not /home). */
+ *  Answers once per app session, and never for a deep link (a notification
+ *  tap opens /reminders, which is not /home). */
 export function launchRestoreTarget(pathname: string, search: string, standalone: boolean): string | null {
   try {
     if (sessionStorage.getItem(SESSION_KEY)) return null;
@@ -57,4 +59,13 @@ export function launchRestoreTarget(pathname: string, search: string, standalone
   } catch {
     return null;
   }
+}
+
+/** Running as the installed home-screen app (not a browser tab). Not a
+ *  breakpoint check — the layout never depends on it. */
+export function isStandalone(): boolean {
+  return (
+    window.matchMedia?.('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
 }

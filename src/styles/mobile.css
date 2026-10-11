@@ -1,0 +1,698 @@
+/* Phone layer — everything here is phone-only. Desktop never sees it.
+   Spec: docs/mobile/IMPLEMENTATION.md (Phases 0–3) and
+   docs/mobile/alfred-mobile-prototype.html.
+
+   "Phone" is max-width 760px (the brief) or — agreed addition — a touch
+   phone held sideways with a short viewport. Every rule that changes a
+   screen sits inside that one media query; the only rules outside it are
+   .phone-only (hidden everywhere until the query shows it) and the shared
+   load states, which only phone markup renders. No JS breakpoint checks:
+   phone-only / desktop-only markup renders always and is swapped here.   */
+
+.phone-only {
+  display: none !important;
+}
+
+/* ---------- shared load states (LoadState.tsx) ---------- */
+.ld {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+.ld-line {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  animation: ld-pulse 1.4s ease-in-out infinite;
+}
+.ld-line:nth-child(2n) {
+  width: 70%;
+}
+@keyframes ld-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+.ld-fail {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.ld-retry {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--base);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+  .phone-only {
+    display: revert !important;
+  }
+  .desk-only {
+    display: none !important;
+  }
+
+  /* ================= Phase 1 — the dock ================= */
+  .app {
+    display: block;
+  }
+  .side {
+    display: none;
+  }
+  .main {
+    min-height: 100dvh;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dock {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    z-index: 60;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--line-soft);
+    border-radius: 24px;
+    box-shadow: var(--sh-sm);
+    overflow: hidden;
+  }
+  .dock-scroll {
+    position: relative; /* offsetLeft of items is measured against this */
+    display: flex;
+    gap: 2px;
+    padding: 6px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+  }
+  .dock-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .dock-item {
+    position: relative;
+    flex: none;
+    scroll-snap-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 64px;
+    height: 52px;
+    padding: 0 10px;
+    border-radius: 18px;
+    color: var(--text-faint);
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.28s cubic-bezier(0.22, 1, 0.36, 1), color 0.13s ease;
+  }
+  .dock-item.active {
+    flex-direction: row;
+    gap: 8px;
+    padding: 0 16px;
+    background: var(--base);
+    color: var(--base-ink);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .dock-item:not(.active):active {
+    background: var(--surface-2);
+  }
+  .dock-badge {
+    position: absolute;
+    top: 4px;
+    right: 10px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 100px;
+    background: var(--base);
+    color: var(--base-ink);
+    font: 700 9px/16px var(--mono);
+    text-align: center;
+  }
+  .dock-item.active .dock-badge {
+    position: static;
+    background: var(--base-ink);
+    color: var(--base);
+  }
+
+  /* ================= Phase 2 — quiet headers ================= */
+  .topbar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    padding: 8px 20px 12px;
+    background: var(--ground);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: 0;
+    flex-wrap: nowrap;
+  }
+  .topbar .tl .tlabel {
+    display: none;
+  }
+  .topbar .tl h1 {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  /* the prototype's .hdr-row: a 44px row, title and actions centred in it */
+  .topbar .tr {
+    gap: 4px;
+    min-height: 44px;
+  }
+  /* phoneAction's wrapper must not become a box in the actions row */
+  .topbar .tr > .topbar-phone-actions {
+    display: contents !important;
+  }
+  .hbtn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .hbtn.primary,
+  .hbtn.on {
+    background: var(--base);
+    color: var(--base-ink);
+  }
+  .wrap {
+    padding: 4px 20px 32px;
+  }
+
+  /* A nested screen: the prototype's back row (back button + actions), then
+     the title on its own line. */
+  .topbar.has-back {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'back actions'
+      'title title';
+    align-items: center;
+    row-gap: 0;
+  }
+  .topbar.has-back .topbar-back {
+    grid-area: back;
+  }
+  .topbar.has-back .tr {
+    grid-area: actions;
+    min-height: 44px;
+  }
+  .topbar.has-back .tl {
+    grid-area: title;
+  }
+  .topbar .topbar-back {
+    display: inline-flex !important;
+    align-items: center;
+    justify-self: start;
+    gap: 2px;
+    height: 40px;
+    margin-left: -6px;
+    padding: 0 8px 0 0;
+    border: 0;
+    background: none;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .topbar-back svg {
+    transform: rotate(180deg);
+  }
+  /* no page shows two back links: every nested page carries its own
+     "‹ back" header link, which the back button replaces here */
+  .topbar.has-back .tr > a.btn.sec {
+    display: none;
+  }
+
+  /* ================= Phase 2 — bottom sheets =================
+     The prototype's .sheet: grabber, head (22px title over a soft rule),
+     a body that scrolls, and a pinned two-button footer (1fr / 1.4fr). */
+  .dlg,
+  .dlg.dlg-wide {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    transform: none;
+    width: 100%;
+    max-height: 92dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 18px 18px 0 0;
+    animation: sheet-up 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .dlg::before,
+  .rem-sheet::before {
+    content: '';
+    display: block;
+    flex: none;
+    width: 36px;
+    height: 5px;
+    border-radius: 5px;
+    background: var(--line);
+    margin: 8px auto 0;
+  }
+  .dlg-h {
+    flex: none;
+    padding: 10px 20px 14px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .dlg-h h3 {
+    margin: 4px 0 0;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+  }
+  .dlg-rule {
+    display: none;
+  }
+  .dlg-b {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dlg-b:has(+ .dlg-f) {
+    padding-bottom: 18px;
+  }
+  /* ReminderSheet is its own Radix dialog (not Dialog.tsx): same treatment */
+  .rem-sheet {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 92dvh;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 18px 18px 0 0;
+    animation: sheet-up 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .rem-sheet-head {
+    height: auto;
+    padding: 10px 20px 14px;
+  }
+  .rem-sheet-title {
+    margin-top: 4px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+  }
+  .rem-sheet-body {
+    min-height: 0;
+    padding: 18px 20px;
+  }
+  .dlg-f,
+  .rem-sheet-footer {
+    flex: none;
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 10px;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line-soft);
+  }
+  /* a third item (a note, or a Delete set apart with margin-right:auto)
+     takes its own full-width row above the usual pair */
+  .dlg-f > :first-child:nth-last-child(3),
+  .rem-sheet-footer > :first-child:nth-last-child(3) {
+    grid-column: 1 / -1;
+    margin-right: 0 !important;
+  }
+  /* one button: full width */
+  .dlg-f > .btn:only-child,
+  .rem-sheet-footer > .btn:only-child {
+    grid-column: 1 / -1;
+  }
+  /* the dock hides while a sheet is up (where :has() isn't supported, it
+     simply stays visible under the overlay) */
+  body:has(.dlg, .rem-sheet) .dock {
+    visibility: hidden;
+  }
+
+  /* ================= Phase 2 — touch sizes ================= */
+  .input,
+  select.input,
+  textarea.input {
+    font-size: 16px; /* stops iOS zooming the page on focus */
+    min-height: 48px;
+  }
+  .btn {
+    min-height: 44px;
+  }
+  .btn.sm {
+    min-height: 36px;
+  }
+  .dlg-f .btn,
+  .dlg-f .btn.sm,
+  .rem-sheet-footer .btn,
+  .rem-sheet-footer .btn.sm {
+    min-height: 48px;
+    padding: 0 20px;
+    font-size: 15px;
+    justify-content: center;
+  }
+
+  /* ================= link rows (prototype .links / .linkrow) ================= */
+  .links {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .linkrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    border-bottom: 1px solid var(--line-soft);
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .linkrow .grow {
+    flex: 1;
+  }
+  .linkrow .chev-ic {
+    color: var(--text-faint);
+  }
+
+  /* ================= Phase 3 — Home ================= */
+  .ph-home {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding: 12px 20px 32px;
+  }
+  .ph-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .ph-greet {
+    margin-top: 4px;
+    font-family: 'Inter', var(--sans);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+  }
+  .ph-avatar {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    text-decoration: none;
+  }
+  .ph-avatar .mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    font-size: 18px;
+  }
+  .ph-command {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 0 6px 0 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  .ph-command:focus-within {
+    border-color: var(--base);
+    box-shadow: 0 0 0 3px var(--base-soft);
+  }
+  .ph-command-ic {
+    display: grid;
+    color: var(--text-faint);
+  }
+  .ph-command input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: none;
+    color: var(--text);
+    font-family: 'Inter', var(--sans);
+    font-size: 16px;
+  }
+  .ph-command input::placeholder {
+    color: var(--text-faint);
+  }
+  .ph-command-go {
+    width: 36px;
+    height: 36px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--base);
+    border-radius: 50%;
+    background: var(--base);
+    color: var(--base-ink);
+    cursor: pointer;
+  }
+  .ph-command-err {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--neg);
+  }
+  .ph-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .ph-sect-h {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .ph-link {
+    color: var(--base);
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .ph-dueline {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .ph-dueline b {
+    color: var(--text);
+    font-weight: 700;
+  }
+  .ph-dueline .late {
+    color: var(--neg);
+    font-weight: 700;
+  }
+  .ph-card {
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 15px;
+  }
+  .ph-nextcard {
+    display: flex;
+    flex-direction: column;
+    padding: 2px 14px;
+  }
+  .ph-nextup-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .ph-nextup-row:last-child {
+    border-bottom: 0;
+  }
+  .ph-tick {
+    width: 32px;
+    height: 44px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .ph-box {
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid var(--text-faint);
+    border-radius: 5px;
+  }
+  .ph-box.round {
+    border-radius: 50%;
+  }
+  .ph-grow {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ph-due {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .ph-due.now {
+    color: var(--text);
+  }
+  .ph-due.now::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--base);
+  }
+  .ph-due.late {
+    color: var(--neg);
+    font-weight: 600;
+  }
+  .ph-empty {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  .ph-ok {
+    color: var(--pos);
+  }
+  .ph-tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  /* compact module tiles: module colour only as the 3px left edge and chip */
+  .ph-tile {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-left: 3px solid var(--tile-accent, var(--line));
+    border-radius: 12px;
+    color: inherit;
+    font-family: 'Inter', var(--sans);
+    text-align: left;
+    text-decoration: none;
+    transition: transform 0.42s cubic-bezier(0.33, 0, 0.2, 1);
+  }
+  .ph-tile:active {
+    transform: scale(0.985);
+    transition-duration: 0.13s;
+  }
+  .ph-tile.wide {
+    grid-column: 1 / -1;
+  }
+  .ph-tile-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ph-tile-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .ph-chip {
+    width: 26px;
+    height: 26px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--tile-accent, var(--text-faint));
+    color: var(--chip-ink);
+  }
+  .ph-tile-fig {
+    margin-top: 6px;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+  .ph-tile-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .ph-tile[data-module='expenses'] {
+    --tile-accent: var(--m-expenses);
+  }
+  .ph-tile[data-module='work'] {
+    --tile-accent: var(--m-work);
+  }
+  .ph-tile[data-module='design'] {
+    --tile-accent: var(--m-design);
+  }
+  .ph-tile[data-module='goals'] {
+    --tile-accent: var(--m-goals);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ld-line {
+    animation: none;
+  }
+}

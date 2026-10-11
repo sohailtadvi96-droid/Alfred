@@ -1,23 +1,22 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Outlet, ScrollRestoration, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
-import { parentOf, screenLabel, tabFor } from '../nav';
-import { PhoneChromeContext, type PhoneChrome } from './chrome';
-import { launchRestoreTarget, rememberLocation } from './phoneNav';
-import { isStandalone } from './useIsPhone';
-import { TabBar } from './TabBar';
+import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
+import { dockFor, parentOf, screenLabel } from '../nav';
+import type { PhoneChrome } from './chrome';
+import { isStandalone, launchRestoreTarget, rememberLocation } from './phoneNav';
 
-const MORE_MEMBERS = ['/goals', '/design', '/secrets', '/settings'];
-
-/** The phone layout: the routed screen, then the tab bar. Screens keep
- *  rendering their own header (TopBar, compacted by phone.css); the shell
- *  only tells them whether to show a back button. */
-export function PhoneShell() {
+/** The back button for the screen on show, plus the bookkeeping behind the
+ *  dock's per-module memory and the installed app's launch restore. Runs at
+ *  every width (no breakpoint checks); only phone CSS ever shows the button.
+ *
+ *  Back goes the way the user came when the previous screen is in the same
+ *  module — the same step an iPhone edge-swipe takes — else to parentOf(),
+ *  keeping the search string (Expenses' ?month=) within a module. */
+export function useNavChrome(): PhoneChrome {
   const location = useLocation();
   const navType = useNavigationType();
   const navigate = useNavigate();
 
-  // A mirror of this session's history (pathnames), so the back button can
-  // return the way the user came — the same step an iPhone edge-swipe takes.
+  // A mirror of this session's history (pathnames).
   const stack = useRef<string[]>([]);
   const seenKey = useRef<string | null>(null);
   if (seenKey.current !== location.key) {
@@ -44,32 +43,17 @@ export function PhoneShell() {
     rememberLocation(location.pathname, location.search);
   }, [location.pathname, location.search]);
 
-  const tab = tabFor(location.pathname);
   const s = stack.current;
   const prev = s.length >= 2 ? s[s.length - 2] : null;
 
-  const chrome = useMemo<PhoneChrome>(() => {
+  return useMemo<PhoneChrome>(() => {
     const here = location.pathname;
     const parent = parentOf(here);
     if (!parent) return { back: null };
-    // the previous screen, when it is where this one was opened from
-    if (prev && prev !== here && (tabFor(prev) === tabFor(here) || MORE_MEMBERS.includes(here))) {
+    if (prev && prev !== here && dockFor(prev) === dockFor(here)) {
       return { back: { label: screenLabel(prev), onBack: () => navigate(-1) } };
     }
-    // same tab: keep the address's filters (Expenses' ?month=) on the way up
-    const search = tabFor(parent) === tabFor(here) ? location.search : '';
+    const search = dockFor(parent) === dockFor(here) ? location.search : '';
     return { back: { label: screenLabel(parent), onBack: () => navigate({ pathname: parent, search }) } };
   }, [location.pathname, location.search, prev, navigate]);
-
-  return (
-    <PhoneChromeContext.Provider value={chrome}>
-      <div className="ph-app" data-tab={tab}>
-        <main className="ph-main">
-          <Outlet />
-        </main>
-        <TabBar active={tab} />
-      </div>
-      <ScrollRestoration />
-    </PhoneChromeContext.Provider>
-  );
 }
