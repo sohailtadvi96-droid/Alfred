@@ -204,7 +204,7 @@
   --space-8: 32px;
   --tap-min: 44px;
   --control-h: 48px;
-  --tabbar-h: 64px;
+  --dock-h: 64px;
   --radius-xs: 6px;
   --radius-sm: 10px;
   --radius-md: 12px;
@@ -224,7 +224,7 @@
   --font-home: "Inter", "Helvetica Neue", Arial, sans-serif;
 }
 .wordmark { font-family: var(--font-sans); font-size: 19px; line-height: 1.02; font-weight: 900; letter-spacing: 0.02em; }
-.large-title { font-family: var(--font-sans); font-size: 30px; line-height: 1.02; font-weight: 800; letter-spacing: -0.015em; }
+.large-title { font-family: var(--font-sans); font-size: 28px; line-height: 1.05; font-weight: 800; letter-spacing: -0.02em; }
 .figure-xl { font-family: var(--font-sans); font-size: 34px; line-height: 1; font-weight: 900; letter-spacing: -0.03em; }
 .figure-lg { font-family: var(--font-sans); font-size: 30px; line-height: 1; font-weight: 900; letter-spacing: -0.03em; }
 .figure-md { font-family: var(--font-sans); font-size: 22px; line-height: 1.05; font-weight: 900; letter-spacing: -0.03em; }
@@ -301,21 +301,21 @@ button { font-family: inherit; color: inherit; }
 .wordmark { font-weight: 900; font-size: 19px; letter-spacing: 0.02em; }
 .wordmark small { display: block; font-family: var(--font-mono); font-size: 9px; font-weight: 500; letter-spacing: 0.18em; color: var(--text-faint); margin-top: 2px; }
 
-/* ---------- app header (mobile adaptation of .topbar) ---------- */
+/* ---------- app header (mobile adaptation of .topbar) ----------
+   Quiet by default: no bar, no rule, no numbered crumb. The title sits on the
+   ground; actions are plain icons, the one add action a small brass disc. */
 .hdr {
   position: sticky; top: 0; z-index: 20;
-  padding: 10px 16px 14px;
-  background: color-mix(in srgb, var(--ground) 88%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line-soft);
+  padding: 8px 20px 12px;
+  background: var(--ground);
 }
 .hdr-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
-.hdr-back { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; padding: 0 8px 0 0; height: 44px; color: var(--base); font-weight: 700; font-size: 15px; cursor: pointer; }
+.hdr-back { display: inline-flex; align-items: center; gap: 2px; background: none; border: 0; padding: 0 8px 0 0; margin-left: -6px; height: 40px; color: var(--text-dim); font-weight: 600; font-size: 15px; cursor: pointer; }
 .hdr-back svg { transform: rotate(180deg); }
-.hdr-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.hdr h1 { margin: 2px 0 0; font-size: 30px; font-weight: 800; letter-spacing: -0.015em; line-height: 1.02; text-wrap: balance; }
-.hdr .hdr-meta { font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); margin-top: 6px; }
+.hdr-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.hdr-actions .ibtn { width: 40px; height: 40px; border-radius: 50%; }
+.hdr h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; text-wrap: balance; }
+.hdr .hdr-meta { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
 
 /* ---------- buttons ---------- */
 .btn {
@@ -421,24 +421,42 @@ textarea.input { padding: 12px 14px; min-height: 120px; resize: vertical; line-h
 .sw[aria-checked='true'] { background: var(--base); }
 .sw[aria-checked='true']::after { transform: translateX(20px); background: var(--base-ink); }
 
-/* ---------- tab bar (mobile) ---------- */
+/* ---------- dock: side-scrolling tab bar (mobile) ----------
+   Every built module sits in one row that scrolls sideways and snaps; no
+   "More" tab. It floats 10px off the edges as a rounded pill. Inactive items
+   are a quiet icon + label; the active one becomes a brass pill with its label
+   inline, so the strip reads as "where I am" first. Edges fade to show there's
+   more to scroll. */
 .tabbar {
-  display: grid; grid-template-columns: repeat(5, 1fr);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border-top: 1px solid var(--line);
-  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  flex: none;
+  margin: 0 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--line-soft);
+  border-radius: 24px;
+  box-shadow: var(--sh-sm);
+  overflow: hidden;
 }
+.tabbar-scroll {
+  display: flex; gap: 2px; padding: 6px;
+  overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+}
+.tabbar-scroll::-webkit-scrollbar { display: none; }
 .tab {
-  position: relative;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  min-height: 52px; background: none; border: 0; cursor: pointer;
+  position: relative; flex: none; scroll-snap-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-width: 64px; height: 52px; padding: 0 10px; border-radius: 18px;
+  background: none; border: 0; cursor: pointer;
   color: var(--text-faint); font-size: 11px; font-weight: 600;
+  transition: background var(--dur-lift) var(--ease-out), color var(--dur-quick) ease;
 }
-.tab .tab-ic { width: 52px; height: 28px; border-radius: 100px; display: grid; place-items: center; transition: background var(--dur-lift) var(--ease-out), color var(--dur-quick) ease; }
-.tab.on { color: var(--text); }
-.tab.on .tab-ic { background: var(--base); color: var(--base-ink); }
-.tab .badge { position: absolute; top: 2px; left: calc(50% + 8px); }
+.tab .tab-ic { display: grid; place-items: center; }
+.tab.on { flex-direction: row; gap: 8px; padding: 0 16px; background: var(--base); color: var(--base-ink); font-size: 14px; font-weight: 700; }
+.tab:not(.on):active { background: var(--surface-2); }
+.tab .badge { position: absolute; top: 4px; right: 10px; min-width: 16px; height: 16px; font-size: 9px; }
+.tab.on .badge { position: static; background: var(--base-ink); color: var(--base); }
 
 /* ---------- badge ---------- */
 .badge {
@@ -675,8 +693,79 @@ textarea.input { padding: 12px 14px; min-height: 120px; resize: vertical; line-h
 @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 
 /* ---------- toast (mobile) ---------- */
-.toast { position: absolute; left: 16px; right: 16px; bottom: 84px; z-index: 60; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--text); color: var(--ground); border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 600; box-shadow: var(--sh); animation: rise var(--dur-lift) var(--ease-out) both; }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 96px; z-index: 60; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--text); color: var(--ground); border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 600; box-shadow: var(--sh); animation: rise var(--dur-lift) var(--ease-out) both; }
 .toast .link { color: var(--ground); text-decoration: underline; }
+
+/* ---------- calm surfaces ----------
+   Lists and cards on phones use the softer hairline so a screen of several
+   groups doesn't read as a stack of boxes. `line` stays on inputs and controls. */
+.card, .scard, .ledger, .rem-row, .goal, .pcard, .tile, .sumcard, .stat { border-color: var(--line-soft); }
+.rem-row.late { border-left-color: var(--neg); }
+
+/* ---------- hero figure (mobile) ----------
+   One number leads a screen: an eyebrow, the figure, one line of context.
+   Secondary figures sit beside it as plain label/value pairs, not cards. */
+.hero { display: flex; flex-direction: column; gap: 4px; }
+.hero-v { font-weight: 900; font-size: 40px; letter-spacing: -0.035em; line-height: 1; font-variant-numeric: tabular-nums; }
+.hero-s { font-size: 13px; color: var(--text-dim); }
+.hero-s .up { color: var(--neg); } .hero-s .down { color: var(--pos); }
+.pairs { display: flex; gap: 28px; margin-top: 14px; }
+.pair { display: flex; flex-direction: column; gap: 2px; }
+.pair b { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pair b.in { color: var(--pos); }
+
+/* ---------- category list (mobile) ----------
+   Phones list categories as rows with a share bar instead of a card grid:
+   colour dot, name, entries, amount, then a 3px bar in the category colour. */
+.catlist { display: flex; flex-direction: column; }
+.catrow { display: grid; grid-template-columns: 10px 1fr auto; gap: 4px 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line-soft); background: none; border-left: 0; border-right: 0; border-top: 0; width: 100%; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.catrow:last-child { border-bottom: 0; }
+.catrow .cdot { width: 10px; height: 10px; border-radius: 50%; background: var(--cat); }
+.catrow .cname { font-size: 15px; font-weight: 600; }
+.catrow .cname small { font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--text-faint); margin-left: 6px; }
+.catrow .camt { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+.catrow .cbar { grid-column: 2 / -1; height: 3px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.catrow .cbar i { display: block; height: 100%; background: var(--cat); border-radius: 3px; }
+
+/* ---------- compact variants (mobile) ---------- */
+.hdr-actions .ibtn:not(.primary):not(.on) { background: transparent; border-color: transparent; color: var(--text-dim); }
+.tile.compact { min-height: 0; gap: 8px; padding: 12px 14px; }
+.tile.compact .tile-fig { font-size: 24px; margin-top: 6px; }
+.tile.compact .tile-sub { font-size: 12px; }
+.seg.sm { border-radius: 100px; padding: 2px; border-color: var(--line-soft); }
+.seg.sm button { min-height: 28px; padding: 0 12px; font-size: 12px; border-radius: 100px; }
+.monthnav.compact { gap: 0; margin-left: -10px; }
+.monthnav.compact .ibtn { width: 32px; height: 32px; }
+.monthnav.compact .mn-label { flex: none; font-size: 14px; font-weight: 700; color: var(--text-dim); }
+
+/* ---------- accounts row (collapsed wallet, mobile) ----------
+   The wallet opens from this one row instead of taking the screen by default.
+   Three overlapping dots in the account colours echo the stacked cards. */
+.acctbar { display: flex; align-items: center; gap: 14px; padding: 14px 16px; width: 100%; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.acctbar .grow { flex: 1; min-width: 0; }
+.acctbar b { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.acct-dots { display: flex; }
+.acct-dots i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--surface); margin-left: -7px; }
+.acct-dots i:first-child { margin-left: 0; }
+.chev-rot { color: var(--text-faint); display: grid; transition: transform var(--dur-lift) var(--ease-out); transform: rotate(90deg); }
+.chev-rot.open { transform: rotate(-90deg); }
+
+/* ---------- view toggle (mobile) ----------
+   Two icon buttons that switch how one list is drawn (Expenses categories:
+   simple list ⇄ category cards). Sits beside the section's filter; the active
+   view is a surface-2 chip, not brass, so it never competes with the filter. */
+.viewtoggle { display: flex; border: 1px solid var(--line-soft); border-radius: 100px; padding: 2px; }
+.viewtoggle button { width: 30px; height: 28px; border-radius: 100px; border: 0; background: none; color: var(--text-faint); display: grid; place-items: center; cursor: pointer; }
+.viewtoggle button.on { background: var(--surface-2); color: var(--text); }
+
+/* ---------- section links (mobile) ----------
+   Secondary destinations of a module (Review queue, Insights…) as quiet rows
+   at the end of the screen, never as a chip strip at the top. */
+.links { display: flex; flex-direction: column; border-top: 1px solid var(--line-soft); }
+.linkrow { display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--line-soft); background: none; border-left: 0; border-right: 0; border-top: 0; width: 100%; text-align: left; color: var(--text); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; padding: 0; }
+.linkrow .grow { flex: 1; }
+.linkrow .sub { font-family: var(--font-mono); font-size: 12px; font-weight: 400; color: var(--text-faint); }
+.linkrow svg.chev-ic { color: var(--text-faint); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -706,11 +795,11 @@ body[data-tone='light'] { color-scheme: light; }
 .scr.pop { animation: popin .28s var(--ease-out) both; }
 @keyframes push { from { transform: translateX(28%); opacity: .4; } to { transform: none; opacity: 1; } }
 @keyframes popin { from { transform: translateX(-12%); opacity: .5; } to { transform: none; opacity: 1; } }
-.content { padding: 16px 16px 28px; display: flex; flex-direction: column; gap: 24px; }
+.content { padding: 4px 20px 32px; display: flex; flex-direction: column; gap: 28px; }
 .stack { display: flex; flex-direction: column; gap: 12px; }
 .row { display: flex; align-items: center; gap: 10px; }
 .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.chiprow { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+.chiprow { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -20px; padding: 0 20px; }
 .chiprow::-webkit-scrollbar { display: none; }
 .note { font-size: 13px; color: var(--text-dim); }
 .mono-s { font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); }
@@ -727,6 +816,14 @@ body[data-tone='light'] { color-scheme: light; }
 }
 
 /* home */
+.greet { font-family: var(--font-home); font-size: 28px; font-weight: 700; letter-spacing: -.025em; line-height: 1.1; margin-top: 4px; }
+.avatar { background: none; border: 0; padding: 0; cursor: pointer; width: 44px; height: 44px; display: grid; place-items: center; }
+.avatar .mark { width: 36px; height: 36px; border-radius: 12px; font-size: 18px; }
+.nextcard { padding: 2px 14px; }
+.nextcard .nextup-row { min-height: 52px; }
+.dueline { font-size: 13px; color: var(--text-dim); }
+.dueline b { color: var(--text); font-weight: 700; }
+.dueline .late { color: var(--neg); font-weight: 700; }
 .homehead { display: flex; align-items: center; justify-content: space-between; }
 .nowline { display: flex; align-items: center; gap: 10px; }
 .nowline b { font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; color: var(--base); font-weight: 600; }
@@ -834,7 +931,6 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 .hide-amt .amt-v { filter: blur(0); }
 .fab-row { display: flex; gap: 8px; }
 .fab-row .btn { flex: 1; }
-.linkrow { display: flex; justify-content: center; }
 .focus-ring:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--base); outline-offset: 2px; }
 </style>
 
@@ -843,11 +939,11 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
     <div class="wm"><span class="mark">A</span><span class="wordmark">ALFRED<small>MOBILE PROTOTYPE</small></span></div>
     <p>A clickable layout prototype of the phone app. It covers the modules that exist in the web app: Home, Expenses, Reminders, Work (freelance and office), Goals, Design, Secrets and Settings.</p>
     <ol>
-      <li>Tick a reminder on Home or in Reminders.</li>
-      <li>Add a transaction from Expenses and watch the totals move.</li>
-      <li>Open Work → a project → an invoice.</li>
-      <li>More → Secrets, then any four digits.</li>
-      <li>More → Settings to switch between the 12 grounds.</li>
+      <li>Swipe the dock at the bottom sideways: every section is in it.</li>
+      <li>Tick a reminder on Home, then add a transaction in Expenses.</li>
+      <li>Work → a project → an invoice → Mark paid.</li>
+      <li>Secrets: any four digits unlock it.</li>
+      <li>Tap the A on Home for Settings and the 12 grounds.</li>
     </ol>
     <p class="mono-s">All figures and names are sample data. Nothing is saved.</p>
   </aside>
@@ -860,7 +956,7 @@ select.input { appearance: none; -webkit-appearance: none; background-image: lin
 </div>
 
 <script>
-const ICONS = {"home":"M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-9Z","check":"M9.55 18 3.85 12.3l1.425-1.425L9.55 15.15l9.175-9.175L20.15 7.4Z","goals":"M6 2h2v20H6V2Zm2 1h11l-2.5 4L19 11H8V3Z","expenses":"M4 5h13l3 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2 6v2h9v-2H6Zm0 4v2h6v-2H6Z","secrets":"M9 3a6 6 0 0 1 5.65 8H21l1.5 1.5L21 15l-2-1.5L17 15l-2-1.5-.6.4A6 6 0 1 1 9 3Zm-1.5 5A1.5 1.5 0 1 0 6 6.5 1.5 1.5 0 0 0 7.5 8Z","work":"M9 3h6l1 3h4a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4l1-3Zm3 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z","design":"M4 4h16v13H4z M2 19h20v2H2z M8 8l4 6 3-4 3 5H6z","settings":"M12 2c1 0 2 1 2 2l3 1 1 3 2 2-1 3 1 3-3 1-1 3-3 1-2 2-2-2-3-1-1-3-3-1 1-3-1-3 3-1 1-3 3-1c0-1 1-2 2-2Zm0 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z","eye":"M12 5c6 0 10 7 10 7s-4 7-10 7S2 12 2 12s4-7 10-7Zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z","pencil":"M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z","bell":"M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2Zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5S10.5 3.17 10.5 4v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2Z","plus":"M10.5 3h3v7.5H21v3h-7.5V21h-3v-7.5H3v-3h7.5Z","close":"M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4Z","search":"M10 2a8 8 0 0 1 6.32 12.9l5.4 5.4-2.12 2.12-5.4-5.4A8 8 0 1 1 10 2Zm0 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z","more":"M5 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z","grid":"M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"};
+const ICONS = {"home":"M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-9Z","check":"M9.55 18 3.85 12.3l1.425-1.425L9.55 15.15l9.175-9.175L20.15 7.4Z","goals":"M6 2h2v20H6V2Zm2 1h11l-2.5 4L19 11H8V3Z","expenses":"M4 5h13l3 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2 6v2h9v-2H6Zm0 4v2h6v-2H6Z","secrets":"M9 3a6 6 0 0 1 5.65 8H21l1.5 1.5L21 15l-2-1.5L17 15l-2-1.5-.6.4A6 6 0 1 1 9 3Zm-1.5 5A1.5 1.5 0 1 0 6 6.5 1.5 1.5 0 0 0 7.5 8Z","work":"M9 3h6l1 3h4a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4l1-3Zm3 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z","design":"M4 4h16v13H4z M2 19h20v2H2z M8 8l4 6 3-4 3 5H6z","settings":"M12 2c1 0 2 1 2 2l3 1 1 3 2 2-1 3 1 3-3 1-1 3-3 1-2 2-2-2-3-1-1-3-3-1 1-3-1-3 3-1 1-3 3-1c0-1 1-2 2-2Zm0 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z","eye":"M12 5c6 0 10 7 10 7s-4 7-10 7S2 12 2 12s4-7 10-7Zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z","pencil":"M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z","bell":"M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2Zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5S10.5 3.17 10.5 4v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2Z","plus":"M10.5 3h3v7.5H21v3h-7.5V21h-3v-7.5H3v-3h7.5Z","close":"M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4Z","search":"M10 2a8 8 0 0 1 6.32 12.9l5.4 5.4-2.12 2.12-5.4-5.4A8 8 0 1 1 10 2Zm0 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z","more":"M5 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z","grid":"M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z","list":"M3 4.5h3.5V8H3zM9 4.5h12V8H9zM3 10.25h3.5v3.5H3zM9 10.25h12v3.5H9zM3 16h3.5v3.5H3zM9 16h12v3.5H9z"};
 const CHEVRON = "M9 6l6 6-6 6";
 const ic = (n, s = 18) => n === 'chevron' ? `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${CHEVRON}"/></svg>` : `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="currentColor" aria-hidden="true"><path d="${ICONS[n]}"/></svg>`;
 (() => {
@@ -922,7 +1018,7 @@ function genMonth(y, m, upto) {
   return out.sort((a, b) => b.date - a.date);
 }
 const S = {
-  tab: 'home', stacks: { home: [{ s: 'home' }], expenses: [{ s: 'expenses' }], reminders: [{ s: 'reminders' }], work: [{ s: 'work' }], more: [{ s: 'more' }] },
+  tab: 'home', stacks: { home: [{ s: 'home' }], expenses: [{ s: 'expenses' }], reminders: [{ s: 'reminders' }], work: [{ s: 'work' }], goals: [{ s: 'goals' }], design: [{ s: 'design' }], secrets: [{ s: 'secrets' }] },
   ground: 'ink', anim: '', hideAmt: false, flow: 'out', month: [2026, 9], remTab: 'today', doneOpen: true, workCat: 'freelance', officeDay: dkey(TODAY),
   unlocked: false, pin: '', pinBad: false, vaultQ: '', revealed: {}, designQ: '', mediums: [], goalOpen: { gym: true }, toast: null, sheet: null,
   months: {},
@@ -1022,7 +1118,7 @@ function back() { const st = S.stacks[S.tab]; if (st.length > 1) { st.pop(); S.a
 function switchTab(t, r) { if (S.tab === t && !r) { S.stacks[t] = S.stacks[t].slice(0, 1); } S.tab = t; if (r) S.stacks[t] = [S.stacks[t][0], r]; S.anim = ''; S.sheet = null; render(); }
 let toastT;
 function toast(msg, undo) { S.toast = { msg, undo }; clearTimeout(toastT); toastT = setTimeout(() => { S.toast = null; renderOverlay(); }, 5000); renderOverlay(); }
-const header = ({ crumb, title, meta, back: b, actions = '' }) => `<header class="hdr"><div class="hdr-row">${b ? `<button class="hdr-back" data-act="back">${ic('chevron', 16)} ${esc(b)}</button>` : `<div><div class="tlabel">${esc(crumb)}</div><h1>${esc(title)}</h1></div>`}<div class="hdr-actions">${actions}</div></div>${b ? `<div class="tlabel" style="margin-top:2px">${esc(crumb)}</div><h1>${esc(title)}</h1>` : ''}${meta ? `<div class="hdr-meta">${meta}</div>` : ''}</header>`;
+const header = ({ title, meta, back: b, actions = '' }) => { const showBack = b && S.stacks[S.tab].length > 1; return `<header class="hdr">${showBack ? `<div class="hdr-row"><button class="hdr-back" data-act="back">${ic('chevron', 16)} ${esc(b)}</button><div class="hdr-actions">${actions}</div></div><h1>${esc(title)}</h1>` : `<div class="hdr-row"><h1>${esc(title)}</h1><div class="hdr-actions">${actions}</div></div>`}${meta ? `<div class="hdr-meta">${meta}</div>` : ''}</header>`; };
 const LBL = { home: 'Home', expenses: 'Expenses', txns: 'Transactions', cat: 'Category', review: 'Review queue', insights: 'Insights', people: 'Family & shops', reminders: 'Reminders', work: 'Work', project: 'Project', invoices: 'Invoices', invoice: 'Invoice', more: 'More', goals: 'Goals', design: 'Design', board: 'Board', secrets: 'Secrets', settings: 'Settings' };
 const bl = () => { const st = S.stacks[S.tab]; return LBL[st[st.length - 2]?.s] || 'Back'; };
 const money = (n, hide) => (hide ? MASK : inr(n));
@@ -1034,24 +1130,24 @@ const SCREENS = {};
 SCREENS.home = () => {
   const items = todayItems().filter((x) => x.status !== 'skipped');
   const open = items.filter((x) => !x.status).slice(0, 4);
-  const [y, m] = [2026, 9];
-  const spend = txFor(y, m).filter((t) => t.dir === 'debit').reduce((s, t) => s + t.amt, 0);
+  const spend = txFor(2026, 9).filter((t) => t.dir === 'debit').reduce((s, t) => s + t.amt, 0);
   const active = GOALS.filter((g) => g.status === 'active');
   const onTrack = active.filter((g) => g.pace === 'ahead' || g.pace === 'on-track').length;
-  const due = items.filter((x) => !x.status && x.state !== 'later').length;
+  const now = items.filter((x) => !x.status && x.state === 'now').length, late = items.filter((x) => !x.status && x.state === 'late').length;
+  const tile = (mod, icon, title, fig, sub, tab) => `<button class="tile compact" data-module="${mod}" data-act="tab" data-v="${tab}"><span class="tile-head"><span class="chip-ic">${ic(icon, 14)}</span><span class="tile-title">${title}</span></span><span class="tile-fig">${fig}</span><span class="tile-sub">${sub}</span></button>`;
   return `<div class="content" style="padding-top:12px">
-  <div class="homehead"><div class="row"><span class="mark">A</span><span class="wordmark">ALFRED<small>PERSONAL BUTLER</small></span></div><button class="ibtn plain" data-act="tab" data-v="more" data-r="settings" aria-label="Settings">${ic('settings')}</button></div>
-  <div class="stack" style="gap:10px"><div class="tlabel">Today</div><div class="homedate">${fmtD(TODAY)}</div><div class="nowline"><b>NOW</b><i></i><span class="mono-s">${NOW}</span></div></div>
-  <form class="command" data-form="command"><span style="color:var(--text-faint);display:grid">${ic('search', 16)}</span><input id="cmd" name="q" placeholder="Tell Alfred anything…" autocomplete="off" aria-label="Tell Alfred anything"><button class="ibtn primary" style="width:40px;height:40px" aria-label="Send">${ic('chevron', 16)}</button></form>
-  <div class="tiles">
-    <div class="tile wide" data-module="reminders"><div class="tile-head"><span class="chip-ic">${ic('bell', 14)}</span><span class="tile-title">Next up</span><span class="mono-s" style="margin-left:auto">${due ? `${due} due` : ''}</span></div>
-      <div class="nextup">${open.length ? open.map((x) => `<div class="nextup-row"><button class="rem-tick" data-act="tick" data-v="${x.r.id}" aria-checked="false" aria-label="Tick ${esc(x.r.title)}">${tickBox(x.r.kind === 'once', false)}</button><span class="grow">${esc(x.r.title)}</span>${dueTag(x)}</div>`).join('') : `<div class="empty" style="margin-top:4px"><span class="ck">${ic('check', 16)}</span>Nothing else due today.</div>`}</div>
-      <button class="btn sec sm" style="align-self:flex-start" data-act="tab" data-v="reminders">All reminders</button></div>
-    <button class="tile" data-module="expenses" data-act="tab" data-v="expenses"><span class="tile-head"><span class="chip-ic">${ic('expenses', 14)}</span><span class="tile-title">Expenses</span></span><span class="tile-fig">${money(spend, S.hideAmt)}</span><span class="tile-sub">October 2026</span></button>
-    <button class="tile" data-module="work" data-act="tab" data-v="work"><span class="tile-head"><span class="chip-ic">${ic('work', 14)}</span><span class="tile-title">Work</span></span><span class="tile-fig">${PROJECTS.filter((p) => p.status === 'active').length}</span><span class="tile-sub">Active projects</span></button>
-    <button class="tile" data-module="design" data-act="tab" data-v="more" data-r="design"><span class="tile-head"><span class="chip-ic">${ic('design', 14)}</span><span class="tile-title">Design</span></span><span class="tile-fig">${BOARDS.length}</span><span class="tile-sub">Boards</span></button>
-    <button class="tile" data-module="goals" data-act="tab" data-v="more" data-r="goals"><span class="tile-head"><span class="chip-ic">${ic('goals', 14)}</span><span class="tile-title">Goals</span></span><span class="tile-fig">${onTrack} / ${active.length}</span><span class="tile-sub">On track</span></button>
-  </div></div>`;
+  <div class="between"><div><div class="tlabel">${DOW[TODAY.getDay()]} · ${TODAY.getDate()} ${MON[TODAY.getMonth()]}</div><div class="greet">Good morning</div></div><button class="avatar" data-act="go" data-v="settings" aria-label="Settings"><span class="mark">A</span></button></div>
+  <form class="command" data-form="command"><span style="color:var(--text-faint);display:grid">${ic('search', 16)}</span><input id="cmd" name="q" placeholder="Tell Alfred anything…" autocomplete="off" aria-label="Tell Alfred anything"><button class="ibtn primary" style="width:36px;height:36px;border-radius:50%" aria-label="Send">${ic('chevron', 14)}</button></form>
+  <section class="stack" style="gap:10px"><div class="sect-h" style="margin:0"><span class="tlabel">Next up</span><button class="link" style="font-size:13px" data-act="tab" data-v="reminders">See all</button></div>
+    ${open.length ? `<div class="dueline">${now ? `<b>${now} due now</b>` : 'Nothing due right now'}${late ? ` · <span class="late">${late} late</span>` : ''}</div>` : ''}
+    ${open.length ? `<div class="card nextcard nextup">${open.map((x) => `<div class="nextup-row"><button class="rem-tick" data-act="tick" data-v="${x.r.id}" aria-checked="false" aria-label="Tick ${esc(x.r.title)}">${tickBox(x.r.kind === 'once', false)}</button><span class="grow">${esc(x.r.title)}</span>${dueTag(x)}</div>`).join('')}</div>` : `<div class="empty"><span class="ck">${ic('check', 16)}</span>Nothing else due today.</div>`}
+  </section>
+  <section class="stack" style="gap:10px"><span class="tlabel">At a glance</span><div class="tiles">
+    ${tile('expenses', 'expenses', 'Spent', money(spend, S.hideAmt), 'October', 'expenses')}
+    ${tile('goals', 'goals', 'Goals', `${onTrack}/${active.length}`, 'On track', 'goals')}
+    ${tile('work', 'work', 'Work', PROJECTS.filter((p) => p.status === 'active').length, 'Active projects', 'work')}
+    ${tile('design', 'design', 'Design', ITEMS.length, 'References', 'design')}
+  </div></section></div>`;
 };
 function dueTag(x) {
   if (x.status === 'done') return `<span class="rem-due" style="color:var(--pos)">Done</span>`;
@@ -1071,25 +1167,35 @@ function monthData() {
 SCREENS.expenses = () => {
   const d = monthData(); const h = S.hideAmt;
   const list = S.flow === 'in' ? d.inc : S.flow === 'out' ? d.out : d.tx;
-  const cats = CATS.filter((c) => (S.flow === 'all' ? true : S.flow === 'in' ? c.dir === 'credit' : c.dir === 'debit')).map((c) => { const ts = list.filter((t) => t.cat === c.id); return { c, n: ts.length, sum: ts.reduce((s, t) => s + t.amt, 0) }; }).sort((a, b) => b.sum - a.sum);
-  const base = S.flow === 'in' ? d.income : S.flow === 'out' ? d.spend : d.spend + d.income;
+  const cats = CATS.filter((c) => (S.flow === 'all' ? true : S.flow === 'in' ? c.dir === 'credit' : c.dir === 'debit')).map((c) => { const ts = list.filter((t) => t.cat === c.id); return { c, n: ts.length, sum: ts.reduce((s, t) => s + t.amt, 0) }; }).filter((x) => x.n).sort((a, b) => b.sum - a.sum);
+  const top = cats[0]?.sum || 1; const asCards = S.catView === 'cards'; const limit = asCards ? 6 : 5; const shown = S.catAll ? cats : cats.slice(0, limit); const base = S.flow === 'in' ? d.income : S.flow === 'out' ? d.spend : d.spend + d.income;
   const delta = d.prev ? Math.round(((d.spend - d.prev) / d.prev) * 100) : 0;
-  const total = ACCTS.reduce((s, a) => s + a.bal, 0);
-  return header({ crumb: '01 / MODULE', title: 'Expenses', actions: `<button class="ibtn${h ? ' on' : ''}" data-act="hideamt" aria-pressed="${h}" aria-label="${h ? 'Show amounts' : 'Hide amounts'}">${ic('eye')}</button><button class="ibtn primary" data-act="sheet" data-v="addtx" aria-label="Add transaction">${ic('plus')}</button>` }) +
+  const total = ACCTS.reduce((s, a) => s + a.bal, 0); const cur = d.y === 2026 && d.m === 9;
+  const linkrow = (act, v, label, sub) => `<button class="linkrow" data-act="${act}" data-v="${v}"><span class="grow">${label}</span>${sub}${ic('chevron', 14).replace('<svg', '<svg class="chev-ic"')}</button>`;
+  return header({ title: 'Expenses', actions: `<button class="ibtn${h ? ' on' : ''}" data-act="hideamt" aria-pressed="${h}" aria-label="${h ? 'Show amounts' : 'Hide amounts'}">${ic('eye')}</button><button class="ibtn primary" data-act="sheet" data-v="addtx" aria-label="Add transaction">${ic('plus')}</button>` }) +
   `<div class="content">
-   <div class="stack">
-    <div class="monthnav"><button class="ibtn" data-act="month" data-v="-1" aria-label="Previous month"><span style="transform:rotate(180deg);display:grid">${ic('chevron', 16)}</span></button><div class="mn-label"><small>${d.y}</small>${MONTH[d.m]}</div><button class="ibtn" data-act="month" data-v="1" aria-label="Next month" ${d.y === 2026 && d.m === 9 ? 'disabled style="opacity:.35"' : ''}>${ic('chevron', 16)}</button></div>
-    <div class="seg">${[['out', 'Money out'], ['in', 'Money in'], ['all', 'All']].map(([v, l]) => `<button class="${S.flow === v ? 'on' : ''}" data-act="flow" data-v="${v}">${l}</button>`).join('')}</div>
+   <div class="hero">
+     <div class="monthnav compact"><button class="ibtn plain" data-act="month" data-v="-1" aria-label="Previous month"><span style="transform:rotate(180deg);display:grid">${ic('chevron', 14)}</span></button><span class="mn-label">${MONTH[d.m]} ${d.y}</span><button class="ibtn plain" data-act="month" data-v="1" aria-label="Next month" ${cur ? 'disabled style="opacity:.3"' : ''}>${ic('chevron', 14)}</button></div>
+     <span class="tlabel" style="margin-top:6px">Spent ${cur ? 'this month' : 'in ' + MONTH[d.m]}</span>
+     <span class="hero-v">${inr(d.spend)}</span>
+     <span class="hero-s"><span class="${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}%</span> vs ${MONTH[(d.m + 11) % 12]} · ${d.out.length} entries</span>
+     <div class="pairs"><div class="pair"><span class="tlabel">Income</span><b class="in">${money(d.income, h)}</b></div><div class="pair"><span class="tlabel">Left over</span><b>${money(d.income - d.spend, h)}</b></div><div class="pair"><span class="tlabel">Transfers</span><b>${inr(6400)}</b></div></div>
    </div>
-   <div class="wallet"><div class="acct a1"><span>${ACCTS[0].name}</span><span class="bal">${money(ACCTS[0].bal, h)}</span></div><div class="acct a2"><span>${ACCTS[1].name}</span><span class="bal">${money(ACCTS[1].bal, h)}</span></div><div class="acct a3"><span>${ACCTS[2].name}</span><span class="bal">${money(ACCTS[2].bal, h)}</span></div><div class="pocket"><div class="tt">Across accounts</div><div class="amt">${money(total, h)}</div></div></div>
-   <div class="sumcards">
-    <div class="sumcard"><span class="sumcard-l">Total spend · ${d.m === 9 && d.y === 2026 ? 'this month' : MON[d.m] + ' ' + d.y}</span><span class="sumcard-v">${inr(d.spend)}</span><span class="sumcard-s">${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}% vs ${MONTH[(d.m + 11) % 12]} · ${d.out.length} entries</span></div>
-    <div class="sumcard income"><span class="sumcard-l">Income</span><span class="sumcard-v" style="font-size:24px">${money(d.income, h)}</span><span class="sumcard-s">${d.inc.length} credits</span></div>
-    <div class="sumcard transfers"><span class="sumcard-l">Transfers</span><span class="sumcard-v">${inr(6400)}</span><span class="sumcard-s">self · 3</span></div>
+   <div class="stack" style="gap:10px">
+     <button class="card acctbar" data-act="wallet" aria-expanded="${!!S.walletOpen}"><span class="acct-dots"><i style="background:var(--acct-1)"></i><i style="background:var(--acct-2)"></i><i style="background:var(--acct-3)"></i></span><span class="grow"><span class="tlabel" style="display:block">Across ${ACCTS.length} accounts</span><b>${money(total, h)}</b></span><span class="chev-rot${S.walletOpen ? ' open' : ''}">${ic('chevron', 14)}</span></button>
+     ${S.walletOpen ? `<div class="wallet">${ACCTS.map((a, i) => `<div class="acct a${i + 1}"><span>${a.name}</span><span class="bal">${money(a.bal, h)}</span></div>`).join('')}<div class="pocket"><div class="tt">Across accounts</div><div class="amt">${money(total, h)}</div></div></div>` : ''}
    </div>
-   <div class="chiprow"><button class="dchip" data-act="go" data-v="txns">Transactions</button><button class="dchip" data-act="go" data-v="review">Review queue <span class="badge" style="margin-left:4px">${S.review.length}</span></button><button class="dchip" data-act="go" data-v="insights">Insights</button><button class="dchip" data-act="go" data-v="people">Family &amp; shops</button><button class="dchip" data-act="sheet" data-v="addcat">+ Category</button></div>
-   <div class="stack"><div class="sect-h"><span class="tlabel">${S.flow === 'in' ? 'Money in' : S.flow === 'out' ? 'Where it went' : 'All categories'}</span><span class="mono-s">${cats.filter((x) => x.n).length} categories</span></div>
-   <div class="catgrid">${cats.map(({ c, n, sum }) => `<button class="catcard${n ? '' : ' empty'}" style="--cat:${c.color};--cat-ink:${ink(c.color)}" data-act="go" data-v="cat" data-id="${c.id}"><span class="catcard-band">${base ? Math.round((sum / base) * 100) : 0}% of ${c.dir === 'credit' ? 'income' : 'spend'}</span><span class="catcard-body"><span class="catcard-title">${c.label}</span><span class="catcard-sub">${c.dir === 'credit' ? 'Money in' : 'Money out'}</span><span class="catcard-big">${c.dir === 'credit' ? money(sum, h) : inr(sum)}</span><span class="catcard-entries">${n} ${n === 1 ? 'entry' : 'entries'}</span></span></button>`).join('')}</div></div>
+   <div class="stack" style="gap:6px">
+     <div class="sect-h"><span class="tlabel">${S.flow === 'in' ? 'Where it came from' : S.flow === 'out' ? 'Where it went' : 'Everything'}</span><div class="row" style="gap:6px"><div class="seg sm">${[['out', 'Out'], ['in', 'In'], ['all', 'All']].map(([v, l]) => `<button class="${S.flow === v ? 'on' : ''}" data-act="flow" data-v="${v}">${l}</button>`).join('')}</div><div class="viewtoggle" role="group" aria-label="Category view"><button class="${asCards ? '' : 'on'}" data-act="catview" data-v="list" aria-pressed="${!asCards}" aria-label="Simple list">${ic('list', 14)}</button><button class="${asCards ? 'on' : ''}" data-act="catview" data-v="cards" aria-pressed="${asCards}" aria-label="Category cards">${ic('grid', 14)}</button></div></div></div>
+     ${cats.length ? `${asCards ? `<div class="catgrid">${shown.map(({ c, n, sum }) => `<button class="catcard" style="--cat:${c.color};--cat-ink:${ink(c.color)}" data-act="go" data-v="cat" data-id="${c.id}"><span class="catcard-band">${base ? Math.round((sum / base) * 100) : 0}% of ${c.dir === 'credit' ? 'income' : 'spend'}</span><span class="catcard-body"><span class="catcard-title">${c.label}</span><span class="catcard-sub">${c.dir === 'credit' ? 'Money in' : 'Money out'}</span><span class="catcard-big">${c.dir === 'credit' ? money(sum, h) : inr(sum)}</span><span class="catcard-entries">${n} ${n === 1 ? 'entry' : 'entries'}</span></span></button>`).join('')}</div>` : `<div class="catlist">${shown.map(({ c, n, sum }) => `<button class="catrow" style="--cat:${c.color}" data-act="go" data-v="cat" data-id="${c.id}"><span class="cdot"></span><span class="cname">${c.label}<small>${n}</small></span><span class="camt">${c.dir === 'credit' ? money(sum, h) : inr(sum)}</span><span class="cbar"><i style="width:${(sum / top) * 100}%"></i></span></button>`).join('')}</div>`}${cats.length > limit ? `<button class="link" style="font-size:13px;align-self:flex-start;padding:6px 0" data-act="catall">${S.catAll ? 'Show fewer' : `Show all ${cats.length}`}</button>` : ''}` : `<div class="empty">Nothing on the books for this month.</div>`}
+   </div>
+   <div class="links">
+     ${linkrow('go', 'txns', 'Transactions', `<span class="sub">${d.tx.length}</span>`)}
+     ${linkrow('go', 'review', 'Review queue', S.review.length ? `<span class="badge">${S.review.length}</span>` : '<span class="sub">clear</span>')}
+     ${linkrow('go', 'insights', 'Insights', '')}
+     ${linkrow('go', 'people', 'Family &amp; shops', `<span class="sub">${S.people.length}</span>`)}
+     ${linkrow('sheet', 'addcat', 'Add a category', '')}
+   </div>
   </div>`;
 };
 const txRow = (t) => { const c = cat(t.cat); const cr = t.dir === 'credit'; return `<button class="lrow" data-act="sheet" data-v="tx" data-id="${t.id}"><span class="lrow-ic" style="background:${c.color};color:${ink(c.color)}">${c.label[0]}</span><span class="lrow-main"><span class="lrow-t">${esc(t.merchant)}</span><span class="lrow-s">${t.mode} · ${ACCTS.find((a) => a.id === t.acct)?.name.split(' ')[0] ?? 'ICICI'} · ${c.label}</span></span><span class="lrow-end amt${cr ? ' in' : ''}">${cr ? '+' + money(t.amt, S.hideAmt) : inr(t.amt)}</span></button>`; };
@@ -1133,7 +1239,7 @@ SCREENS.people = () => header({ back: bl(), crumb: '01 / ENTITIES', title: 'Fami
 function remRow(x, opts = {}) {
   const r = x.r; const done = x.status === 'done'; const late = x.state === 'late' && !done;
   const meta = r.kind === 'once' ? (r.note || (r.task ? 'Counts as a task' : '')) : `${r.time} · ${r.kind === 'daily' ? 'Daily' : r.kind === 'weekly' ? 'Weekly' : 'Monthly'}${r.streak ? ` · <span class="rem-streak">${r.streak}d streak</span>` : ''}${r.auto ? ' · ticks from Office journal' : ''}`;
-  return `<div class="rem-row${late ? ' late' : ''}${done ? ' done' : ''}">${r.auto ? `<span class="rem-tick" title="Ticks itself">${tickBox(false, done)}</span>` : `<button class="rem-tick" data-act="tick" data-v="${r.id}" aria-checked="${done}" aria-label="${done ? 'Untick' : 'Tick'} ${esc(r.title)}">${tickBox(r.kind === 'once', done)}</button>`}<button class="rem-body" style="background:none;border:0;text-align:left;color:inherit;cursor:pointer" data-act="sheet" data-v="rem" data-id="${r.id}"><div class="rem-title">${esc(r.title)}</div>${r.kind === 'once' ? `<div class="rem-sub">${meta}</div>` : `<div class="rem-meta">${meta}</div>`}${opts.dots && r.hist ? `<div class="rem-dots">${r.hist.split('').map((c) => `<i class="${c}"></i>`).join('')}</div>` : ''}</button>${opts.noDue ? '' : `<span style="padding-right:4px">${dueTag(x)}</span>`}<button class="ibtn plain" style="width:36px" data-act="sheet" data-v="remact" data-id="${r.id}" aria-label="More for ${esc(r.title)}">${ic('more', 16)}</button></div>`;
+  return `<div class="rem-row${late ? ' late' : ''}${done ? ' done' : ''}">${r.auto ? `<span class="rem-tick" title="Ticks itself">${tickBox(false, done)}</span>` : `<button class="rem-tick" data-act="tick" data-v="${r.id}" aria-checked="${done}" aria-label="${done ? 'Untick' : 'Tick'} ${esc(r.title)}">${tickBox(r.kind === 'once', done)}</button>`}<button class="rem-body" style="background:none;border:0;text-align:left;color:inherit;cursor:pointer" data-act="sheet" data-v="remact" data-id="${r.id}"><div class="rem-title">${esc(r.title)}</div>${r.kind === 'once' ? `<div class="rem-sub">${meta}</div>` : `<div class="rem-meta">${meta}</div>`}${opts.dots && r.hist ? `<div class="rem-dots">${r.hist.split('').map((c) => `<i class="${c}"></i>`).join('')}</div>` : ''}</button>${opts.noDue ? '' : `<span style="padding-right:12px">${dueTag(x)}</span>`}</div>`;
 }
 SCREENS.reminders = () => {
   const items = todayItems(); const live = items.filter((x) => x.status !== 'skipped');
@@ -1152,12 +1258,12 @@ SCREENS.reminders = () => {
     body = up.map(([d, rs]) => `<div class="stack" style="gap:8px"><span class="tlabel">${i18day(d)}</span><div class="rlist">${rs.map((r) => remRow({ r, state: 'later', status: null }, { noDue: false })).join('')}</div></div>`).join('');
   } else {
     const rec = all.filter((r) => r.kind !== 'once'), once = all.filter((r) => r.kind === 'once');
-    body = `<div class="stack" style="gap:8px"><span class="tlabel">Recurring</span><div class="rlist">${rec.map((r) => remRow({ r, state: 'later', status: null }, { dots: true, noDue: true }).replace('</button><button class="ibtn plain"', `</button>${r.paused ? '<span class="rem-due" style="padding-right:4px">Paused</span>' : ''}<button class="ibtn plain"`)).join('')}</div></div>
+    body = `<div class="stack" style="gap:8px"><span class="tlabel">Recurring</span><div class="rlist">${rec.map((r) => remRow({ r, state: 'later', status: null }, { dots: true, noDue: true }).replace(/<\/div>$/, `${r.paused ? '<span class="rem-due" style="padding-right:12px">Paused</span>' : ''}</div>`)).join('')}</div></div>
     <div class="stack" style="gap:8px"><span class="tlabel">One-time</span>${once.length ? `<div class="rlist">${once.map((r) => remRow({ r, state: r.date < TODAY ? 'late' : 'later', status: r.completed ? 'done' : null }, { noDue: true })).join('')}</div>` : `<div class="empty">Nothing pending.</div>`}</div>`;
   }
-  return header({ crumb: '06 / MODULE', title: 'Reminders', meta: `${doneN} / ${live.length} done today`, actions: `<button class="ibtn primary" data-act="sheet" data-v="newrem" aria-label="New reminder">${ic('plus')}</button>` }) +
-  `<div class="content"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="stat"><span class="tlabel">Today</span><span class="stat-v">${doneN} / ${live.length}</span><div class="prog pos"><i style="width:${live.length ? (doneN / live.length) * 100 : 0}%"></i></div></div><div class="stat ochre"><span class="tlabel">Longest streak</span><span class="stat-v">${best ? best.streak + 'd' : '—'}</span><span class="stat-s">${best ? esc(best.title) : 'no streaks yet'}</span></div></div>
-  <form class="quickadd" data-form="quickadd"><div class="quickadd-row"><input class="input" name="t" id="qa" placeholder="Remind me to… (due today)" autocomplete="off" aria-label="Quick add a reminder"><button class="ibtn primary" style="height:48px;width:48px" aria-label="Add">${ic('plus')}</button></div><div class="quickadd-hint">return to add · <button type="button" class="link" data-act="sheet" data-v="newrem">More options</button> for repeating ones</div></form>
+  return header({ title: 'Reminders', meta: `${doneN} of ${live.length} done today${best ? ` · <span style="color:var(--c-ochre)">${best.streak}d best streak</span>` : ''}`, actions: `<button class="ibtn primary" data-act="sheet" data-v="newrem" aria-label="New reminder">${ic('plus')}</button>` }) +
+  `<div class="content">
+  <form class="quickadd" data-form="quickadd"><div class="quickadd-row"><input class="input" name="t" id="qa" placeholder="Remind me to… (due today)" autocomplete="off" aria-label="Quick add a reminder"><button class="ibtn primary" style="height:48px;width:48px" aria-label="Add">${ic('plus')}</button></div><div class="quickadd-hint">Due today · <button type="button" class="link" data-act="sheet" data-v="newrem">Repeat or schedule it</button></div></form>
   <div class="utabs">${[['today', 'Today', live.length], ['upcoming', 'Upcoming', upN], ['all', 'All', all.length]].map(([v, l, n]) => `<button class="utab${S.remTab === v ? ' on' : ''}" data-act="remtab" data-v="${v}">${l} · ${n}</button>`).join('')}</div>
   ${body}</div>`;
 };
@@ -1170,10 +1276,12 @@ SCREENS.work = () => {
   const out = INVOICES.filter((i) => i.status !== 'paid').reduce((s, i) => s + i.lines.reduce((a, l) => a + l[1], 0), 0);
   let body;
   if (fl) {
-    body = `<div class="sumcards"><div class="sumcard"><span class="sumcard-l">Outstanding</span><span class="sumcard-v">${inr(out)}</span><span class="sumcard-s">${INVOICES.filter((i) => invStatus(i) === 'overdue').length} overdue · ${INVOICES.filter((i) => i.status === 'sent').length} sent</span></div><div class="sumcard income"><span class="sumcard-l">Paid · FY 26–27</span><span class="sumcard-v" style="font-size:22px">${inr(earned + 220000)}</span><span class="sumcard-s">7 invoices</span></div><button class="sumcard" style="text-align:left;cursor:pointer;color:inherit;font:inherit" data-act="go" data-v="invoices"><span class="sumcard-l">Invoices</span><span class="sumcard-v" style="font-size:22px">${INVOICES.length}</span><span class="sumcard-s" style="color:var(--base)">Open list →</span></button></div>
+    const od = INVOICES.filter((i) => invStatus(i) === 'overdue').length;
+    body = `<div class="hero"><span class="tlabel">Waiting to be paid</span><span class="hero-v">${inr(out)}</span><span class="hero-s">${od ? `<span class="up">${od} overdue</span> · ` : ''}${INVOICES.filter((i) => i.status === 'sent').length} sent</span><div class="pairs"><div class="pair"><span class="tlabel">Paid this FY</span><b class="in">${inr(earned + 220000)}</b></div><div class="pair"><span class="tlabel">Active</span><b>${PROJECTS.filter((p) => p.status === 'active').length} projects</b></div></div></div>
+    <div class="links"><button class="linkrow" data-act="go" data-v="invoices"><span class="grow">Invoices</span><span class="sub">${INVOICES.length}</span>${ic('chevron', 14).replace('<svg', '<svg class="chev-ic"')}</button></div>
     <div class="stack"><span class="tlabel">Projects</span>${PROJECTS.map((p) => `<button class="pcard" data-act="go" data-v="project" data-id="${p.id}"><span class="pcard-head"><span class="status ${ST[p.status][1]}">${ST[p.status][0]}</span><span class="pcard-cur">${p.cur}</span></span><span class="pcard-name">${esc(p.name)}</span><span class="pcard-client">${esc(p.client)}</span><span class="pcard-foot"><span class="pcard-rate">${p.rate}</span><span class="pcard-due">${p.due ? 'Due ' + p.due.getDate() + ' ' + MON[p.due.getMonth()] : 'No due date'}</span></span></button>`).join('')}</div>`;
   } else body = officeBody();
-  return header({ crumb: '03 / MODULE', title: 'Work', actions: fl ? `<button class="ibtn primary" data-act="sheet" data-v="newproj" aria-label="New project">${ic('plus')}</button>` : `<button class="ibtn primary" data-act="sheet" data-v="newtask" aria-label="New task">${ic('plus')}</button>` }) +
+  return header({ title: 'Work', actions: fl ? `<button class="ibtn primary" data-act="sheet" data-v="newproj" aria-label="New project">${ic('plus')}</button>` : `<button class="ibtn primary" data-act="sheet" data-v="newtask" aria-label="New task">${ic('plus')}</button>` }) +
   `<div class="content"><div class="seg"><button class="${fl ? 'on' : ''}" data-act="workcat" data-v="freelance">Freelance</button><button class="${fl ? '' : 'on'}" data-act="workcat" data-v="office">Office work</button></div>${body}</div>`;
 };
 function officeBody() {
@@ -1209,8 +1317,6 @@ SCREENS.invoice = (r) => {
 };
 
 /* ---- More / Goals / Design / Secrets / Settings ---- */
-SCREENS.more = () => header({ crumb: 'ALFRED', title: 'More' }) + `<div class="content"><div class="menu">${[['goals', 'Goals', '05', 'goals', `${GOALS.filter((g) => g.status === 'active').length} active`], ['design', 'Design', '04', 'design', `${BOARDS.length} boards · ${ITEMS.length} items`], ['secrets', 'Secrets', '02', 'secrets', S.unlocked ? 'Unlocked' : 'Locked'], ['settings', 'Settings', '', 'settings', 'Ground, profile']].map(([v, l, n, m, s]) => `<button class="lrow" data-act="go" data-v="${v}"><span class="chip-ic" data-module="${m}" style="${m === 'settings' ? 'background:var(--surface-2);color:var(--text)' : ''}">${ic(m === 'settings' ? 'settings' : m, 16)}</span><span class="lrow-main"><span class="lrow-t">${l}</span><span class="lrow-s">${s}</span></span><span class="mono-s">${n}</span><span class="chev">${ic('chevron', 14)}</span></button>`).join('')}</div>
-  <div class="mono-s" style="text-align:center">Invest, Health and Travel arrive when they’re built.</div></div>`;
 SCREENS.goals = () => {
   const groups = [['Needs attention', GOALS.filter((g) => g.status === 'active' && (g.pace === 'at-risk' || g.pace === 'behind'))], ['Active', GOALS.filter((g) => g.status === 'active' && (g.pace === 'ahead' || g.pace === 'on-track'))], ['Achieved', GOALS.filter((g) => g.status === 'achieved')], ['Paused', GOALS.filter((g) => g.status === 'paused')]];
   return header({ back: bl(), crumb: '05 / MODULE', title: 'Goals', meta: `${GOALS.filter((g) => g.status === 'active').length} / ${GOALS.length} active`, actions: `<button class="ibtn primary" data-act="sheet" data-v="newgoal" aria-label="New goal">${ic('plus')}</button>` }) +
@@ -1284,16 +1390,29 @@ SHEETS.newsecret = () => sheetWrap('02 / SECRETS', 'Add secret', `<div class="fi
 function genPw() { const a = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*'; let s = ''; const b = new Uint32Array(20); crypto.getRandomValues(b); b.forEach((x) => (s += a[x % a.length])); return s; }
 
 /* ---------------- render ---------------- */
-const TABS = [['home', 'Home', 'home'], ['expenses', 'Expenses', 'expenses'], ['reminders', 'Reminders', 'bell'], ['work', 'Work', 'work'], ['more', 'More', 'more']];
+const TABS = [['home', 'Home', 'home'], ['expenses', 'Expenses', 'expenses'], ['reminders', 'Reminders', 'bell'], ['work', 'Work', 'work'], ['goals', 'Goals', 'goals'], ['design', 'Design', 'design'], ['secrets', 'Secrets', 'secrets']];
 function render() {
   const vp = $('#vp'); const r = route(); const prevScroll = vp.firstElementChild && !S.anim ? vp.firstElementChild.scrollTop : 0;
   const focusId = document.activeElement?.id; const selStart = document.activeElement?.selectionStart;
   vp.innerHTML = `<div class="scr ${S.anim}" id="scr">${SCREENS[r.s](r)}</div>`;
   const scr = $('#scr'); if (!S.anim) scr.scrollTop = prevScroll; S.anim = '';
   if (focusId) { const el = document.getElementById(focusId); if (el && el.tagName !== 'BUTTON') { el.focus(); try { el.setSelectionRange(selStart, selStart); } catch (e) {} } }
-  const due = todayItems().filter((x) => !x.status && x.state !== 'later').length;
-  $('#tabbar').innerHTML = TABS.map(([v, l, i]) => `<button class="tab${S.tab === v ? ' on' : ''}" data-act="tab" data-v="${v}" aria-current="${S.tab === v ? 'page' : 'false'}"><span class="tab-ic">${ic(i, 22)}</span>${l}${v === 'reminders' && due ? `<span class="badge">${due}</span>` : ''}</button>`).join('');
+  renderDock();
   renderOverlay();
+}
+function renderDock() {
+  const due = todayItems().filter((x) => !x.status && x.state !== 'later').length;
+  let sc = $('#dock');
+  if (!sc) { $('#tabbar').innerHTML = '<div class="tabbar-scroll" id="dock"></div>'; sc = $('#dock'); }
+  const sl = sc.scrollLeft;
+  sc.innerHTML = TABS.map(([v, l, i]) => `<button class="tab${S.tab === v ? ' on' : ''}" data-act="tab" data-v="${v}" aria-current="${S.tab === v ? 'page' : 'false'}"><span class="tab-ic">${ic(i, 20)}</span><span>${l}</span>${v === 'reminders' && due ? `<span class="badge">${due}</span>` : ''}</button>`).join('');
+  sc.scrollLeft = sl;
+  if (sc.dataset.active !== S.tab) {
+    const first = !sc.dataset.active; sc.dataset.active = S.tab;
+    const on = sc.querySelector('.tab.on');
+    const target = on.offsetLeft - (sc.clientWidth - on.offsetWidth) / 2;
+    sc.scrollTo({ left: Math.max(0, target), behavior: first ? 'auto' : 'smooth' });
+  }
 }
 function renderOverlay() {
   let h = '';
@@ -1321,6 +1440,9 @@ const A = {
   closesheet: () => { S.sheet = null; renderOverlay(); },
   toast: (el) => toast(el.dataset.v),
   hideamt: () => { S.hideAmt = !S.hideAmt; render(); },
+  wallet: () => { S.walletOpen = !S.walletOpen; render(); },
+  catall: () => { S.catAll = !S.catAll; render(); },
+  catview: (el) => { S.catView = el.dataset.v; try { localStorage.setItem('alfred-proto-catview', S.catView); } catch (e) {} render(); },
   month: (el) => { let [y, m] = S.month; m += +el.dataset.v; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } if (y > 2026 || (y === 2026 && m > 9)) return; S.month = [y, m]; render(); },
   flow: (el) => { S.flow = el.dataset.v; render(); },
   assign: (el) => { const q = S.review.find((x) => x.id === el.dataset.id); S.review = S.review.filter((x) => x !== q); txFor(2026, 9).unshift({ id: txid++, date: q.date, merchant: q.merchant, cat: el.dataset.v, amt: q.amt, dir: q.credit ? 'credit' : 'debit', acct: 'icici', mode: 'UPI' }); txFor(2026, 9).sort((a, b) => b.date - a.date); toast(`${q.merchant} → ${cat(el.dataset.v).label}`); render(); },
@@ -1400,6 +1522,7 @@ document.addEventListener('input', (ev) => {
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { if (S.lightbox) A.closelb(); else if (S.sheet) A.closesheet(); } });
 
 /* boot */
+try { S.catView = localStorage.getItem('alfred-proto-catview') === 'cards' ? 'cards' : 'list'; } catch (e) { S.catView = 'list'; }
 let g0 = 'ink'; try { g0 = localStorage.getItem('alfred-proto-ground') || 'ink'; } catch (e) {}
 setGround(GROUNDS.some((g) => g[0] === g0) ? g0 : 'ink');
 render();
